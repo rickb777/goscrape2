@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/cornelk/goscrape/work"
 	"github.com/cornelk/gotokit/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -94,7 +95,7 @@ func TestScraperLinks(t *testing.T) {
 	err := scraper.Start(ctx)
 	require.NoError(t, err)
 
-	expectedProcessed := map[string]struct{}{
+	expectedProcessed := work.Set[string]{
 		"/":          {},
 		"/page2":     {},
 		"/sub/":      {},
@@ -132,7 +133,7 @@ func TestScraperAttributes(t *testing.T) {
 	err := scraper.Start(ctx)
 	require.NoError(t, err)
 
-	expectedProcessed := map[string]struct{}{
+	expectedProcessed := work.Set[string]{
 		"/":       {},
 		"/bg.gif": {},
 	}

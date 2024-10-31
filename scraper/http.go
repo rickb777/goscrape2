@@ -60,6 +60,12 @@ func (s *Scraper) downloadURL(ctx context.Context, u *url.URL) (resp *http.Respo
 
 		// 2xx status code = success
 		default:
+			s.logger.Debug("GET",
+				log.String("url", u.String()),
+				log.Int("status", resp.StatusCode),
+				log.String("Content-Type", resp.Header.Get("Content-Type")),
+				log.String("Content-Length", resp.Header.Get("Content-Length")),
+				log.String("Last-Modified", resp.Header.Get("Last-Modified")))
 			return resp, nil
 		}
 

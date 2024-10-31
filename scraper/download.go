@@ -86,6 +86,10 @@ func (s *Scraper) downloadAsset(ctx context.Context, u *url.URL, processor asset
 		return fmt.Errorf("downloading asset: %w", err)
 	}
 
+	if resp == nil {
+		return nil // 304-not modified
+	}
+
 	defer closeResponseBody(resp, s.logger)
 
 	var rdr io.Reader = resp.Body

@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/rickb777/acceptable/header"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -15,7 +14,9 @@ import (
 	"time"
 
 	"github.com/cornelk/goscrape/htmlindex"
+	"github.com/cornelk/goscrape/work"
 	"github.com/cornelk/gotokit/log"
+	"github.com/rickb777/acceptable/header"
 	"golang.org/x/net/html"
 	"golang.org/x/net/proxy"
 )
@@ -62,11 +63,10 @@ type Scraper struct {
 	excludes []*regexp.Regexp
 
 	// key is the URL of page or asset
-	processed map[string]struct{}
+	processed work.Set[string]
 
-	imagesQueue       []*url.URL
-	webPageQueue      []*url.URL
-	webPageQueueDepth map[string]uint
+	imagesQueue  []*url.URL
+	webPageQueue []work.Item
 
 	dirCreator         dirCreator
 	fileExistenceCheck fileExistenceCheck
@@ -145,9 +145,7 @@ func New(logger *log.Logger, cfg Config) (*Scraper, error) {
 		includes: includes,
 		excludes: excludes,
 
-		processed: map[string]struct{}{},
-
-		webPageQueueDepth: map[string]uint{},
+		processed: work.NewSet[string](),
 	}
 
 	s.dirCreator = s.createDownloadPath
@@ -177,10 +175,9 @@ func (s *Scraper) Start(ctx context.Context) error {
 	}
 
 	for len(s.webPageQueue) > 0 {
-		ur := s.webPageQueue[0]
+		item := s.webPageQueue[0]
 		s.webPageQueue = s.webPageQueue[1:]
-		currentDepth := s.webPageQueueDepth[ur.String()]
-		if err := s.processURL(ctx, ur, currentDepth+1); err != nil && errors.Is(err, context.Canceled) {
+		if err := s.processURL(ctx, item.URL, item.Depth+1); err != nil && errors.Is(err, context.Canceled) {
 			return err
 		}
 	}
@@ -196,6 +193,10 @@ func (s *Scraper) processURL(ctx context.Context, u *url.URL, currentDepth uint)
 			log.String("url", u.String()),
 			log.Err(err))
 		return err
+	}
+
+	if resp == nil {
+		return nil // 304-not modified
 	}
 
 	defer closeResponseBody(resp, s.logger)
@@ -263,8 +264,7 @@ func (s *Scraper) processURL(ctx context.Context, u *url.URL, currentDepth uint)
 			ur.Fragment = ""
 
 			if s.shouldURLBeDownloaded(ur, currentDepth, false) {
-				s.webPageQueue = append(s.webPageQueue, ur)
-				s.webPageQueueDepth[ur.String()] = currentDepth
+				s.webPageQueue = append(s.webPageQueue, work.Item{URL: ur, Referrer: u, Depth: currentDepth})
 			}
 		}
 
