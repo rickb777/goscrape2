@@ -26,9 +26,10 @@ type Config struct {
 	Includes []string
 	Excludes []string
 
-	ImageQuality uint // image quality from 0 to 100%, 0 to disable reencoding
-	MaxDepth     uint // download depth, 0 for unlimited
-	Timeout      uint // time limit in seconds to process each http request
+	ImageQuality uint          // image quality from 0 to 100%, 0 to disable reencoding
+	MaxDepth     uint          // download depth, 0 for unlimited
+	Timeout      time.Duration // time limit to process each http request
+	Tries        int           // download attempts, 0 for unlimited
 
 	OutputDirectory string
 	Username        string
@@ -114,7 +115,7 @@ func New(logger *log.Logger, cfg Config) (*Scraper, error) {
 
 	client := &http.Client{
 		Jar:     cookies,
-		Timeout: time.Duration(cfg.Timeout) * time.Second,
+		Timeout: cfg.Timeout,
 	}
 
 	if cfg.Proxy != "" {

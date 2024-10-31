@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/alexflint/go-arg"
 	"github.com/cornelk/goscrape/scraper"
@@ -23,14 +24,15 @@ var (
 )
 
 type arguments struct {
-	Include []string `arg:"-n,--include" help:"only include URLs with PERL Regular Expressions support"`
+	Include []string `arg:"-i,--include" help:"only include URLs with PERL Regular Expressions support"`
 	Exclude []string `arg:"-x,--exclude" help:"exclude URLs with PERL Regular Expressions support"`
 	Output  string   `arg:"-o,--output" help:"output directory to write files to"`
 	URLs    []string `arg:"positional"`
 
-	Depth        int64 `arg:"-d,--depth" help:"download depth, 0 for unlimited" default:"10"`
-	ImageQuality int64 `arg:"-i,--imagequality" help:"image quality, 0 to disable reencoding"`
-	Timeout      int64 `arg:"-t,--timeout" help:"time limit in seconds for each HTTP request to connect and read the request body"`
+	Depth        int64         `arg:"-d,--depth" help:"download depth, 0 for unlimited" default:"10"`
+	ImageQuality int64         `arg:"-q,--imagequality" help:"image quality, 0 to disable reencoding"`
+	Timeout      time.Duration `arg:"-t,--timeout" help:"time limit (with units, e.g. 1s) for each HTTP request to connect and read the response"`
+	Tries        int64         `arg:"-n,--tries" help:"the number of tries to download each file if the server gives a 5xx error" default:"1"`
 
 	Serve      string `arg:"-s,--serve" help:"serve the website using a webserver"`
 	ServerPort int16  `arg:"-r,--serverport" help:"port to use for the webserver" default:"8080"`
@@ -144,7 +146,8 @@ func runScraper(ctx context.Context, args arguments, logger *log.Logger) error {
 
 		ImageQuality: uint(imageQuality),
 		MaxDepth:     uint(args.Depth),
-		Timeout:      uint(args.Timeout),
+		Timeout:      args.Timeout,
+		Tries:        int(args.Tries),
 
 		OutputDirectory: args.Output,
 		Username:        username,
