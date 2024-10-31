@@ -13,13 +13,16 @@ import (
 	"github.com/cornelk/gotokit/log"
 )
 
-func (s *Scraper) downloadURL(ctx context.Context, u *url.URL) ([]byte, *url.URL, error) {
+func (s *Scraper) downloadURL(ctx context.Context, u *url.URL) (resp *http.Response, err error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("creating HTTP request: %w", err)
+		return nil, fmt.Errorf("creating HTTP request: %w", err)
 	}
 
-	req.Header.Set("User-Agent", s.config.UserAgent)
+	if s.config.UserAgent != "" {
+		req.Header.Set("User-Agent", s.config.UserAgent)
+	}
+
 	if s.auth != "" {
 		req.Header.Set("Authorization", s.auth)
 	}
@@ -30,39 +33,49 @@ func (s *Scraper) downloadURL(ctx context.Context, u *url.URL) ([]byte, *url.URL
 		}
 	}
 
-	var statusCode int
-	var body []byte
-	var actualUrl *url.URL
-	sleepFor := 5 * time.Second // give the server plenty of time to recover
+	sleepFor := 5 * time.Second // give the server plenty of time to recover; this grows larger every retry
 
 	// this loop provides retries if 5xx server errors arise
 	for i := 0; i < s.config.Tries; i++ {
-		statusCode, body, actualUrl, err = s.makeHttpRequest(req)
+		resp, err = s.client.Do(req)
 		if err != nil {
-			return body, actualUrl, err
+			return nil, fmt.Errorf("sending HTTP request: %w", err)
 		}
 
-		switch statusCode / 100 {
+		switch {
 		// 1xx status codes are never returned
-		// 3xx status code = redirect - handled by http.Client (up to 10 redirections)
-		// 5xx status code = server error - retry the specified number of times
+		// 3xx redirect status code - handled by http.Client (up to 10 redirections)
 
-		case 2: // 2xx status code = success
-			return body, actualUrl, err
-		case 4: // 4xx status code = client error
-			return nil, nil, fmt.Errorf("unexpected HTTP response status code %d", statusCode)
+		// 5xx status code = server error - retry the specified number of times
+		case resp.StatusCode >= 500:
+			// retry logic continues below
+
+		// 4xx status code = client error
+		case resp.StatusCode >= 400:
+			return nil, fmt.Errorf("unhandled HTTP client error: status %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
+
+		// 304 not modified - no further action
+		case resp.StatusCode == http.StatusNotModified:
+			return nil, nil
+
+		// 2xx status code = success
+		default:
+			return resp, nil
 		}
 
 		s.logger.Warn("HTTP server error",
 			log.String("url", req.URL.String()),
-			log.Int("status", statusCode))
-		log.String("sleep", sleepFor.String())
+			log.Int("status", resp.StatusCode),
+			log.String("sleep", sleepFor.String()))
 
 		time.Sleep(sleepFor)
 		sleepFor = backoff(sleepFor)
 	}
 
-	return nil, nil, fmt.Errorf("unexpected HTTP response status code %d", statusCode)
+	if resp == nil {
+		return nil, fmt.Errorf("%s response status unknown", resp.Request.URL)
+	}
+	return nil, fmt.Errorf("%s response status %d %s", resp.Request.URL, resp.StatusCode, http.StatusText(resp.StatusCode))
 }
 
 func backoff(t time.Duration) time.Duration {
@@ -71,30 +84,20 @@ func backoff(t time.Duration) time.Duration {
 	return time.Duration(t*factor) / divisor
 }
 
-func (s *Scraper) makeHttpRequest(req *http.Request) (int, []byte, *url.URL, error) {
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return 0, nil, nil, fmt.Errorf("sending HTTP request: %w", err)
+func closeResponseBody(resp *http.Response, logger *log.Logger) {
+	if err := resp.Body.Close(); err != nil {
+		logger.Error("Closing HTTP response body failed",
+			log.String("url", resp.Request.URL.String()),
+			log.Err(err))
 	}
+}
 
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			s.logger.Error("Closing HTTP Request body failed",
-				log.String("url", req.URL.String()),
-				log.Err(err))
-		}
-	}()
-
-	// All 2xx responses are considered acceptable, although some may have no response body
-	if 200 <= resp.StatusCode && resp.StatusCode < 300 {
-		buf := &bytes.Buffer{}
-		if _, err := io.Copy(buf, resp.Body); err != nil {
-			return 0, nil, nil, fmt.Errorf("reading HTTP response body: %w", err)
-		}
-		return resp.StatusCode, buf.Bytes(), resp.Request.URL, nil
+func bufferEntireResponse(resp *http.Response) ([]byte, error) {
+	buf := &bytes.Buffer{}
+	if _, err := io.Copy(buf, resp.Body); err != nil {
+		return nil, fmt.Errorf("%s reading response body: %w", resp.Request.URL, err)
 	}
-
-	return resp.StatusCode, nil, nil, nil
+	return buf.Bytes(), nil
 }
 
 func Headers(headers []string) http.Header {

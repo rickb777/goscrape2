@@ -6,6 +6,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/rickb777/acceptable/header"
+	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -14,8 +16,6 @@ import (
 
 	"github.com/cornelk/goscrape/htmlindex"
 	"github.com/cornelk/gotokit/log"
-	"github.com/h2non/filetype"
-	"github.com/h2non/filetype/types"
 	"golang.org/x/net/html"
 	"golang.org/x/net/proxy"
 )
@@ -42,10 +42,10 @@ type Config struct {
 }
 
 type (
-	httpDownloader     func(ctx context.Context, u *url.URL) ([]byte, *url.URL, error)
+	httpDownloader     func(ctx context.Context, u *url.URL) (*http.Response, error)
 	dirCreator         func(path string) error
 	fileExistenceCheck func(filePath string) bool
-	fileWriter         func(filePath string, data []byte) error
+	fileWriter         func(filePath string, data io.Reader) error
 )
 
 // Scraper contains all scraping data.
@@ -190,7 +190,7 @@ func (s *Scraper) Start(ctx context.Context) error {
 
 func (s *Scraper) processURL(ctx context.Context, u *url.URL, currentDepth uint) error {
 	s.logger.Info("Downloading webpage", log.String("url", u.String()))
-	data, respURL, err := s.httpDownloader(ctx, u)
+	resp, err := s.httpDownloader(ctx, u)
 	if err != nil {
 		s.logger.Error("Processing HTTP Request failed",
 			log.String("url", u.String()),
@@ -198,52 +198,78 @@ func (s *Scraper) processURL(ctx context.Context, u *url.URL, currentDepth uint)
 		return err
 	}
 
-	fileExtension := ""
-	kind, err := filetype.Match(data)
-	if err == nil && kind != types.Unknown {
-		fileExtension = kind.Extension
-	}
+	defer closeResponseBody(resp, s.logger)
+
+	contentType := header.ParseContentTypeFromHeaders(resp.Header)
+
+	isHtml := contentType.Type == "text" && contentType.Subtype == "html"
+	isXHtml := contentType.Type == "application" && contentType.Subtype == "xhtml+xml"
+
+	//fileExtension := ""
+	//kind, err := filetype.Match(data)
+	//if err == nil && kind != types.Unknown {
+	//	fileExtension = kind.Extension
+	//}
 
 	if currentDepth == 0 {
-		u = respURL
+		u = resp.Request.URL
 		// use the URL that the website returned as new base url for the
-		// scrape, in case of a redirect it changed
+		// scrape, in case a redirect changed it
 		s.URL = u
 	}
 
-	buf := bytes.NewBuffer(data)
-	doc, err := html.Parse(buf)
-	if err != nil {
-		s.logger.Error("Parsing HTML failed",
-			log.String("url", u.String()),
-			log.Err(err))
-		return fmt.Errorf("parsing HTML: %w", err)
-	}
-
-	index := htmlindex.New()
-	index.Index(u, doc)
-
-	s.storeDownload(u, data, doc, index, fileExtension)
-
-	if err := s.downloadReferences(ctx, index); err != nil {
-		return err
-	}
-
-	// check first and download afterward to not hit max depth limit for
-	// start page links because of recursive linking
-	// a hrefs
-	references, err := index.URLs(htmlindex.ATag)
-	if err != nil {
-		s.logger.Error("Parsing URL failed", log.Err(err))
-	}
-
-	for _, ur := range references {
-		ur.Fragment = ""
-
-		if s.shouldURLBeDownloaded(ur, currentDepth, false) {
-			s.webPageQueue = append(s.webPageQueue, ur)
-			s.webPageQueueDepth[ur.String()] = currentDepth
+	if isHtml || isXHtml {
+		data, err := bufferEntireResponse(resp)
+		if err != nil {
+			return fmt.Errorf("buffering HTML: %w", err)
 		}
+
+		doc, err := html.Parse(bytes.NewReader(data))
+		if err != nil {
+			return fmt.Errorf("parsing HTML: %w", err)
+		}
+
+		index := htmlindex.New()
+		index.Index(u, doc)
+
+		fixed, hasChanges, err := s.fixURLReferences(u, doc, index)
+		if err != nil {
+			s.logger.Error("Fixing file references failed",
+				log.String("url", u.String()),
+				log.Err(err))
+			return nil
+		}
+
+		rdr := bytes.NewReader(data)
+		if hasChanges {
+			rdr = bytes.NewReader(fixed)
+		}
+
+		s.storeDownload(u, rdr, true)
+
+		if err := s.downloadReferences(ctx, index); err != nil {
+			return err
+		}
+
+		// check first and download afterward to not hit max depth limit for
+		// start page links because of recursive linking
+		// a hrefs
+		references, err := index.URLs(htmlindex.ATag)
+		if err != nil {
+			s.logger.Error("Parsing URL failed", log.Err(err))
+		}
+
+		for _, ur := range references {
+			ur.Fragment = ""
+
+			if s.shouldURLBeDownloaded(ur, currentDepth, false) {
+				s.webPageQueue = append(s.webPageQueue, ur)
+				s.webPageQueueDepth[ur.String()] = currentDepth
+			}
+		}
+
+	} else {
+		s.storeDownload(u, resp.Body, false)
 	}
 
 	return nil
@@ -251,27 +277,10 @@ func (s *Scraper) processURL(ctx context.Context, u *url.URL, currentDepth uint)
 
 // storeDownload writes the download to a file, if a known binary file is detected,
 // processing of the file as page to look for links is skipped.
-func (s *Scraper) storeDownload(u *url.URL, data []byte, doc *html.Node,
-	index *htmlindex.Index, fileExtension string) {
-
-	isAPage := false
-	if fileExtension == "" {
-		fixed, hasChanges, err := s.fixURLReferences(u, doc, index)
-		if err != nil {
-			s.logger.Error("Fixing file references failed",
-				log.String("url", u.String()),
-				log.Err(err))
-			return
-		}
-
-		if hasChanges {
-			data = fixed
-		}
-		isAPage = true
-	}
+func (s *Scraper) storeDownload(u *url.URL, data io.Reader, isAPage bool) {
 
 	filePath := s.getFilePath(u, isAPage)
-	// always update html files, content might have changed
+
 	if err := s.fileWriter(filePath, data); err != nil {
 		s.logger.Error("Writing to file failed",
 			log.String("URL", u.String()),

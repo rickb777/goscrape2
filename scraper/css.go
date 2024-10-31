@@ -23,6 +23,7 @@ func (s *Scraper) checkCSSForUrls(url *url.URL, data []byte) []byte {
 		if token.Type == scanner.TokenEOF || token.Type == scanner.TokenError {
 			break
 		}
+
 		if token.Type != scanner.TokenURI {
 			continue
 		}

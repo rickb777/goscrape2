@@ -1,8 +1,11 @@
 package scraper
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"testing"
 
@@ -25,19 +28,25 @@ func newTestScraper(t *testing.T, startURL string, urls map[string][]byte) *Scra
 	scraper.dirCreator = func(_ string) error {
 		return nil
 	}
-	scraper.fileWriter = func(_ string, _ []byte) error {
+	scraper.fileWriter = func(_ string, _ io.Reader) error {
 		return nil
 	}
 	scraper.fileExistenceCheck = func(_ string) bool {
 		return false
 	}
-	scraper.httpDownloader = func(_ context.Context, url *url.URL) ([]byte, *url.URL, error) {
+	scraper.httpDownloader = func(_ context.Context, url *url.URL) (*http.Response, error) {
 		ur := url.String()
 		b, ok := urls[ur]
-		if ok {
-			return b, url, nil
+		if !ok {
+			return nil, fmt.Errorf("url '%s' not found in test data", ur)
 		}
-		return nil, nil, fmt.Errorf("url '%s' not found in test data", ur)
+		req, _ := http.NewRequest(http.MethodGet, ur, nil)
+		body := bytes.NewReader(b)
+		return &http.Response{
+			Request: req,
+			Header:  http.Header{"Content-Type": []string{"text/html"}},
+			Body:    io.NopCloser(body),
+		}, nil
 	}
 
 	return scraper

@@ -22,9 +22,7 @@ var ignoredURLPrefixes = []string{
 // fixURLReferences fixes URL references to point to relative file names.
 // It returns a bool that indicates that no reference needed to be fixed,
 // in this case the returned HTML string will be empty.
-func (s *Scraper) fixURLReferences(url *url.URL, doc *html.Node,
-	index *htmlindex.Index) ([]byte, bool, error) {
-
+func (s *Scraper) fixURLReferences(url *url.URL, doc *html.Node, index *htmlindex.Index) ([]byte, bool, error) {
 	relativeToRoot := urlRelativeToRoot(url)
 	if !s.fixHTMLNodeURLs(url, relativeToRoot, index) {
 		return nil, false, nil

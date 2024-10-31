@@ -1,9 +1,11 @@
 package scraper
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 
 	"github.com/cornelk/goscrape/htmlindex"
@@ -76,7 +78,7 @@ func (s *Scraper) downloadAsset(ctx context.Context, u *url.URL, processor asset
 	}
 
 	s.logger.Info("Downloading asset", log.String("url", urlFull))
-	data, _, err := s.httpDownloader(ctx, u)
+	resp, err := s.httpDownloader(ctx, u)
 	if err != nil {
 		s.logger.Error("Downloading asset failed",
 			log.String("url", urlFull),
@@ -84,11 +86,19 @@ func (s *Scraper) downloadAsset(ctx context.Context, u *url.URL, processor asset
 		return fmt.Errorf("downloading asset: %w", err)
 	}
 
+	defer closeResponseBody(resp, s.logger)
+
+	var rdr io.Reader = resp.Body
+
 	if processor != nil {
-		data = processor(u, data)
+		data, err := bufferEntireResponse(resp)
+		if err != nil {
+			return fmt.Errorf("%s: downloading asset: %w", u, err)
+		}
+		rdr = bytes.NewReader(processor(u, data))
 	}
 
-	if err = s.fileWriter(filePath, data); err != nil {
+	if err = s.fileWriter(filePath, rdr); err != nil {
 		s.logger.Error("Writing asset file failed",
 			log.String("url", urlFull),
 			log.String("file", filePath),
