@@ -9,6 +9,7 @@ import (
 	"net/url"
 
 	"github.com/cornelk/goscrape/htmlindex"
+	"github.com/cornelk/goscrape/work"
 	"github.com/cornelk/gotokit/log"
 )
 
@@ -48,7 +49,8 @@ func (s *Scraper) downloadReferences(ctx context.Context, index *htmlindex.Index
 			processor = s.checkCSSForUrls
 		}
 		for _, ur := range references {
-			if err := s.downloadAsset(ctx, ur, processor); err != nil && errors.Is(err, context.Canceled) {
+			err := s.downloadAsset(ctx, ur, processor)
+			if err != nil && errors.Is(err, context.Canceled) {
 				return err
 			}
 		}
@@ -68,7 +70,7 @@ func (s *Scraper) downloadAsset(ctx context.Context, u *url.URL, processor asset
 	u.Fragment = ""
 	urlFull := u.String()
 
-	if !s.shouldURLBeDownloaded(u, 0, true) {
+	if !s.shouldURLBeDownloaded(work.Item{URL: u}, true) {
 		return nil
 	}
 

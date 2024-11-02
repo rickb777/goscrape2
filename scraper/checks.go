@@ -3,26 +3,27 @@ package scraper
 import (
 	"net/url"
 
+	"github.com/cornelk/goscrape/work"
 	"github.com/cornelk/gotokit/log"
 )
 
 // shouldURLBeDownloaded checks whether a page should be downloaded.
 // nolint: cyclop
-func (s *Scraper) shouldURLBeDownloaded(url *url.URL, currentDepth uint, isAsset bool) bool {
-	if url.Scheme != "http" && url.Scheme != "https" {
+func (s *Scraper) shouldURLBeDownloaded(item work.Item, isAsset bool) bool {
+	if item.URL.Scheme != "http" && item.URL.Scheme != "https" {
 		return false
 	}
 
-	p := url.String()
-	if url.Host == s.URL.Host {
-		p = url.Path
+	p := item.URL.String()
+	if item.URL.Host == s.URL.Host {
+		p = item.URL.Path
 	}
 	if p == "" {
 		p = "/"
 	}
 
 	if _, ok := s.processed[p]; ok { // was already downloaded or checked?
-		if url.Fragment != "" {
+		if item.URL.Fragment != "" {
 			return false
 		}
 		return false
@@ -31,25 +32,25 @@ func (s *Scraper) shouldURLBeDownloaded(url *url.URL, currentDepth uint, isAsset
 	s.processed[p] = struct{}{}
 
 	if !isAsset {
-		if url.Host != s.URL.Host {
-			s.logger.Debug("Skipping external host page", log.String("url", url.String()))
+		if item.URL.Host != s.URL.Host {
+			s.logger.Debug("Skipping external host page", log.String("url", item.URL.String()))
 			return false
 		}
 
-		if s.config.MaxDepth != 0 && currentDepth == s.config.MaxDepth {
-			s.logger.Debug("Skipping too deep level page", log.String("url", url.String()))
+		if s.config.MaxDepth != 0 && item.Depth == s.config.MaxDepth {
+			s.logger.Debug("Skipping too deep level page", log.String("url", item.URL.String()))
 			return false
 		}
 	}
 
-	if s.includes != nil && !s.isURLIncluded(url) {
+	if s.includes != nil && !s.isURLIncluded(item.URL) {
 		return false
 	}
-	if s.excludes != nil && s.isURLExcluded(url) {
+	if s.excludes != nil && s.isURLExcluded(item.URL) {
 		return false
 	}
 
-	s.logger.Debug("New URL to download", log.String("url", url.String()))
+	s.logger.Debug("New URL to download", log.String("url", item.URL.String()))
 	return true
 }
 
