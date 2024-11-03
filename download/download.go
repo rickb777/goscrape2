@@ -4,6 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/cookiejar"
+	"net/url"
+
 	"github.com/cornelk/goscrape/config"
 	"github.com/cornelk/goscrape/htmlindex"
 	"github.com/cornelk/goscrape/logger"
@@ -11,15 +16,7 @@ import (
 	"github.com/cornelk/gotokit/log"
 	"github.com/rickb777/acceptable/header"
 	"golang.org/x/net/html"
-	"io"
-	"net/http"
-	"net/http/cookiejar"
-	"net/url"
 )
-
-// assetProcessor is a processor of a downloaded asset that can transform
-// a downloaded file content before it will be stored on disk.
-type assetProcessor func(URL *url.URL, data []byte) []byte
 
 var tagsWithReferences = []string{
 	htmlindex.ATag,
@@ -76,12 +73,12 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, []
 	case isHtml || isXHtml:
 		data, err := bufferEntireResponse(resp)
 		if err != nil {
-			return nil, nil, fmt.Errorf("buffering HTML: %w", err)
+			return nil, nil, fmt.Errorf("buffering %s: %w", contentType.String(), err)
 		}
 
 		doc, err := html.Parse(bytes.NewReader(data))
 		if err != nil {
-			return nil, nil, fmt.Errorf("parsing HTML: %w", err)
+			return nil, nil, fmt.Errorf("parsing %s: %w", contentType.String(), err)
 		}
 
 		index := htmlindex.New()
@@ -112,10 +109,20 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, []
 	case contentType.Type == "text" && contentType.Subtype == "css":
 		data, err := bufferEntireResponse(resp)
 		if err != nil {
-			return nil, nil, fmt.Errorf("buffering HTML: %w", err)
+			return nil, nil, fmt.Errorf("buffering text/scs: %w", err)
 		}
 
 		data, references = d.checkCSSForUrls(item.URL, data)
+
+		d.storeDownload(item.URL, bytes.NewReader(data), false)
+
+	case contentType.Type == "image" && d.Config.ImageQuality != 0:
+		data, err := bufferEntireResponse(resp)
+		if err != nil {
+			return nil, nil, fmt.Errorf("buffering %s: %w", contentType.String(), err)
+		}
+
+		data = d.Config.ImageQuality.CheckImageForRecode(item.URL, data)
 
 		d.storeDownload(item.URL, bytes.NewReader(data), false)
 
@@ -138,17 +145,9 @@ func (d *Download) findReferences(index *htmlindex.Index) ([]*url.URL, error) {
 				log.Err(err))
 		}
 
-		//var processor assetProcessor
-		//if tag == htmlindex.LinkTag {
-		//	processor = s.checkCSSForUrls
-		//}
 		for _, ur := range references {
 			ur.Fragment = ""
 			result = append(result, ur)
-			//err := s.downloadAsset(ctx, ur, processor)
-			//if err != nil && errors.Is(err, context.Canceled) {
-			//	return err
-			//}
 		}
 	}
 
@@ -156,72 +155,23 @@ func (d *Download) findReferences(index *htmlindex.Index) ([]*url.URL, error) {
 	if err != nil {
 		logger.Error("Getting img node URLs failed", log.Err(err))
 	}
+
 	for _, ur := range references {
 		ur.Fragment = ""
 		result = append(result, ur)
 	}
 
-	//for _, image := range s.imagesQueue {
-	//	if err := s.downloadAsset(ctx, image, s.checkImageForRecode); err != nil && errors.Is(err, context.Canceled) {
-	//		return nil, err
-	//	}
-	//}
 	return result, nil
 }
-
-// downloadAsset downloads an asset if it does not exist on disk yet.
-//func (s *Download) downloadAsset(ctx context.Context, u *url.URL, processor assetProcessor) error {
-//	u.Fragment = ""
-//	urlFull := u.String()
-//
-//	//if !s.shouldURLBeDownloaded(work.Item{URL: u}, true) {
-//	//	return nil
-//	//}
-//
-//	filePath := s.getFilePath(u, false)
-//	if FileExists(filePath) {
-//		return nil
-//	}
-//
-//	logger.Info("Downloading asset", log.String("url", urlFull))
-//	resp, err := s.HttpDownloader(ctx, u)
-//	if err != nil {
-//		logger.Error("Downloading asset failed",
-//			log.String("url", urlFull),
-//			log.Err(err))
-//		return fmt.Errorf("downloading asset: %w", err)
-//	}
-//
-//	if resp == nil {
-//		return nil // 304-not modified
-//	}
-//
-//	defer closeResponseBody(resp)
-//
-//	var rdr io.Reader = resp.Body
-//
-//	if processor != nil {
-//		data, err := bufferEntireResponse(resp)
-//		if err != nil {
-//			return fmt.Errorf("%s: downloading asset: %w", u, err)
-//		}
-//		rdr = bytes.NewReader(processor(u, data))
-//	}
-//
-//	if err = WriteFile(s.StartURL, filePath, rdr); err != nil {
-//		logger.Error("Writing asset file failed",
-//			log.String("url", urlFull),
-//			log.String("file", filePath),
-//			log.Err(err))
-//	}
-//
-//	return nil
-//}
 
 // storeDownload writes the download to a file, if a known binary file is detected,
 // processing of the file as page to look for links is skipped.
 func (d *Download) storeDownload(u *url.URL, data io.Reader, isAPage bool) {
 	filePath := d.getFilePath(u, isAPage)
+
+	if !isAPage && FileExists(filePath) {
+		return
+	}
 
 	if err := WriteFile(d.StartURL, filePath, data); err != nil {
 		logger.Error("Writing to file failed",

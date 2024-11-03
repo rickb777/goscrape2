@@ -1,4 +1,4 @@
-package scraper
+package images
 
 import (
 	"bytes"
@@ -15,11 +15,9 @@ import (
 	"github.com/h2non/filetype/types"
 )
 
-func (s *Scraper) checkImageForRecode(url *url.URL, data []byte) []byte {
-	if s.config.ImageQuality == 0 {
-		return data
-	}
+type ImageQuality int
 
+func (q ImageQuality) CheckImageForRecode(url *url.URL, data []byte) []byte {
 	kind, err := filetype.Match(data)
 	if err != nil || kind == types.Unknown {
 		return data
@@ -30,14 +28,14 @@ func (s *Scraper) checkImageForRecode(url *url.URL, data []byte) []byte {
 		log.String("sub_type", kind.MIME.Subtype))
 
 	if kind.MIME.Type == matchers.TypeJpeg.MIME.Type && kind.MIME.Subtype == matchers.TypeJpeg.MIME.Subtype {
-		if recoded := s.recodeJPEG(url, data); recoded != nil {
+		if recoded := q.recodeJPEG(url, data); recoded != nil {
 			return recoded
 		}
 		return data
 	}
 
 	if kind.MIME.Type == matchers.TypePng.MIME.Type && kind.MIME.Subtype == matchers.TypePng.MIME.Subtype {
-		if recoded := s.recodePNG(url, data); recoded != nil {
+		if recoded := q.recodePNG(url, data); recoded != nil {
 			return recoded
 		}
 		return data
@@ -47,9 +45,9 @@ func (s *Scraper) checkImageForRecode(url *url.URL, data []byte) []byte {
 }
 
 // encodeJPEG encodes a new JPG based on the given quality setting.
-func (s *Scraper) encodeJPEG(img image.Image) []byte {
+func (q ImageQuality) encodeJPEG(img image.Image) []byte {
 	o := &jpeg.Options{
-		Quality: int(s.config.ImageQuality),
+		Quality: int(q),
 	}
 
 	outBuf := &bytes.Buffer{}
@@ -60,14 +58,14 @@ func (s *Scraper) encodeJPEG(img image.Image) []byte {
 }
 
 // recodeJPEG recodes the image and returns it if it is smaller than before.
-func (s *Scraper) recodeJPEG(url fmt.Stringer, data []byte) []byte {
+func (q ImageQuality) recodeJPEG(url fmt.Stringer, data []byte) []byte {
 	inBuf := bytes.NewBuffer(data)
 	img, err := jpeg.Decode(inBuf)
 	if err != nil {
 		return nil
 	}
 
-	encoded := s.encodeJPEG(img)
+	encoded := q.encodeJPEG(img)
 	if encoded == nil || len(encoded) > len(data) { // only use the new file if it is smaller
 		return nil
 	}
@@ -80,14 +78,14 @@ func (s *Scraper) recodeJPEG(url fmt.Stringer, data []byte) []byte {
 }
 
 // recodePNG recodes the image and returns it if it is smaller than before.
-func (s *Scraper) recodePNG(url fmt.Stringer, data []byte) []byte {
+func (q ImageQuality) recodePNG(url fmt.Stringer, data []byte) []byte {
 	inBuf := bytes.NewBuffer(data)
 	img, err := png.Decode(inBuf)
 	if err != nil {
 		return nil
 	}
 
-	encoded := s.encodeJPEG(img)
+	encoded := q.encodeJPEG(img)
 	if encoded == nil || len(encoded) > len(data) { // only use the new file if it is smaller
 		return nil
 	}

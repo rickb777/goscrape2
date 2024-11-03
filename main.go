@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/cornelk/goscrape/images"
 	"os"
 	"strings"
 	"time"
@@ -147,7 +148,7 @@ func runScraper(ctx context.Context, args arguments) error {
 		Includes: args.Include,
 		Excludes: args.Exclude,
 
-		ImageQuality: uint(imageQuality),
+		ImageQuality: images.ImageQuality(imageQuality),
 		MaxDepth:     uint(args.Depth),
 		Timeout:      args.Timeout,
 		Tries:        int(args.Tries),
@@ -208,11 +209,11 @@ func createLogger() (*log.Logger, error) {
 	logCfg.JSONOutput = false
 	logCfg.CallerInfo = false
 
-	logger, err := log.NewWithConfig(logCfg)
+	lgr, err := log.NewWithConfig(logCfg)
 	if err != nil {
 		return nil, fmt.Errorf("initializing logger: %w", err)
 	}
-	return logger, nil
+	return lgr, nil
 }
 
 func readCookieFile(cookieFile string) ([]config.Cookie, error) {
