@@ -9,6 +9,9 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/cornelk/goscrape/config"
+	"github.com/cornelk/goscrape/download"
+	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/goscrape/work"
 	"github.com/cornelk/gotokit/log"
 	"github.com/stretchr/testify/assert"
@@ -18,25 +21,25 @@ import (
 func newTestScraper(t *testing.T, startURL string, urls map[string][]byte) *Scraper {
 	t.Helper()
 
-	logger := log.NewTestLogger(t)
-	cfg := Config{
+	logger.Logger = log.NewTestLogger(t)
+	cfg := config.Config{
 		URL: startURL,
 	}
-	scraper, err := New(logger, cfg)
+	scraper, err := New(cfg)
 	require.NoError(t, err)
 	require.NotNil(t, scraper)
 
-	scraper.dirCreator = func(_ string) error {
+	download.CreateDirectory = func(_ string) error {
 		return nil
 	}
-	scraper.fileWriter = func(_ string, _ io.Reader) error {
+	download.WriteFile = func(_ *url.URL, _ string, _ io.Reader) error {
 		return nil
 	}
-	scraper.fileExistenceCheck = func(_ string) bool {
+	download.FileExists = func(_ string) bool {
 		return false
 	}
-	scraper.httpDownloader = func(_ context.Context, url *url.URL) (*http.Response, error) {
-		ur := url.String()
+	download.DownloadURL = func(_ context.Context, _ *download.Download, u *url.URL) (*http.Response, error) {
+		ur := u.String()
 		b, ok := urls[ur]
 		if !ok {
 			return nil, fmt.Errorf("url '%s' not found in test data", ur)

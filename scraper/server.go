@@ -6,6 +6,7 @@ import (
 	"mime"
 	"net/http"
 
+	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/gotokit/log"
 )
 
@@ -15,7 +16,7 @@ var mimeTypes = map[string]string{
 	".asp": "text/html; charset=utf-8",
 }
 
-func ServeDirectory(ctx context.Context, path string, port int16, logger *log.Logger) error {
+func ServeDirectory(ctx context.Context, path string, port int16) error {
 	fs := http.FileServer(http.Dir(path))
 	mux := http.NewServeMux()
 	mux.Handle("/", fs) // server root by file system

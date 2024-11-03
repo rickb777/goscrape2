@@ -8,6 +8,7 @@ import (
 	"image/png"
 	"net/url"
 
+	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/gotokit/log"
 	"github.com/h2non/filetype"
 	"github.com/h2non/filetype/matchers"
@@ -24,7 +25,7 @@ func (s *Scraper) checkImageForRecode(url *url.URL, data []byte) []byte {
 		return data
 	}
 
-	s.logger.Debug("File type detected",
+	logger.Debug("File type detected",
 		log.String("type", kind.MIME.Type),
 		log.String("sub_type", kind.MIME.Subtype))
 
@@ -71,7 +72,7 @@ func (s *Scraper) recodeJPEG(url fmt.Stringer, data []byte) []byte {
 		return nil
 	}
 
-	s.logger.Debug("Recoded JPEG",
+	logger.Debug("Recoded JPEG",
 		log.String("url", url.String()),
 		log.Int("size_original", len(data)),
 		log.Int("size_recoded", len(encoded)))
@@ -91,7 +92,7 @@ func (s *Scraper) recodePNG(url fmt.Stringer, data []byte) []byte {
 		return nil
 	}
 
-	s.logger.Debug("Recoded PNG",
+	logger.Debug("Recoded PNG",
 		log.String("url", url.String()),
 		log.Int("size_original", len(data)),
 		log.Int("size_recoded", len(encoded)))

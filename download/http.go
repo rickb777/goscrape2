@@ -1,33 +1,33 @@
-package scraper
+package download
 
 import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/cornelk/goscrape/logger"
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/cornelk/gotokit/log"
 )
 
-func (s *Scraper) downloadURL(ctx context.Context, u *url.URL) (resp *http.Response, err error) {
+var DownloadURL = func(ctx context.Context, d *Download, u *url.URL) (resp *http.Response, err error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating HTTP request: %w", err)
 	}
 
-	if s.config.UserAgent != "" {
-		req.Header.Set("User-Agent", s.config.UserAgent)
+	if d.Config.UserAgent != "" {
+		req.Header.Set("User-Agent", d.Config.UserAgent)
 	}
 
-	if s.auth != "" {
-		req.Header.Set("Authorization", s.auth)
+	if d.Auth != "" {
+		req.Header.Set("Authorization", d.Auth)
 	}
 
-	for key, values := range s.config.Header {
+	for key, values := range d.Config.Header {
 		for _, value := range values {
 			req.Header.Set(key, value)
 		}
@@ -36,8 +36,8 @@ func (s *Scraper) downloadURL(ctx context.Context, u *url.URL) (resp *http.Respo
 	sleepFor := 5 * time.Second // give the server plenty of time to recover; this grows larger every retry
 
 	// this loop provides retries if 5xx server errors arise
-	for i := 0; i < s.config.Tries; i++ {
-		resp, err = s.client.Do(req)
+	for i := 0; i < d.Config.Tries; i++ {
+		resp, err = d.Client.Do(req)
 		if err != nil {
 			return nil, fmt.Errorf("sending HTTP request: %w", err)
 		}
@@ -60,7 +60,7 @@ func (s *Scraper) downloadURL(ctx context.Context, u *url.URL) (resp *http.Respo
 
 		// 2xx status code = success
 		default:
-			s.logger.Debug("GET",
+			logger.Debug("GET",
 				log.String("url", u.String()),
 				log.Int("status", resp.StatusCode),
 				log.String("Content-Type", resp.Header.Get("Content-Type")),
@@ -69,7 +69,7 @@ func (s *Scraper) downloadURL(ctx context.Context, u *url.URL) (resp *http.Respo
 			return resp, nil
 		}
 
-		s.logger.Warn("HTTP server error",
+		logger.Warn("HTTP server error",
 			log.String("url", req.URL.String()),
 			log.Int("status", resp.StatusCode),
 			log.String("sleep", sleepFor.String()))
@@ -79,7 +79,7 @@ func (s *Scraper) downloadURL(ctx context.Context, u *url.URL) (resp *http.Respo
 	}
 
 	if resp == nil {
-		return nil, fmt.Errorf("%s response status unknown", resp.Request.URL)
+		return nil, fmt.Errorf("%s response status unknown", u)
 	}
 	return nil, fmt.Errorf("%s response status %d %s", resp.Request.URL, resp.StatusCode, http.StatusText(resp.StatusCode))
 }
@@ -90,7 +90,7 @@ func backoff(t time.Duration) time.Duration {
 	return time.Duration(t*factor) / divisor
 }
 
-func closeResponseBody(resp *http.Response, logger *log.Logger) {
+func closeResponseBody(resp *http.Response) {
 	if err := resp.Body.Close(); err != nil {
 		logger.Error("Closing HTTP response body failed",
 			log.String("url", resp.Request.URL.String()),
@@ -104,15 +104,4 @@ func bufferEntireResponse(resp *http.Response) ([]byte, error) {
 		return nil, fmt.Errorf("%s reading response body: %w", resp.Request.URL, err)
 	}
 	return buf.Bytes(), nil
-}
-
-func Headers(headers []string) http.Header {
-	h := http.Header{}
-	for _, header := range headers {
-		sl := strings.SplitN(header, ":", 2)
-		if len(sl) == 2 {
-			h.Set(sl[0], sl[1])
-		}
-	}
-	return h
 }

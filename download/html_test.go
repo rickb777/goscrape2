@@ -1,10 +1,13 @@
-package scraper
+package download
 
 import (
 	"bytes"
+	"net/url"
 	"testing"
 
+	"github.com/cornelk/goscrape/config"
 	"github.com/cornelk/goscrape/htmlindex"
+	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/gotokit/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -12,12 +15,12 @@ import (
 )
 
 func TestFixURLReferences(t *testing.T) {
-	logger := log.NewTestLogger(t)
-	cfg := Config{
+	logger.Logger = log.NewTestLogger(t)
+	cfg := config.Config{
 		URL: "http://domain.com",
 	}
-	s, err := New(logger, cfg)
-	require.NoError(t, err)
+	u, _ := url.Parse(cfg.URL)
+	d := Download{Config: cfg, StartURL: u}
 
 	b := []byte(`
 <html lang="es">
@@ -27,16 +30,16 @@ func TestFixURLReferences(t *testing.T) {
 `)
 
 	buf := &bytes.Buffer{}
-	_, err = buf.Write(b)
+	_, err := buf.Write(b)
 	require.NoError(t, err)
 
 	doc, err := html.Parse(buf)
 	require.NoError(t, err)
 
 	index := htmlindex.New()
-	index.Index(s.URL, doc)
+	index.Index(d.StartURL, doc)
 
-	ref, fixed, err := s.fixURLReferences(s.URL, doc, index)
+	ref, fixed, err := d.fixURLReferences(d.StartURL, doc, index)
 	require.NoError(t, err)
 	assert.True(t, fixed)
 

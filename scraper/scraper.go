@@ -1,59 +1,24 @@
 package scraper
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io"
+	"github.com/cornelk/goscrape/config"
+	"github.com/cornelk/goscrape/download"
+	"github.com/cornelk/goscrape/work"
+	"golang.org/x/net/proxy"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
 	"regexp"
-	"time"
-
-	"github.com/cornelk/goscrape/htmlindex"
-	"github.com/cornelk/goscrape/work"
-	"github.com/cornelk/gotokit/log"
-	"github.com/rickb777/acceptable/header"
-	"golang.org/x/net/html"
-	"golang.org/x/net/proxy"
-)
-
-// Config contains the scraper configuration.
-type Config struct {
-	URL      string
-	Includes []string
-	Excludes []string
-
-	ImageQuality uint          // image quality from 0 to 100%, 0 to disable reencoding
-	MaxDepth     uint          // download depth, 0 for unlimited
-	Timeout      time.Duration // time limit to process each http request
-	Tries        int           // download attempts, 0 for unlimited
-
-	OutputDirectory string
-	Username        string
-	Password        string
-
-	Cookies   []Cookie
-	Header    http.Header
-	Proxy     string
-	UserAgent string
-}
-
-type (
-	httpDownloader     func(ctx context.Context, u *url.URL) (*http.Response, error)
-	dirCreator         func(path string) error
-	fileExistenceCheck func(filePath string) bool
-	fileWriter         func(filePath string, data io.Reader) error
 )
 
 // Scraper contains all scraping data.
 type Scraper struct {
-	config  Config
+	config  config.Config
 	cookies *cookiejar.Jar
-	logger  *log.Logger
 	URL     *url.URL // contains the main URL to parse, will be modified in case of a redirect
 
 	auth   string
@@ -65,18 +30,12 @@ type Scraper struct {
 	// key is the URL of page or asset
 	processed work.Set[string]
 
-	imagesQueue  []*url.URL
-	webPageQueue []work.Item
-
-	dirCreator         dirCreator
-	fileExistenceCheck fileExistenceCheck
-	fileWriter         fileWriter
-	httpDownloader     httpDownloader
+	imagesQueue []*url.URL
 }
 
 // New creates a new Scraper instance.
 // nolint: funlen
-func New(logger *log.Logger, cfg Config) (*Scraper, error) {
+func New(cfg config.Config) (*Scraper, error) {
 	var errs []error
 
 	u, err := url.Parse(cfg.URL)
@@ -137,7 +96,6 @@ func New(logger *log.Logger, cfg Config) (*Scraper, error) {
 	s := &Scraper{
 		config:  cfg,
 		cookies: cookies,
-		logger:  logger,
 		URL:     u,
 
 		client: client,
@@ -148,11 +106,6 @@ func New(logger *log.Logger, cfg Config) (*Scraper, error) {
 		processed: work.NewSet[string](),
 	}
 
-	s.dirCreator = s.createDownloadPath
-	s.fileExistenceCheck = s.fileExists
-	s.fileWriter = s.writeFile
-	s.httpDownloader = s.downloadURL
-
 	if s.config.Username != "" {
 		s.auth = "Basic " + base64.StdEncoding.EncodeToString([]byte(s.config.Username+":"+s.config.Password))
 	}
@@ -162,19 +115,28 @@ func New(logger *log.Logger, cfg Config) (*Scraper, error) {
 
 // Start starts the scraping.
 func (s *Scraper) Start(ctx context.Context) error {
-	err := s.dirCreator(s.config.OutputDirectory)
+	err := download.CreateDirectory(s.config.OutputDirectory)
 	if err != nil {
 		return err
 	}
 
 	firstItem := work.Item{URL: s.URL}
+	var workQueue []work.Item
 
 	if !s.shouldURLBeDownloaded(firstItem, false) {
 		return errors.New("start page is excluded from downloading")
 	}
 
-	var redir *url.URL
-	if _, err = s.processURL(ctx, firstItem); err != nil {
+	d := &download.Download{
+		Config:   s.config,
+		Cookies:  s.cookies,
+		StartURL: s.URL,
+		Auth:     s.auth,
+		Client:   s.client,
+	}
+
+	redir, references, err := d.ProcessURL(ctx, firstItem)
+	if err != nil {
 		return err
 	}
 
@@ -182,121 +144,31 @@ func (s *Scraper) Start(ctx context.Context) error {
 		s.URL = redir
 	}
 
-	for len(s.webPageQueue) > 0 {
-		item := s.webPageQueue[0]
-		s.webPageQueue = s.webPageQueue[1:]
-		if _, err := s.processURL(ctx, item); err != nil && errors.Is(err, context.Canceled) {
+	for _, ref := range references {
+		next := firstItem.Derive(ref)
+		if s.shouldURLBeDownloaded(next, false) {
+			workQueue = append(workQueue, next)
+		}
+	}
+
+	for len(workQueue) > 0 {
+		item := workQueue[0]
+		workQueue = workQueue[1:]
+
+		_, references, err = d.ProcessURL(ctx, item)
+		if err != nil && errors.Is(err, context.Canceled) {
 			return err
+		}
+
+		for _, ref := range references {
+			next := item.Derive(ref)
+			if s.shouldURLBeDownloaded(next, false) {
+				workQueue = append(workQueue, next)
+			}
 		}
 	}
 
 	return nil
-}
-
-func (s *Scraper) processURL(ctx context.Context, item work.Item) (*url.URL, error) {
-	s.logger.Info("Downloading webpage", log.String("url", item.URL.String()))
-
-	resp, err := s.httpDownloader(ctx, item.URL)
-	if err != nil {
-		s.logger.Error("Processing HTTP Request failed",
-			log.String("url", item.URL.String()),
-			log.Err(err))
-		return nil, err
-	}
-
-	if resp == nil {
-		return nil, nil //response was 304-not modified
-	}
-
-	defer closeResponseBody(resp, s.logger)
-
-	//fileExtension := ""
-	//kind, err := filetype.Match(data)
-	//if err == nil && kind != types.Unknown {
-	//	fileExtension = kind.Extension
-	//}
-
-	if item.Depth == 0 {
-		// take account of redirection (only on the start page)
-		item.URL = resp.Request.URL
-	}
-
-	contentType := header.ParseContentTypeFromHeaders(resp.Header)
-
-	isHtml := contentType.Type == "text" && contentType.Subtype == "html"
-	isXHtml := contentType.Type == "application" && contentType.Subtype == "xhtml+xml"
-
-	if isHtml || isXHtml {
-		data, err := bufferEntireResponse(resp)
-		if err != nil {
-			return nil, fmt.Errorf("buffering HTML: %w", err)
-		}
-
-		doc, err := html.Parse(bytes.NewReader(data))
-		if err != nil {
-			return nil, fmt.Errorf("parsing HTML: %w", err)
-		}
-
-		index := htmlindex.New()
-		index.Index(item.URL, doc)
-
-		fixed, hasChanges, err := s.fixURLReferences(item.URL, doc, index)
-		if err != nil {
-			s.logger.Error("Fixing file references failed",
-				log.String("url", item.URL.String()),
-				log.Err(err))
-			return nil, nil
-		}
-
-		rdr := bytes.NewReader(data)
-		if hasChanges {
-			rdr = bytes.NewReader(fixed)
-		}
-
-		s.storeDownload(item.URL, rdr, true)
-
-		if err := s.downloadReferences(ctx, index); err != nil {
-			return nil, err
-		}
-
-		// check first and download afterward to not hit max depth limit for
-		// start page links because of recursive linking
-		// a hrefs
-		references, err := index.URLs(htmlindex.ATag)
-		if err != nil {
-			s.logger.Error("Parsing URL failed", log.Err(err))
-		}
-
-		for _, ur := range references {
-			ur.Fragment = ""
-
-			ref := work.Item{URL: ur, Referrer: item.URL, Depth: item.Depth + 1}
-			if s.shouldURLBeDownloaded(ref, false) {
-				s.webPageQueue = append(s.webPageQueue, ref)
-			}
-		}
-
-	} else {
-		s.storeDownload(item.URL, resp.Body, false)
-	}
-
-	// use the URL that the website returned as new base url for the
-	// scrape, in case a redirect changed it (only for the start page)
-	return resp.Request.URL, nil
-}
-
-// storeDownload writes the download to a file, if a known binary file is detected,
-// processing of the file as page to look for links is skipped.
-func (s *Scraper) storeDownload(u *url.URL, data io.Reader, isAPage bool) {
-
-	filePath := s.getFilePath(u, isAPage)
-
-	if err := s.fileWriter(filePath, data); err != nil {
-		s.logger.Error("Writing to file failed",
-			log.String("URL", u.String()),
-			log.String("file", filePath),
-			log.Err(err))
-	}
 }
 
 // compileRegexps compiles the given regex strings to regular expressions

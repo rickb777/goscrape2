@@ -10,3 +10,11 @@ type Item struct {
 	Referrer *url.URL
 	Depth    uint
 }
+
+func (it Item) Derive(u *url.URL) Item {
+	return Item{
+		URL:      u,
+		Depth:    it.Depth + 1,
+		Referrer: it.URL,
+	}
+}

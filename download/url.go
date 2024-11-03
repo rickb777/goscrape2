@@ -1,4 +1,4 @@
-package scraper
+package download
 
 import (
 	"net/url"
@@ -64,9 +64,9 @@ func resolveURL(base *url.URL, reference, mainPageHost string, isHyperlink bool,
 	return resolved
 }
 
-func urlRelativeToRoot(url *url.URL) string {
+func urlRelativeToRoot(u *url.URL) string {
 	var rel string
-	splits := strings.Split(url.Path, "/")
+	splits := strings.Split(u.Path, "/")
 	for i := range splits {
 		if (len(splits[i]) > 0) && (i < len(splits)-1) {
 			rel += "../"

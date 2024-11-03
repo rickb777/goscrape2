@@ -1,21 +1,22 @@
-package scraper
+package download
 
 import (
 	"net/url"
 	"testing"
 
+	"github.com/cornelk/goscrape/config"
+	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/gotokit/log"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestCheckCSSForURLs(t *testing.T) {
-	logger := log.NewTestLogger(t)
-	cfg := Config{
+	logger.Logger = log.NewTestLogger(t)
+	cfg := config.Config{
 		URL: "http://localhost",
 	}
-	s, err := New(logger, cfg)
-	require.NoError(t, err)
+	u, _ := url.Parse(cfg.URL)
+	d := Download{Config: cfg, StartURL: u}
 
 	var fixtures = map[string]string{
 		"url('http://localhost/uri/between/single/quote')": "http://localhost/uri/between/single/quote",
@@ -28,19 +29,17 @@ func TestCheckCSSForURLs(t *testing.T) {
 			}`: "http://localhost/doc/gopher/frontpage.png",
 	}
 
-	u, _ := url.Parse("http://localhost")
+	u, _ = url.Parse("http://localhost")
 	for input, expected := range fixtures {
-		s.imagesQueue = nil
-		s.checkCSSForUrls(u, []byte(input))
+		_, refs := d.checkCSSForUrls(u, []byte(input))
 
 		if expected == "" {
-			assert.Empty(t, s.imagesQueue)
+			assert.Empty(t, refs)
 			continue
 		}
 
-		assert.NotEmpty(t, s.imagesQueue)
+		assert.NotEmpty(t, refs)
 
-		res := s.imagesQueue[0].String()
-		assert.Equal(t, expected, res)
+		assert.Equal(t, expected, refs[0].String())
 	}
 }

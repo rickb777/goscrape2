@@ -1,7 +1,8 @@
-package scraper
+package download
 
 import (
 	"fmt"
+	"github.com/cornelk/goscrape/logger"
 	"net/url"
 	"path"
 	"regexp"
@@ -13,7 +14,8 @@ import (
 
 var cssURLRe = regexp.MustCompile(`^url\(['"]?(.*?)['"]?\)$`)
 
-func (s *Scraper) checkCSSForUrls(url *url.URL, data []byte) []byte {
+func (d *Download) checkCSSForUrls(cssURL *url.URL, data []byte) ([]byte, []*url.URL) {
+	var refs []*url.URL
 	urls := make(map[string]string)
 	str := string(data)
 	css := scanner.New(str)
@@ -38,34 +40,35 @@ func (s *Scraper) checkCSSForUrls(url *url.URL, data []byte) []byte {
 			continue // skip embedded data
 		}
 
-		u, err := url.Parse(src)
+		u, err := cssURL.Parse(src)
 		if err != nil {
-			s.logger.Error("Parsing URL failed",
+			logger.Logger.Error("Parsing URL failed",
 				log.String("url", src),
 				log.Err(err))
 			continue
 		}
-		u = url.ResolveReference(u)
 
-		s.imagesQueue = append(s.imagesQueue, u)
+		u = cssURL.ResolveReference(u)
 
-		cssPath := *url
+		refs = append(refs, u)
+
+		cssPath := *cssURL
 		cssPath.Path = path.Dir(cssPath.Path) + "/"
-		resolved := resolveURL(&cssPath, src, s.URL.Host, false, "")
+		resolved := resolveURL(&cssPath, src, d.StartURL.Host, false, "")
 		urls[token.Value] = resolved
 	}
 
 	if len(urls) == 0 {
-		return data
+		return data, refs
 	}
 
-	for ori, filePath := range urls {
+	for original, filePath := range urls {
 		fixed := fmt.Sprintf("url(%s)", filePath)
-		str = strings.ReplaceAll(str, ori, fixed)
-		s.logger.Debug("CSS Element relinked",
-			log.String("url", ori),
+		str = strings.ReplaceAll(str, original, fixed)
+		logger.Debug("CSS element relinked",
+			log.String("url", original),
 			log.String("fixed_url", fixed))
 	}
 
-	return []byte(str)
+	return []byte(str), refs
 }

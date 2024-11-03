@@ -1,10 +1,12 @@
-package scraper
+package download
 
 import (
+	"github.com/cornelk/goscrape/logger"
 	"net/url"
 	"os"
 	"testing"
 
+	"github.com/cornelk/goscrape/config"
 	"github.com/cornelk/gotokit/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,12 +30,15 @@ func TestGetFilePath(t *testing.T) {
 		{"https://google.com/", "https://google.com/settings", expectedBasePath + "settings.html"},
 	}
 
-	var cfg Config
-	logger := log.NewTestLogger(t)
+	var cfg config.Config
+	logger.Logger = log.NewTestLogger(t)
 	for _, fix := range fixtures {
 		cfg.URL = fix.BaseURL
-		s, err := New(logger, cfg)
-		require.NoError(t, err)
+		u, _ := url.Parse(cfg.URL)
+		s := Download{
+			Config:   cfg,
+			StartURL: u,
+		}
 
 		URL, err := url.Parse(fix.DownloadURL)
 		require.NoError(t, err)

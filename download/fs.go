@@ -1,38 +1,40 @@
-package scraper
+package download
 
 import (
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 
+	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/gotokit/log"
 )
 
-// createDownloadPath creates the download path if it does not exist yet.
-func (s *Scraper) createDownloadPath(path string) error {
+// CreateDirectory creates the download path if it does not exist yet.
+var CreateDirectory = func(path string) error {
 	if path == "" {
 		return nil
 	}
 
-	s.logger.Debug("Creating dir", log.String("path", path))
+	logger.Debug("Creating dir", log.String("path", path))
 	if err := os.MkdirAll(path, os.ModePerm); err != nil {
 		return fmt.Errorf("creating directory '%s': %w", path, err)
 	}
 	return nil
 }
 
-func (s *Scraper) writeFile(filePath string, data io.Reader) error {
+var WriteFile = func(startURL *url.URL, filePath string, data io.Reader) error {
 	dir := filepath.Dir(filePath)
-	if len(dir) < len(s.URL.Host) { // nothing to append if it is the root dir
-		dir = filepath.Join(".", s.URL.Host, dir)
+	if len(dir) < len(startURL.Host) { // nothing to append if it is the root dir
+		dir = filepath.Join(".", startURL.Host, dir)
 	}
 
-	if err := s.dirCreator(dir); err != nil {
+	if err := CreateDirectory(dir); err != nil {
 		return err
 	}
 
-	s.logger.Debug("Creating file", log.String("path", filePath))
+	logger.Debug("Creating file", log.String("path", filePath))
 	f, err := os.Create(filePath)
 	if err != nil {
 		return fmt.Errorf("creating file '%s': %w", filePath, err)
@@ -51,9 +53,7 @@ func (s *Scraper) writeFile(filePath string, data io.Reader) error {
 	return nil
 }
 
-func (s *Scraper) fileExists(filePath string) bool {
-	if _, err := os.Stat(filePath); !os.IsNotExist(err) {
-		return true
-	}
-	return false
+var FileExists = func(filePath string) bool {
+	_, err := os.Stat(filePath)
+	return !os.IsNotExist(err)
 }

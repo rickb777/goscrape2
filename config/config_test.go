@@ -1,4 +1,4 @@
-package scraper
+package config
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 )
 
 func TestHeaders(t *testing.T) {
-	headers := Headers([]string{"a:b", "c:d:e"})
+	headers := MakeHeaders([]string{"a:b", "c:d:e"})
 	assert.Equal(t, "b", headers.Get("a"))
 	assert.Equal(t, "d:e", headers.Get("c"))
 }

@@ -1,4 +1,4 @@
-package scraper
+package download
 
 import (
 	"bytes"
@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/cornelk/goscrape/htmlindex"
+	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/gotokit/log"
 	"golang.org/x/net/html"
 )
@@ -22,9 +23,9 @@ var ignoredURLPrefixes = []string{
 // fixURLReferences fixes URL references to point to relative file names.
 // It returns a bool that indicates that no reference needed to be fixed,
 // in this case the returned HTML string will be empty.
-func (s *Scraper) fixURLReferences(url *url.URL, doc *html.Node, index *htmlindex.Index) ([]byte, bool, error) {
-	relativeToRoot := urlRelativeToRoot(url)
-	if !s.fixHTMLNodeURLs(url, relativeToRoot, index) {
+func (d *Download) fixURLReferences(u *url.URL, doc *html.Node, index *htmlindex.Index) ([]byte, bool, error) {
+	relativeToRoot := urlRelativeToRoot(u)
+	if !d.fixHTMLNodeURLs(u, relativeToRoot, index) {
 		return nil, false, nil
 	}
 
@@ -37,7 +38,7 @@ func (s *Scraper) fixURLReferences(url *url.URL, doc *html.Node, index *htmlinde
 
 // fixHTMLNodeURLs processes all HTML nodes that contain URLs that need to be fixed
 // to link to downloaded files. It returns whether any URLS have been fixed.
-func (s *Scraper) fixHTMLNodeURLs(baseURL *url.URL, relativeToRoot string, index *htmlindex.Index) bool {
+func (d *Download) fixHTMLNodeURLs(baseURL *url.URL, relativeToRoot string, index *htmlindex.Index) bool {
 	var changed bool
 
 	for tag, nodeInfo := range htmlindex.Nodes {
@@ -46,7 +47,7 @@ func (s *Scraper) fixHTMLNodeURLs(baseURL *url.URL, relativeToRoot string, index
 		urls := index.Nodes(tag)
 		for _, nodes := range urls {
 			for _, node := range nodes {
-				if s.fixNodeURL(baseURL, nodeInfo.Attributes, node, isHyperlink, relativeToRoot) {
+				if d.fixNodeURL(baseURL, nodeInfo.Attributes, node, isHyperlink, relativeToRoot) {
 					changed = true
 				}
 			}
@@ -58,7 +59,7 @@ func (s *Scraper) fixHTMLNodeURLs(baseURL *url.URL, relativeToRoot string, index
 
 // fixNodeURL fixes the URL references of a HTML node to point to a relative file name.
 // It returns whether any attribute value bas been adjusted.
-func (s *Scraper) fixNodeURL(baseURL *url.URL, attributes []string, node *html.Node,
+func (d *Download) fixNodeURL(baseURL *url.URL, attributes []string, node *html.Node,
 	isHyperlink bool, relativeToRoot string) bool {
 
 	var changed bool
@@ -89,16 +90,16 @@ func (s *Scraper) fixNodeURL(baseURL *url.URL, attributes []string, node *html.N
 		var adjusted string
 
 		if _, isSrcSet := htmlindex.SrcSetAttributes[attr.Key]; isSrcSet {
-			adjusted = resolveSrcSetURLs(baseURL, value, s.URL.Host, isHyperlink, relativeToRoot)
+			adjusted = resolveSrcSetURLs(baseURL, value, d.StartURL.Host, isHyperlink, relativeToRoot)
 		} else {
-			adjusted = resolveURL(baseURL, value, s.URL.Host, isHyperlink, relativeToRoot)
+			adjusted = resolveURL(baseURL, value, d.StartURL.Host, isHyperlink, relativeToRoot)
 		}
 
 		if adjusted == value { // check for no change
 			continue
 		}
 
-		s.logger.Debug("HTML node relinked",
+		logger.Debug("HTML node relinked",
 			log.String("value", value),
 			log.String("fixed_value", adjusted))
 

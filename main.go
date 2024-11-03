@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/alexflint/go-arg"
+	"github.com/cornelk/goscrape/config"
+	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/goscrape/scraper"
 	"github.com/cornelk/gotokit/app"
 	"github.com/cornelk/gotokit/buildinfo"
@@ -68,21 +70,22 @@ func main() {
 	if args.Verbose {
 		log.SetDefaultLevel(log.DebugLevel)
 	}
-	logger, err := createLogger()
+
+	logger.Logger, err = createLogger()
 	if err != nil {
 		fmt.Printf("Creating logger failed: %s\n", err)
 		os.Exit(1)
 	}
 
 	if args.Serve != "" {
-		if err := runServer(ctx, args, logger); err != nil {
+		if err := runServer(ctx, args); err != nil {
 			fmt.Printf("Server execution error: %s\n", err)
 			os.Exit(1)
 		}
 		return
 	}
 
-	if err := runScraper(ctx, args, logger); err != nil {
+	if err := runScraper(ctx, args); err != nil {
 		fmt.Printf("Scraping execution error: %s\n", err)
 		os.Exit(1)
 	}
@@ -116,7 +119,7 @@ func readArguments() (arguments, error) {
 	return args, nil
 }
 
-func runScraper(ctx context.Context, args arguments, logger *log.Logger) error {
+func runScraper(ctx context.Context, args arguments) error {
 	if len(args.URLs) == 0 {
 		return nil
 	}
@@ -140,7 +143,7 @@ func runScraper(ctx context.Context, args arguments, logger *log.Logger) error {
 		return fmt.Errorf("reading cookie: %w", err)
 	}
 
-	cfg := scraper.Config{
+	cfg := config.Config{
 		Includes: args.Include,
 		Excludes: args.Exclude,
 
@@ -154,20 +157,19 @@ func runScraper(ctx context.Context, args arguments, logger *log.Logger) error {
 		Password:        password,
 
 		Cookies:   cookies,
-		Header:    scraper.Headers(args.Headers),
+		Header:    config.MakeHeaders(args.Headers),
 		Proxy:     args.Proxy,
 		UserAgent: args.UserAgent,
 	}
 
-	return scrapeURLs(ctx, cfg, logger, args)
+	return scrapeURLs(ctx, cfg, args)
 }
 
-func scrapeURLs(ctx context.Context, cfg scraper.Config,
-	logger *log.Logger, args arguments) error {
+func scrapeURLs(ctx context.Context, cfg config.Config, args arguments) error {
 
 	for _, url := range args.URLs {
 		cfg.URL = url
-		sc, err := scraper.New(logger, cfg)
+		sc, err := scraper.New(cfg)
 		if err != nil {
 			return fmt.Errorf("initializing scraper: %w", err)
 		}
@@ -191,8 +193,8 @@ func scrapeURLs(ctx context.Context, cfg scraper.Config,
 	return nil
 }
 
-func runServer(ctx context.Context, args arguments, logger *log.Logger) error {
-	if err := scraper.ServeDirectory(ctx, args.Serve, args.ServerPort, logger); err != nil {
+func runServer(ctx context.Context, args arguments) error {
+	if err := scraper.ServeDirectory(ctx, args.Serve, args.ServerPort); err != nil {
 		return fmt.Errorf("serving directory: %w", err)
 	}
 	return nil
@@ -213,7 +215,7 @@ func createLogger() (*log.Logger, error) {
 	return logger, nil
 }
 
-func readCookieFile(cookieFile string) ([]scraper.Cookie, error) {
+func readCookieFile(cookieFile string) ([]config.Cookie, error) {
 	if cookieFile == "" {
 		return nil, nil
 	}
@@ -222,7 +224,7 @@ func readCookieFile(cookieFile string) ([]scraper.Cookie, error) {
 		return nil, fmt.Errorf("reading cookie file: %w", err)
 	}
 
-	var cookies []scraper.Cookie
+	var cookies []config.Cookie
 	if err := json.Unmarshal(b, &cookies); err != nil {
 		return nil, fmt.Errorf("unmarshaling cookies: %w", err)
 	}
@@ -230,7 +232,7 @@ func readCookieFile(cookieFile string) ([]scraper.Cookie, error) {
 	return cookies, nil
 }
 
-func saveCookies(cookieFile string, cookies []scraper.Cookie) error {
+func saveCookies(cookieFile string, cookies []config.Cookie) error {
 	if cookieFile == "" || len(cookies) == 0 {
 		return nil
 	}
