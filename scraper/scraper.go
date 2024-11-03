@@ -5,14 +5,15 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/cornelk/goscrape/config"
-	"github.com/cornelk/goscrape/download"
-	"github.com/cornelk/goscrape/work"
-	"golang.org/x/net/proxy"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
-	"regexp"
+
+	"github.com/cornelk/goscrape/config"
+	"github.com/cornelk/goscrape/download"
+	"github.com/cornelk/goscrape/filter"
+	"github.com/cornelk/goscrape/work"
+	"golang.org/x/net/proxy"
 )
 
 // Scraper contains all scraping data.
@@ -24,8 +25,8 @@ type Scraper struct {
 	auth   string
 	client *http.Client
 
-	includes []*regexp.Regexp
-	excludes []*regexp.Regexp
+	includes filter.Filter
+	excludes filter.Filter
 
 	// key is the URL of page or asset
 	processed work.Set[string]
@@ -44,12 +45,12 @@ func New(cfg config.Config) (*Scraper, error) {
 	}
 	u.Fragment = ""
 
-	includes, err := compileRegexps(cfg.Includes)
+	includes, err := filter.New(cfg.Includes)
 	if err != nil {
 		errs = append(errs, err)
 	}
 
-	excludes, err := compileRegexps(cfg.Excludes)
+	excludes, err := filter.New(cfg.Excludes)
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -169,25 +170,4 @@ func (s *Scraper) Start(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-// compileRegexps compiles the given regex strings to regular expressions
-// to be used in the include and exclude filters.
-func compileRegexps(regexps []string) ([]*regexp.Regexp, error) {
-	var errs []error
-	var compiled []*regexp.Regexp
-
-	for _, exp := range regexps {
-		re, err := regexp.Compile(exp)
-		if err == nil {
-			compiled = append(compiled, re)
-		} else {
-			errs = append(errs, err)
-		}
-	}
-
-	if len(errs) > 0 {
-		return nil, errors.Join(errs...)
-	}
-	return compiled, nil
 }

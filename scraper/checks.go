@@ -1,8 +1,6 @@
 package scraper
 
 import (
-	"net/url"
-
 	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/goscrape/work"
 	"github.com/cornelk/gotokit/log"
@@ -34,42 +32,19 @@ func (s *Scraper) shouldURLBeDownloaded(item work.Item) bool {
 		return false
 	}
 
-	if s.config.MaxDepth != 0 && item.Depth == s.config.MaxDepth {
+	if s.config.MaxDepth != 0 && item.Depth >= s.config.MaxDepth {
 		logger.Debug("Skipping too deep level page", log.String("url", item.URL.String()))
 		return false
 	}
 
-	if s.includes != nil && !s.isURLIncluded(item.URL) {
+	if s.includes != nil && !s.includes.Matches(item.URL, "Including URL") {
 		return false
 	}
-	if s.excludes != nil && s.isURLExcluded(item.URL) {
+
+	if s.excludes != nil && s.excludes.Matches(item.URL, "Skipping URL") {
 		return false
 	}
 
 	logger.Debug("New URL to download", log.String("url", item.URL.String()))
 	return true
-}
-
-func (s *Scraper) isURLIncluded(url *url.URL) bool {
-	for _, re := range s.includes {
-		if re.MatchString(url.Path) {
-			logger.Info("Including URL",
-				log.String("url", url.String()),
-				log.Stringer("included_expression", re))
-			return true
-		}
-	}
-	return false
-}
-
-func (s *Scraper) isURLExcluded(url *url.URL) bool {
-	for _, re := range s.excludes {
-		if re.MatchString(url.Path) {
-			logger.Info("Skipping URL",
-				log.String("url", url.String()),
-				log.Stringer("excluded_expression", re))
-			return true
-		}
-	}
-	return false
 }

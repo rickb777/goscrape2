@@ -23,7 +23,8 @@ func newTestScraper(t *testing.T, startURL string, urls map[string][]byte) *Scra
 
 	logger.Logger = log.NewTestLogger(t)
 	cfg := config.Config{
-		URL: startURL,
+		URL:      startURL,
+		MaxDepth: 10,
 	}
 	scraper, err := New(cfg)
 	require.NoError(t, err)

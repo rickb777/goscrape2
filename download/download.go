@@ -38,7 +38,7 @@ type Download struct {
 }
 
 func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, []*url.URL, error) {
-	logger.Info("Downloading webpage", log.String("url", item.URL.String()))
+	logger.Info("Downloading", log.String("url", item.URL.String()))
 
 	var references []*url.URL
 
