@@ -10,7 +10,7 @@ import (
 
 // shouldURLBeDownloaded checks whether a page should be downloaded.
 // nolint: cyclop
-func (s *Scraper) shouldURLBeDownloaded(item work.Item, isAsset bool) bool {
+func (s *Scraper) shouldURLBeDownloaded(item work.Item) bool {
 	if item.URL.Scheme != "http" && item.URL.Scheme != "https" {
 		return false
 	}
@@ -29,16 +29,14 @@ func (s *Scraper) shouldURLBeDownloaded(item work.Item, isAsset bool) bool {
 
 	s.processed[p] = struct{}{}
 
-	if !isAsset {
-		if item.URL.Host != s.URL.Host {
-			logger.Debug("Skipping external host page", log.String("url", item.URL.String()))
-			return false
-		}
+	if item.URL.Host != s.URL.Host {
+		logger.Debug("Skipping external host page", log.String("url", item.URL.String()))
+		return false
+	}
 
-		if s.config.MaxDepth != 0 && item.Depth == s.config.MaxDepth {
-			logger.Debug("Skipping too deep level page", log.String("url", item.URL.String()))
-			return false
-		}
+	if s.config.MaxDepth != 0 && item.Depth == s.config.MaxDepth {
+		logger.Debug("Skipping too deep level page", log.String("url", item.URL.String()))
+		return false
 	}
 
 	if s.includes != nil && !s.isURLIncluded(item.URL) {

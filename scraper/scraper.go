@@ -123,7 +123,7 @@ func (s *Scraper) Start(ctx context.Context) error {
 	firstItem := work.Item{URL: s.URL}
 	var workQueue []work.Item
 
-	if !s.shouldURLBeDownloaded(firstItem, false) {
+	if !s.shouldURLBeDownloaded(firstItem) {
 		return errors.New("start page is excluded from downloading")
 	}
 
@@ -146,7 +146,7 @@ func (s *Scraper) Start(ctx context.Context) error {
 
 	for _, ref := range references {
 		next := firstItem.Derive(ref)
-		if s.shouldURLBeDownloaded(next, false) {
+		if s.shouldURLBeDownloaded(next) {
 			workQueue = append(workQueue, next)
 		}
 	}
@@ -162,7 +162,7 @@ func (s *Scraper) Start(ctx context.Context) error {
 
 		for _, ref := range references {
 			next := item.Derive(ref)
-			if s.shouldURLBeDownloaded(next, false) {
+			if s.shouldURLBeDownloaded(next) {
 				workQueue = append(workQueue, next)
 			}
 		}
