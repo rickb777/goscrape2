@@ -72,7 +72,8 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, []
 	isHtml := contentType.Type == "text" && contentType.Subtype == "html"
 	isXHtml := contentType.Type == "application" && contentType.Subtype == "xhtml+xml"
 
-	if isHtml || isXHtml {
+	switch {
+	case isHtml || isXHtml:
 		data, err := bufferEntireResponse(resp)
 		if err != nil {
 			return nil, nil, fmt.Errorf("buffering HTML: %w", err)
@@ -108,25 +109,17 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, []
 			return nil, nil, err
 		}
 
-		// check first and download afterward to not hit max depth limit for
-		// start page links because of recursive linking
-		// a hrefs
-		//references, err := index.URLs(htmlindex.ATag)
-		//if err != nil {
-		//	config.Logger.Error("Parsing URL failed", log.Err(err))
-		//}
-		//
-		//for _, ur := range references {
-		//	ur.Fragment = ""
-		//	references = append(references, ur)
+	case contentType.Type == "text" && contentType.Subtype == "css":
+		data, err := bufferEntireResponse(resp)
+		if err != nil {
+			return nil, nil, fmt.Errorf("buffering HTML: %w", err)
+		}
 
-		//ref := work.Item{URL: ur, Referrer: item.URL, Depth: item.Depth + 1}
-		//if s.shouldURLBeDownloaded(ref, false) {
-		//	s.webPageQueue = append(s.webPageQueue, ref)
-		//}
-		//}
+		data, references = d.checkCSSForUrls(item.URL, data)
 
-	} else {
+		d.storeDownload(item.URL, bytes.NewReader(data), false)
+
+	default:
 		d.storeDownload(item.URL, resp.Body, false)
 	}
 

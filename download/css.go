@@ -2,12 +2,12 @@ package download
 
 import (
 	"fmt"
-	"github.com/cornelk/goscrape/logger"
 	"net/url"
 	"path"
 	"regexp"
 	"strings"
 
+	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/gotokit/log"
 	"github.com/gorilla/css/scanner"
 )
