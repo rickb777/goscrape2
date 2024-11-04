@@ -7,12 +7,12 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"testing"
 
 	"github.com/cornelk/goscrape/config"
 	"github.com/cornelk/goscrape/download"
 	"github.com/cornelk/goscrape/logger"
-	"github.com/cornelk/goscrape/work"
 	"github.com/cornelk/gotokit/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -99,13 +99,15 @@ func TestScraperLinks(t *testing.T) {
 	err := scraper.Start(ctx)
 	require.NoError(t, err)
 
-	expectedProcessed := work.Set[string]{
-		"/":          {},
-		"/page2":     {},
-		"/sub/":      {},
-		"/style.css": {},
+	expectedProcessed := []string{
+		"/",
+		"/page2",
+		"/style.css",
+		"/sub/",
 	}
-	assert.Equal(t, expectedProcessed, scraper.processed)
+	actualProcessed := scraper.processed.Slice()
+	slices.Sort(actualProcessed)
+	assert.Equal(t, expectedProcessed, actualProcessed)
 }
 
 func TestScraperAttributes(t *testing.T) {
@@ -137,9 +139,11 @@ func TestScraperAttributes(t *testing.T) {
 	err := scraper.Start(ctx)
 	require.NoError(t, err)
 
-	expectedProcessed := work.Set[string]{
-		"/":       {},
-		"/bg.gif": {},
+	expectedProcessed := []string{
+		"/",
+		"/bg.gif",
 	}
-	assert.Equal(t, expectedProcessed, scraper.processed)
+	actualProcessed := scraper.processed.Slice()
+	slices.Sort(actualProcessed)
+	assert.Equal(t, expectedProcessed, actualProcessed)
 }

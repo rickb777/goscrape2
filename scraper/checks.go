@@ -21,11 +21,9 @@ func (s *Scraper) shouldURLBeDownloaded(item work.Item) bool {
 		p = "/"
 	}
 
-	if _, ok := s.processed[p]; ok { // was already downloaded or checked?
+	if !s.processed.AddIfAbsent(p) { // was already downloaded or checked?
 		return false
 	}
-
-	s.processed[p] = struct{}{}
 
 	if item.URL.Host != s.URL.Host {
 		logger.Debug("Skipping external host page", log.String("url", item.URL.String()))

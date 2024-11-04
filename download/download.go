@@ -18,13 +18,7 @@ import (
 	"golang.org/x/net/html"
 )
 
-var tagsWithReferences = []string{
-	htmlindex.ATag,
-	htmlindex.LinkTag,
-	htmlindex.ScriptTag,
-	htmlindex.BodyTag,
-}
-
+// Download fetches URLs one by one, sequentially.
 type Download struct {
 	Config   config.Config
 	Cookies  *cookiejar.Jar
@@ -52,12 +46,6 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, []
 	}
 
 	defer closeResponseBody(resp)
-
-	//fileExtension := ""
-	//kind, err := filetype.Match(data)
-	//if err == nil && kind != types.Unknown {
-	//	fileExtension = kind.Extension
-	//}
 
 	if item.Depth == 0 {
 		// take account of redirection (only on the start page)
@@ -133,6 +121,15 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, []
 	// use the URL that the website returned as new base url for the
 	// scrape, in case a redirect changed it (only for the start page)
 	return resp.Request.URL, references, nil
+}
+
+//-------------------------------------------------------------------------------------------------
+
+var tagsWithReferences = []string{
+	htmlindex.ATag,
+	htmlindex.LinkTag,
+	htmlindex.ScriptTag,
+	htmlindex.BodyTag,
 }
 
 func (d *Download) findReferences(index *htmlindex.Index) ([]*url.URL, error) {

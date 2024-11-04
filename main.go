@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/cornelk/goscrape/images"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/alexflint/go-arg"
 	"github.com/cornelk/goscrape/config"
+	"github.com/cornelk/goscrape/images"
 	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/goscrape/scraper"
 	"github.com/cornelk/gotokit/app"
@@ -32,15 +32,16 @@ type arguments struct {
 	Output  string   `arg:"-o,--output" help:"output directory to write files to"`
 	URLs    []string `arg:"positional"`
 
-	Depth        int64         `arg:"-d,--depth" help:"download depth, 0 for unlimited" default:"10"`
-	ImageQuality int64         `arg:"-q,--imagequality" help:"image quality, 0 to disable reencoding"`
+	Concurrency  int64         `arg:"-c,--concurrency" help:"the number of concurrent downloads" default:"1"`
+	Depth        int64         `arg:"-d,--depth" help:"download depth limit, 0 for unlimited" default:"10"`
+	ImageQuality int64         `arg:"-q,--imagequality" help:"image quality reduction, 0 to disable re-encoding"`
 	Timeout      time.Duration `arg:"-t,--timeout" help:"time limit (with units, e.g. 1s) for each HTTP request to connect and read the response"`
 	Tries        int64         `arg:"-n,--tries" help:"the number of tries to download each file if the server gives a 5xx error" default:"1"`
 
 	Serve      string `arg:"-s,--serve" help:"serve the website using a webserver"`
 	ServerPort int16  `arg:"-r,--serverport" help:"port to use for the webserver" default:"8080"`
 
-	CookieFile     string `arg:"-c,--cookiefile" help:"file containing the cookie content"`
+	CookieFile     string `arg:"--cookiefile" help:"file containing the cookie content"`
 	SaveCookieFile string `arg:"--savecookiefile" help:"file to save the cookie content"`
 
 	Headers   []string `arg:"-h,--header" help:"HTTP header to use for scraping"`
@@ -148,8 +149,9 @@ func runScraper(ctx context.Context, args arguments) error {
 		Includes: args.Include,
 		Excludes: args.Exclude,
 
-		ImageQuality: images.ImageQuality(imageQuality),
+		Concurrency:  int(args.Concurrency),
 		MaxDepth:     uint(args.Depth),
+		ImageQuality: images.ImageQuality(imageQuality),
 		Timeout:      args.Timeout,
 		Tries:        int(args.Tries),
 

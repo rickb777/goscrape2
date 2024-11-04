@@ -1,6 +1,7 @@
 package work
 
 import (
+	"fmt"
 	"net/url"
 )
 
@@ -17,4 +18,8 @@ func (it Item) Derive(u *url.URL) Item {
 		Depth:    it.Depth + 1,
 		Referrer: it.URL,
 	}
+}
+
+func (it Item) String() string {
+	return fmt.Sprintf("%s (depth:%d)", it.URL.String(), it.Depth)
 }
