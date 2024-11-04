@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/cornelk/gotokit/app"
 	"os"
 	"strings"
 	"time"
@@ -14,7 +15,6 @@ import (
 	"github.com/cornelk/goscrape/images"
 	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/goscrape/scraper"
-	"github.com/cornelk/gotokit/app"
 	"github.com/cornelk/gotokit/buildinfo"
 	"github.com/cornelk/gotokit/env"
 	"github.com/cornelk/gotokit/log"
@@ -67,6 +67,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	//ctx := context.Background()
 	ctx := app.Context()
 
 	if args.Verbose {

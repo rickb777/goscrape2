@@ -9,6 +9,8 @@ import (
 	"golang.org/x/net/html"
 )
 
+type Refs []*url.URL
+
 // Index provides an index for all HTML tags of relevance for scraping.
 type Index struct {
 	// key is HTML tag, value is a map of all its urls and the HTML nodes for it
@@ -53,7 +55,7 @@ func (h *Index) Index(baseURL *url.URL, node *html.Node) {
 }
 
 // URLs returns all URLs of the references found for a specific tag.
-func (h *Index) URLs(tag string) ([]*url.URL, error) {
+func (h *Index) URLs(tag string) (Refs, error) {
 	m, ok := h.data[tag]
 	if !ok {
 		return nil, nil
@@ -65,7 +67,7 @@ func (h *Index) URLs(tag string) ([]*url.URL, error) {
 	}
 	sort.Strings(data)
 
-	urls := make([]*url.URL, 0, len(m))
+	urls := make(Refs, 0, len(m))
 	for _, fullURL := range data {
 		u, err := url.Parse(fullURL)
 		if err != nil {

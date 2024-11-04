@@ -5,20 +5,19 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/cornelk/goscrape/logger"
-	"github.com/cornelk/gotokit/log"
-	"github.com/rickb777/process/v2"
-	"net/http"
-	"net/http/cookiejar"
-	"net/url"
-	"sync"
-
 	"github.com/cornelk/goscrape/config"
 	"github.com/cornelk/goscrape/download"
 	"github.com/cornelk/goscrape/filter"
+	"github.com/cornelk/goscrape/htmlindex"
+	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/goscrape/work"
+	"github.com/cornelk/gotokit/log"
 	"github.com/gammazero/workerpool"
+	"github.com/rickb777/process/v2"
 	"golang.org/x/net/proxy"
+	"net/http"
+	"net/http/cookiejar"
+	"net/url"
 )
 
 // Scraper contains all scraping data, starts the process and handles the concurrency.
@@ -147,54 +146,65 @@ func (s *Scraper) Start(ctx context.Context) error {
 		Client:   s.client,
 	}
 
-	redir, references, err := d.ProcessURL(ctx, firstItem)
+	redirect, firstPageReferences, err := d.ProcessURL(ctx, firstItem)
 	if err != nil {
 		return err
 	}
 
-	if redir != nil {
-		s.URL = redir // s.URL is not altered by any subsequent URLs
+	if redirect != nil {
+		s.URL = redirect // s.URL is not altered subsequently
 	}
 
-	workQueue, queuedItems := process.WorkQueue[work.Item](32)
-	business := sync.WaitGroup{}
-
-	for _, ref := range references {
-		next := firstItem.Derive(ref)
-		if s.shouldURLBeDownloaded(next) {
-			workQueue <- next
-			business.Add(1)
-		}
-	}
+	// WorkQueue has unlimited buffering and so prevents deadlock
+	workQueueIn, workQueueOut := process.WorkQueue[work.Item](32)
+	refsQueue := make(chan htmlindex.Refs, concurrency)
 
 	pool := process.NewGroup()
 
 	pool.GoNE(concurrency, func(_ int) error {
-		for item := range queuedItems {
-			_, moreRefs, err := d.ProcessURL(ctx, item)
-			if err != nil {
-				if !errors.Is(err, context.Canceled) {
-					logger.Error("Failed", log.String("item", item.String()), log.Err(err))
-				}
-				return err
-			}
+		for {
+			select {
+			case <-ctx.Done():
+				return nil
 
-			for _, ref := range moreRefs {
-				next := firstItem.Derive(ref)
-				if s.shouldURLBeDownloaded(next) {
-					workQueue <- next
-					business.Add(1)
+			case item, open := <-workQueueOut:
+				if !open {
+					return nil // normal 'clean' termination
+				} else {
+					_, moreRefs, err := d.ProcessURL(ctx, item)
+					if err != nil {
+						if !errors.Is(err, context.Canceled) {
+							logger.Error("Failed", log.String("item", item.String()), log.Err(err))
+						}
+						return err
+					}
+
+					refsQueue <- moreRefs
 				}
 			}
-
-			business.Add(-1) // this item is done
 		}
-		return nil
 	})
 
-	business.Wait()
-	close(workQueue)
+	go func() {
+		todo := 1 // first page references
+		for refs := range refsQueue {
+			todo--
+			for _, ref := range refs {
+				next := firstItem.Derive(ref)
+				if s.shouldURLBeDownloaded(next) {
+					workQueueIn <- next
+					todo++
+				}
+			}
+			if todo == 0 {
+				break
+			}
+		}
+		close(workQueueIn)
+	}()
+
+	refsQueue <- firstPageReferences // start the ball rolling
 
 	pool.Wait()
-	return nil
+	return pool.Err()
 }

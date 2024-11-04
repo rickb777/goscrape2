@@ -28,10 +28,10 @@ type Download struct {
 	Client *http.Client
 }
 
-func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, []*url.URL, error) {
+func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, htmlindex.Refs, error) {
 	logger.Info("Downloading", log.String("url", item.URL.String()))
 
-	var references []*url.URL
+	var references htmlindex.Refs
 
 	resp, err := DownloadURL(ctx, d, item.URL)
 	if err != nil {
@@ -132,8 +132,8 @@ var tagsWithReferences = []string{
 	htmlindex.BodyTag,
 }
 
-func (d *Download) findReferences(index *htmlindex.Index) ([]*url.URL, error) {
-	var result []*url.URL
+func (d *Download) findReferences(index *htmlindex.Index) (htmlindex.Refs, error) {
+	var result htmlindex.Refs
 	for _, tag := range tagsWithReferences {
 		references, err := index.URLs(tag)
 		if err != nil {
