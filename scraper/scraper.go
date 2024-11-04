@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"sync"
 
 	"github.com/cornelk/goscrape/config"
 	"github.com/cornelk/goscrape/download"
@@ -127,6 +128,11 @@ func (s *Scraper) Start(ctx context.Context) error {
 		return err
 	}
 
+	concurrency := s.config.Concurrency
+	if concurrency < 1 {
+		concurrency = 1
+	}
+
 	firstItem := work.Item{URL: s.URL}
 
 	if !s.shouldURLBeDownloaded(firstItem) {
@@ -151,17 +157,19 @@ func (s *Scraper) Start(ctx context.Context) error {
 	}
 
 	workQueue, queuedItems := process.WorkQueue[work.Item](32)
+	business := sync.WaitGroup{}
 
 	for _, ref := range references {
 		next := firstItem.Derive(ref)
 		if s.shouldURLBeDownloaded(next) {
 			workQueue <- next
+			business.Add(1)
 		}
 	}
 
 	pool := process.NewGroup()
 
-	pool.GoNE(s.config.Concurrency, func(_ int) error {
+	pool.GoNE(concurrency, func(_ int) error {
 		for item := range queuedItems {
 			_, moreRefs, err := d.ProcessURL(ctx, item)
 			if err != nil {
@@ -175,11 +183,17 @@ func (s *Scraper) Start(ctx context.Context) error {
 				next := firstItem.Derive(ref)
 				if s.shouldURLBeDownloaded(next) {
 					workQueue <- next
+					business.Add(1)
 				}
 			}
+
+			business.Add(-1) // this item is done
 		}
 		return nil
 	})
+
+	business.Wait()
+	close(workQueue)
 
 	pool.Wait()
 	return nil
