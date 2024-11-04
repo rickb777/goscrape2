@@ -161,6 +161,7 @@ func (s *Scraper) Start(ctx context.Context) error {
 
 	pool := process.NewGroup()
 
+	// Pool of processes to concurrently handle URL downloading.
 	pool.GoNE(concurrency, func(_ int) error {
 		for {
 			select {
@@ -185,6 +186,9 @@ func (s *Scraper) Start(ctx context.Context) error {
 		}
 	})
 
+	// This goroutine is not part of the pool. It decides when to terminate based on counting
+	// work done/remaining work to do. When it terminates, it closes the workQueueIn channel,
+	// causing all the pool goroutines to terminate.
 	go func() {
 		todo := 1 // first page references
 		for refs := range refsQueue {
@@ -203,8 +207,10 @@ func (s *Scraper) Start(ctx context.Context) error {
 		close(workQueueIn)
 	}()
 
-	refsQueue <- firstPageReferences // start the ball rolling
+	// start the ball rolling: this creates the first batch of work items
+	refsQueue <- firstPageReferences
 
+	// all the pool processes are busy until this unblocks.
 	pool.Wait()
 	return pool.Err()
 }

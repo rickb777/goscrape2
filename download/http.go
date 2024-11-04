@@ -50,9 +50,14 @@ var DownloadURL = func(ctx context.Context, d *Download, u *url.URL) (resp *http
 		case resp.StatusCode >= 500:
 			// retry logic continues below
 
+		case resp.StatusCode == http.StatusTooManyRequests:
+			// retry logic continues below
+
 		// 4xx status code = client error
 		case resp.StatusCode >= 400:
-			return nil, fmt.Errorf("unhandled HTTP client error: status %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
+			logger.Error("HTTP client error", log.String("url", u.String()),
+				log.Int("code", resp.StatusCode), log.String("status", http.StatusText(resp.StatusCode)))
+			return nil, nil
 
 		// 304 not modified - no further action
 		case resp.StatusCode == http.StatusNotModified:
