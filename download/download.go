@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"sync/atomic"
 
 	"github.com/cornelk/goscrape/config"
 	"github.com/cornelk/goscrape/htmlindex"
@@ -18,6 +19,10 @@ import (
 	"golang.org/x/net/html"
 )
 
+type HttpClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 // Download fetches URLs one by one, sequentially.
 type Download struct {
 	Config   config.Config
@@ -25,7 +30,9 @@ type Download struct {
 	StartURL *url.URL
 
 	Auth   string
-	Client *http.Client
+	Client HttpClient
+
+	Throttle atomic.Int64 // increases when server gives 429 responses
 }
 
 func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, htmlindex.Refs, error) {

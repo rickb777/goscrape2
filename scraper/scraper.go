@@ -28,7 +28,7 @@ type Scraper struct {
 	URL     *url.URL // contains the main URL to parse, will be modified in case of a redirect
 
 	auth   string
-	client *http.Client
+	client download.HttpClient
 
 	includes filter.Filter
 	excludes filter.Filter
