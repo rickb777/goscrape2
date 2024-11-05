@@ -34,7 +34,7 @@ type Download struct {
 }
 
 func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, htmlindex.Refs, error) {
-	logger.Info("Downloading", log.String("url", item.URL.String()))
+	//logger.Info("Downloading", log.String("url", item.URL.String()))
 
 	var references htmlindex.Refs
 
@@ -57,9 +57,16 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, ht
 		item.URL = resp.Request.URL
 	}
 
-	if resp.StatusCode == http.StatusTooManyRequests {
+	switch resp.StatusCode {
+	case http.StatusTooManyRequests:
+		logger.Warn("Too many requests", log.String("url", item.URL.String()), log.Int("code", resp.StatusCode))
 		// put this URL back into the work queue to be re-tried later
 		return item.URL, htmlindex.Refs{item.URL}, nil
+
+	case http.StatusNoContent:
+		logger.Info("No content", log.String("url", item.URL.String()), log.Int("code", resp.StatusCode))
+		// put this URL back into the work queue to be re-tried later
+		return nil, nil, nil
 	}
 
 	contentType := header.ParseContentTypeFromHeaders(resp.Header)
@@ -127,6 +134,8 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, ht
 	default:
 		d.storeDownload(item.URL, resp.Body, false)
 	}
+
+	logger.Info("OK", log.String("url", item.URL.String()), log.Int("code", resp.StatusCode))
 
 	// use the URL that the website returned as new base url for the
 	// scrape, in case a redirect changed it (only for the start page)
