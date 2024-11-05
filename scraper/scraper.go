@@ -5,6 +5,10 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/cookiejar"
+	"net/url"
+
 	"github.com/cornelk/goscrape/config"
 	"github.com/cornelk/goscrape/download"
 	"github.com/cornelk/goscrape/filter"
@@ -15,9 +19,6 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/rickb777/process/v2"
 	"golang.org/x/net/proxy"
-	"net/http"
-	"net/http/cookiejar"
-	"net/url"
 )
 
 // Scraper contains all scraping data, starts the process and handles the concurrency.
@@ -127,10 +128,7 @@ func (s *Scraper) Start(ctx context.Context) error {
 		return err
 	}
 
-	concurrency := s.config.Concurrency
-	if concurrency < 1 {
-		concurrency = 1
-	}
+	s.config.SensibleDefaults()
 
 	firstItem := work.Item{URL: s.URL}
 
@@ -157,12 +155,12 @@ func (s *Scraper) Start(ctx context.Context) error {
 
 	// WorkQueue has unlimited buffering and so prevents deadlock
 	workQueueIn, workQueueOut := process.WorkQueue[work.Item](32)
-	refsQueue := make(chan htmlindex.Refs, concurrency)
+	refsQueue := make(chan htmlindex.Refs, s.config.Concurrency)
 
 	pool := process.NewGroup()
 
 	// Pool of processes to concurrently handle URL downloading.
-	pool.GoNE(concurrency, func(_ int) error {
+	pool.GoNE(s.config.Concurrency, func(_ int) error {
 		for {
 			select {
 			case <-ctx.Done():

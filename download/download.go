@@ -4,12 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
-	"net/http"
-	"net/http/cookiejar"
-	"net/url"
-	"sync/atomic"
-
 	"github.com/cornelk/goscrape/config"
 	"github.com/cornelk/goscrape/htmlindex"
 	"github.com/cornelk/goscrape/logger"
@@ -17,6 +11,10 @@ import (
 	"github.com/cornelk/gotokit/log"
 	"github.com/rickb777/acceptable/header"
 	"golang.org/x/net/html"
+	"io"
+	"net/http"
+	"net/http/cookiejar"
+	"net/url"
 )
 
 type HttpClient interface {
@@ -32,7 +30,7 @@ type Download struct {
 	Auth   string
 	Client HttpClient
 
-	Throttle atomic.Int64 // increases when server gives 429 responses
+	Throttle Throttle // increases when server gives 429 (Too Many Requests) responses
 }
 
 func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, htmlindex.Refs, error) {
@@ -40,7 +38,7 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, ht
 
 	var references htmlindex.Refs
 
-	resp, err := DownloadURL(ctx, d, item.URL)
+	resp, err := d.GET(ctx, item.URL)
 	if err != nil {
 		logger.Error("Processing HTTP Request failed",
 			log.String("url", item.URL.String()),

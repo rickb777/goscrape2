@@ -18,17 +18,15 @@ func MustParseURL(s string) *url.URL {
 }
 
 func TestShouldURLBeDownloaded(t *testing.T) {
-	empty := []byte("")
-
 	startURL := "https://example.org/#fragment"
-	urls := map[string][]byte{
-		"https://example.org/":          empty,
-		"https://example.org/page2":     empty,
-		"https://example.org/sub/":      empty,
-		"https://example.org/style.css": empty,
-	}
 
-	scraper := newTestScraper(t, startURL, urls)
+	stub := &stubClient{}
+	stub.response("https://example.org/", "text/html", "")
+	stub.response("https://example.org/page2", "text/html", "")
+	stub.response("https://example.org/sub/", "text/html", "")
+	stub.response("https://example.org/style.css", "text/css", "")
+
+	scraper := newTestScraper(t, startURL, stub)
 	require.NotNil(t, scraper)
 
 	scraper.processed.Add("/ok/done")

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -14,7 +15,7 @@ type Config struct {
 	Includes []string
 	Excludes []string
 
-	Concurrency  int                 // number of concurrent downloads; default 0 implies one
+	Concurrency  int                 // number of concurrent downloads; default 1
 	MaxDepth     uint                // download depth, 0 for unlimited
 	ImageQuality images.ImageQuality // image quality from 0 to 100%, 0 to disable reencoding
 	Timeout      time.Duration       // time limit to process each http request
@@ -28,6 +29,20 @@ type Config struct {
 	Header    http.Header
 	Proxy     string
 	UserAgent string
+}
+
+func (c *Config) SensibleDefaults() {
+	if c.Concurrency < 1 {
+		c.Concurrency = 1
+	}
+
+	if c.Tries < 1 {
+		c.Tries = 1
+	}
+
+	if c.MaxDepth < 1 {
+		c.MaxDepth = math.MaxUint
+	}
 }
 
 // Cookie represents a cookie, it copies parts of the http.Cookie struct but changes

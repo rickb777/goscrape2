@@ -30,7 +30,7 @@ func (s *Scraper) shouldURLBeDownloaded(item work.Item) bool {
 		return false
 	}
 
-	if s.config.MaxDepth != 0 && item.Depth >= s.config.MaxDepth {
+	if item.Depth >= s.config.MaxDepth {
 		logger.Debug("Skipping too deep level page", log.String("url", item.URL.String()))
 		return false
 	}

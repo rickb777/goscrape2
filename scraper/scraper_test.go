@@ -18,7 +18,37 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newTestScraper(t *testing.T, startURL string, urls map[string][]byte) *Scraper {
+type stubClient struct {
+	responses map[string]*http.Response // more configurable responses
+}
+
+func (c *stubClient) response(url, contentType, body string) {
+	req, _ := http.NewRequest(http.MethodGet, url, nil)
+	rdr := bytes.NewReader([]byte(body))
+	resp := &http.Response{
+		Request:    req,
+		Header:     http.Header{"Content-Type": []string{contentType}},
+		Body:       io.NopCloser(rdr),
+		StatusCode: http.StatusOK,
+	}
+	if c.responses == nil {
+		c.responses = make(map[string]*http.Response)
+	}
+	c.responses[url] = resp
+}
+
+func (c *stubClient) Do(req *http.Request) (resp *http.Response, err error) {
+	ur := req.URL.String()
+	resp, ok := c.responses[ur]
+	if ok {
+		return resp, nil
+	}
+	panic(fmt.Sprintf("url '%s' not found in test data", ur))
+}
+
+//-------------------------------------------------------------------------------------------------
+
+func newTestScraper(t *testing.T, startURL string, stub *stubClient) *Scraper {
 	t.Helper()
 
 	logger.Logger = log.NewTestLogger(t)
@@ -30,6 +60,8 @@ func newTestScraper(t *testing.T, startURL string, urls map[string][]byte) *Scra
 	require.NoError(t, err)
 	require.NotNil(t, scraper)
 
+	scraper.client = stub
+
 	download.CreateDirectory = func(_ string) error {
 		return nil
 	}
@@ -39,26 +71,12 @@ func newTestScraper(t *testing.T, startURL string, urls map[string][]byte) *Scra
 	download.FileExists = func(_ string) bool {
 		return false
 	}
-	download.DownloadURL = func(_ context.Context, _ *download.Download, u *url.URL) (*http.Response, error) {
-		ur := u.String()
-		b, ok := urls[ur]
-		if !ok {
-			return nil, fmt.Errorf("url '%s' not found in test data", ur)
-		}
-		req, _ := http.NewRequest(http.MethodGet, ur, nil)
-		body := bytes.NewReader(b)
-		return &http.Response{
-			Request: req,
-			Header:  http.Header{"Content-Type": []string{"text/html"}},
-			Body:    io.NopCloser(body),
-		}, nil
-	}
 
 	return scraper
 }
 
 func TestScraperLinks(t *testing.T) {
-	indexPage := []byte(`
+	indexPage := `
 <html>
 <head>
 <link href=' https://example.org/style.css#fragment' rel='stylesheet' type='text/css'>
@@ -67,9 +85,9 @@ func TestScraperLinks(t *testing.T) {
 <a href="https://example.org/page2">Example</a>
 </body>
 </html>
-`)
+`
 
-	page2 := []byte(`
+	page2 := `
 <html>
 <body>
 
@@ -80,19 +98,17 @@ func TestScraperLinks(t *testing.T) {
 
 </body>
 </html>
-`)
-
-	css := []byte(``)
+`
 
 	startURL := "https://example.org/#fragment" // start page with fragment
-	urls := map[string][]byte{
-		"https://example.org/":          indexPage,
-		"https://example.org/page2":     page2,
-		"https://example.org/sub/":      indexPage,
-		"https://example.org/style.css": css,
-	}
 
-	scraper := newTestScraper(t, startURL, urls)
+	stub := &stubClient{}
+	stub.response("https://example.org/", "text/html", indexPage)
+	stub.response("https://example.org/page2", "text/html", page2)
+	stub.response("https://example.org/sub/", "text/html", indexPage)
+	stub.response("https://example.org/style.css", "text/css", "")
+
+	scraper := newTestScraper(t, startURL, stub)
 	require.NotNil(t, scraper)
 
 	ctx := context.Background()
@@ -111,7 +127,7 @@ func TestScraperLinks(t *testing.T) {
 }
 
 func TestScraperAttributes(t *testing.T) {
-	indexPage := []byte(`
+	indexPage := `
 <html>
 <head>
 </head>
@@ -123,16 +139,15 @@ func TestScraperAttributes(t *testing.T) {
 
 </body>
 </html>
-`)
-	empty := []byte(``)
+`
 
 	startURL := "https://example.org/"
-	urls := map[string][]byte{
-		"https://example.org/":       indexPage,
-		"https://example.org/bg.gif": empty,
-	}
 
-	scraper := newTestScraper(t, startURL, urls)
+	stub := &stubClient{}
+	stub.response("https://example.org/", "text/html", indexPage)
+	stub.response("https://example.org/bg.gif", "image/gif", "")
+
+	scraper := newTestScraper(t, startURL, stub)
 	require.NotNil(t, scraper)
 
 	ctx := context.Background()
