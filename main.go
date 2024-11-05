@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/cornelk/gotokit/app"
 	"os"
 	"strings"
 	"time"
@@ -67,8 +66,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	//ctx := context.Background()
-	ctx := app.Context()
+	ctx := context.Background()
+	//ctx := app.Context() // provides signal handler cancellation
 
 	if args.Verbose {
 		log.SetDefaultLevel(log.DebugLevel)
