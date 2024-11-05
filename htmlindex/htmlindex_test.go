@@ -13,46 +13,53 @@ import (
 func TestIndex(t *testing.T) {
 	input := []byte(`
 <html lang="es">
-<a href="https://domain.com/wp-content/uploads/document.pdf" rel="doc">Guide</a>
-<img src="/test.jpg"/> 
+<a href="https://domain.com/wp-content/uploads/document%2Bindex.pdf" rel="doc">Guide</a>
+<a href="https://domain.com/about.html">About</a>
+<img src="/test%24file.jpg"/> 
 </html>
 `)
 
 	idx := testSetup(t, input)
 
 	// check a tag
-	nodeTag := "a"
-	references, err := idx.URLs(nodeTag)
-	require.NoError(t, err)
-	require.Len(t, references, 1)
+	{
+		references, err := idx.URLs("a")
+		require.NoError(t, err)
+		require.Len(t, references, 2)
 
-	tagURL := "https://domain.com/wp-content/uploads/document.pdf"
-	assert.Equal(t, tagURL, references[0].String())
+		u2 := "https://domain.com/about.html"
+		assert.Equal(t, u2, references[0].String())
+		assert.Equal(t, "/about.html", references[0].Path)
 
-	urls := idx.Nodes(nodeTag)
-	require.Len(t, urls, 1)
-	nodes, ok := urls[tagURL]
-	require.True(t, ok)
-	require.Len(t, nodes, 1)
-	node := nodes[0]
-	assert.Equal(t, nodeTag, node.Data)
+		u1 := "https://domain.com/wp-content/uploads/document%2Bindex.pdf"
+		assert.Equal(t, u1, references[1].String())
+		assert.Equal(t, "/wp-content/uploads/document+index.pdf", references[1].Path)
 
+		urls := idx.Nodes("a")
+		require.Len(t, urls, 2)
+		nodes, ok := urls[u1]
+		require.True(t, ok)
+		require.Len(t, nodes, 1)
+		assert.Equal(t, "a", nodes[0].Data)
+	}
 	// check img tag
-	nodeTag = "img"
-	references, err = idx.URLs(nodeTag)
-	require.NoError(t, err)
-	require.Len(t, references, 1)
+	{
+		references, err := idx.URLs("img")
+		require.NoError(t, err)
+		require.Len(t, references, 1)
 
-	tagURL = "https://domain.com/test.jpg"
-	assert.Equal(t, tagURL, references[0].String())
-
-	// check for not existing tag
-	nodeTag = "not-existing"
-	references, err = idx.URLs(nodeTag)
-	require.NoError(t, err)
-	require.Empty(t, references)
-	urls = idx.Nodes(nodeTag)
-	require.Empty(t, urls)
+		tagURL := "https://domain.com/test%24file.jpg"
+		assert.Equal(t, tagURL, references[0].String())
+		assert.Equal(t, "/test$file.jpg", references[0].Path)
+	}
+	// check for non-existent tag
+	{
+		references, err := idx.URLs("not-existing")
+		require.NoError(t, err)
+		require.Empty(t, references)
+		urls := idx.Nodes("not-existing")
+		require.Empty(t, urls)
+	}
 }
 
 func TestIndexImg(t *testing.T) {
@@ -65,17 +72,20 @@ func TestIndexImg(t *testing.T) {
 `)
 
 	idx := testSetup(t, input)
-	references, err := idx.URLs(ImgTag)
-	require.NoError(t, err)
-	require.Len(t, references, 3)
-	assert.Equal(t, "https://domain.com/test-480w.jpg", references[0].String())
-	assert.Equal(t, "https://domain.com/test-800w.jpg", references[1].String())
-	assert.Equal(t, "https://domain.com/test.jpg", references[2].String())
-
-	references, err = idx.URLs(BodyTag)
-	require.NoError(t, err)
-	require.Len(t, references, 1)
-	assert.Equal(t, "https://domain.com/bg.jpg", references[0].String())
+	{
+		references, err := idx.URLs(ImgTag)
+		require.NoError(t, err)
+		require.Len(t, references, 3)
+		assert.Equal(t, "https://domain.com/test-480w.jpg", references[0].String())
+		assert.Equal(t, "https://domain.com/test-800w.jpg", references[1].String())
+		assert.Equal(t, "https://domain.com/test.jpg", references[2].String())
+	}
+	{
+		references, err := idx.URLs(BodyTag)
+		require.NoError(t, err)
+		require.Len(t, references, 1)
+		assert.Equal(t, "https://domain.com/bg.jpg", references[0].String())
+	}
 }
 
 func testSetup(t *testing.T, input []byte) *Index {
