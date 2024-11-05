@@ -57,6 +57,11 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, ht
 		item.URL = resp.Request.URL
 	}
 
+	if resp.StatusCode == http.StatusTooManyRequests {
+		// put this URL back into the work queue to be re-tried later
+		return item.URL, htmlindex.Refs{item.URL}, nil
+	}
+
 	contentType := header.ParseContentTypeFromHeaders(resp.Header)
 
 	isHtml := contentType.Type == "text" && contentType.Subtype == "html"

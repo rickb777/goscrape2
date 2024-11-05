@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"time"
 
 	"github.com/cornelk/goscrape/config"
 	"github.com/cornelk/goscrape/download"
@@ -160,26 +161,31 @@ func (s *Scraper) Start(ctx context.Context) error {
 	pool := process.NewGroup()
 
 	// Pool of processes to concurrently handle URL downloading.
-	pool.GoNE(s.config.Concurrency, func(_ int) error {
+	pool.GoNE(s.config.Concurrency, func(pid int) error {
 		for {
-			select {
-			case <-ctx.Done():
-				return nil
+			if pid == 0 || d.Throttle.IsNormal() {
+				select {
+				case <-ctx.Done():
+					return nil
 
-			case item, open := <-workQueueOut:
-				if !open {
-					return nil // normal 'clean' termination
-				} else {
-					_, moreRefs, err := d.ProcessURL(ctx, item)
-					if err != nil {
-						if !errors.Is(err, context.Canceled) {
-							logger.Error("Failed", log.String("item", item.String()), log.Err(err))
+				case item, open := <-workQueueOut:
+					if !open {
+						return nil // normal 'clean' termination
+					} else {
+						_, moreRefs, err := d.ProcessURL(ctx, item)
+						if err != nil {
+							if !errors.Is(err, context.Canceled) {
+								logger.Error("Failed", log.String("item", item.String()), log.Err(err))
+							}
+							return err
 						}
-						return err
-					}
 
-					refsQueue <- moreRefs
+						refsQueue <- moreRefs
+					}
 				}
+			} else {
+				// when throttling, do nothing for a while
+				time.Sleep(500 * time.Millisecond)
 			}
 		}
 	})

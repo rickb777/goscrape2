@@ -64,9 +64,9 @@ func (d *Download) GET(ctx context.Context, u *url.URL) (resp *http.Response, er
 			// retry logic continues below
 
 		case resp.StatusCode == http.StatusTooManyRequests:
-			d.Throttle.SlowDown()            // affects all URLs
-			retryDelay = backoff(retryDelay) // affects this URL only
-			// retry logic continues below
+			d.Throttle.SlowDown() // affects all URLs
+			d.Throttle.Sleep()    // throttle every URL
+			return resp, nil      // this URL will be re-tried later
 
 		// 4xx status code = client error
 		case resp.StatusCode >= 400:

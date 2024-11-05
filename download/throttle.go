@@ -9,9 +9,9 @@ type Throttle int64
 
 const (
 	// speed up gently
-	throttleDecrement = 100 * time.Millisecond
+	throttleDecrement = 10 * time.Millisecond
 	// slow down sharply
-	throttleIncrement = 20 * throttleDecrement
+	throttleIncrement = 100 * throttleDecrement
 )
 
 func (t *Throttle) SlowDown() {
@@ -22,9 +22,12 @@ func (t *Throttle) SpeedUp() {
 	a := (*int64)(t)
 	for { // loop until altered
 		oldValue := atomic.LoadInt64(a)
+		if oldValue == 0 {
+			return
+		}
 		newValue := oldValue - int64(throttleDecrement)
 		if newValue < 0 {
-			return
+			newValue = 0
 		}
 		if atomic.CompareAndSwapInt64(a, oldValue, newValue) {
 			return
@@ -32,6 +35,12 @@ func (t *Throttle) SpeedUp() {
 	}
 }
 
+func (t *Throttle) IsNormal() bool {
+	d := atomic.LoadInt64((*int64)(t))
+	return d == 0
+}
+
 func (t *Throttle) Sleep() {
-	time.Sleep(time.Duration(atomic.LoadInt64((*int64)(t))))
+	d := atomic.LoadInt64((*int64)(t))
+	time.Sleep(time.Duration(d))
 }
