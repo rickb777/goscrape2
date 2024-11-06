@@ -10,11 +10,14 @@ import (
 	"github.com/cornelk/goscrape/work"
 	"github.com/cornelk/gotokit/log"
 	"github.com/rickb777/acceptable/header"
+	"github.com/rickb777/acceptable/headername"
 	"golang.org/x/net/html"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"os"
+	"time"
 )
 
 type HttpClient interface {
@@ -70,6 +73,7 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, ht
 	}
 
 	contentType := header.ParseContentTypeFromHeaders(resp.Header)
+	lastModified, _ := header.ParseHTTPDateTime(resp.Header.Get(headername.LastModified))
 
 	isHtml := contentType.Type == "text" && contentType.Subtype == "html"
 	isXHtml := contentType.Type == "application" && contentType.Subtype == "xhtml+xml"
@@ -104,7 +108,7 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, ht
 			rdr = bytes.NewReader(data)
 		}
 
-		d.storeDownload(item.URL, rdr, true)
+		d.storeDownload(item.URL, rdr, lastModified, true)
 
 		references, err = d.findReferences(index)
 		if err != nil {
@@ -119,7 +123,7 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, ht
 
 		data, references = d.checkCSSForUrls(item.URL, data)
 
-		d.storeDownload(item.URL, bytes.NewReader(data), false)
+		d.storeDownload(item.URL, bytes.NewReader(data), lastModified, false)
 
 	case contentType.Type == "image" && d.Config.ImageQuality != 0:
 		data, err := bufferEntireResponse(resp)
@@ -128,11 +132,14 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, ht
 		}
 
 		data = d.Config.ImageQuality.CheckImageForRecode(item.URL, data)
+		if d.Config.ImageQuality != 0 {
+			lastModified = time.Time{} // altered images can't be safely time-stamped
+		}
 
-		d.storeDownload(item.URL, bytes.NewReader(data), false)
+		d.storeDownload(item.URL, bytes.NewReader(data), lastModified, false)
 
 	default:
-		d.storeDownload(item.URL, resp.Body, false)
+		d.storeDownload(item.URL, resp.Body, lastModified, false)
 	}
 
 	logger.Info("OK", log.String("url", item.URL.String()), log.Int("code", resp.StatusCode))
@@ -182,7 +189,7 @@ func (d *Download) findReferences(index *htmlindex.Index) (htmlindex.Refs, error
 
 // storeDownload writes the download to a file, if a known binary file is detected,
 // processing of the file as page to look for links is skipped.
-func (d *Download) storeDownload(u *url.URL, data io.Reader, isAPage bool) {
+func (d *Download) storeDownload(u *url.URL, data io.Reader, lastModified time.Time, isAPage bool) {
 	filePath := d.getFilePath(u, isAPage)
 
 	if !isAPage && FileExists(filePath) {
@@ -194,5 +201,15 @@ func (d *Download) storeDownload(u *url.URL, data io.Reader, isAPage bool) {
 			log.String("URL", u.String()),
 			log.String("file", filePath),
 			log.Err(err))
+		return
+	}
+
+	if !lastModified.IsZero() {
+		if err := os.Chtimes(filePath, lastModified, lastModified); err != nil {
+			logger.Error("Updating file timestamps failed",
+				log.String("URL", u.String()),
+				log.String("file", filePath),
+				log.Err(err))
+		}
 	}
 }
