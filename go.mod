@@ -8,7 +8,7 @@ require (
 	github.com/gammazero/workerpool v1.1.3
 	github.com/gorilla/css v1.0.1
 	github.com/h2non/filetype v1.1.4-0.20231228185113-6469358c2bcb
-	github.com/rickb777/acceptable v0.40.0
+	github.com/rickb777/acceptable v0.41.0
 	github.com/rickb777/process/v2 v2.0.4
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/net v0.30.0

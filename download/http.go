@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/rickb777/acceptable/headername"
 	"io"
 	"net/http"
 	"net/url"
@@ -29,11 +30,11 @@ func (d *Download) GET(ctx context.Context, u *url.URL) (resp *http.Response, er
 	}
 
 	if d.Config.UserAgent != "" {
-		req.Header.Set("User-Agent", d.Config.UserAgent)
+		req.Header.Set(headername.UserAgent, d.Config.UserAgent)
 	}
 
 	if d.Auth != "" {
-		req.Header.Set("Authorization", d.Auth)
+		req.Header.Set(headername.Authorization, d.Auth)
 	}
 
 	for key, values := range d.Config.Header {
@@ -85,9 +86,9 @@ func (d *Download) GET(ctx context.Context, u *url.URL) (resp *http.Response, er
 			logger.Debug(http.MethodGet,
 				log.String("url", u.String()),
 				log.Int("status", resp.StatusCode),
-				log.String("Content-Type", resp.Header.Get("Content-Type")),
-				log.String("Content-Length", resp.Header.Get("Content-Length")),
-				log.String("Last-Modified", resp.Header.Get("Last-Modified")))
+				log.String(headername.ContentType, resp.Header.Get(headername.ContentType)),
+				log.String(headername.ContentLength, resp.Header.Get(headername.ContentLength)),
+				log.String(headername.LastModified, resp.Header.Get(headername.LastModified)))
 			return resp, nil
 
 		default:

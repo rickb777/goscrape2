@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/rickb777/acceptable/headername"
 	"io"
 	"net/http"
 	"net/url"
@@ -27,7 +28,7 @@ func (c *stubClient) response(url, contentType, body string) {
 	rdr := bytes.NewReader([]byte(body))
 	resp := &http.Response{
 		Request:    req,
-		Header:     http.Header{"Content-Type": []string{contentType}},
+		Header:     http.Header{headername.ContentType: []string{contentType}},
 		Body:       io.NopCloser(rdr),
 		StatusCode: http.StatusOK,
 	}

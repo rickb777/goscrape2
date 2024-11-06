@@ -29,6 +29,8 @@ github.com/rickb777/acceptable v0.39.0 h1:SWanIPo3N9IPv068RJJ8ahKICEI6Twl2oNRQlb
 github.com/rickb777/acceptable v0.39.0/go.mod h1:CySXr+H2OGgeGDHMONsuga15d7q0ILX5gCW8lxO07a0=
 github.com/rickb777/acceptable v0.40.0 h1:MlOcOFGNkZDfWC6QecTZohyLuElG2efIntDbQFfi2cE=
 github.com/rickb777/acceptable v0.40.0/go.mod h1:/KkBflODTuQkUC75UUYWWw8tQCU1vvfi7svIqpdZwjM=
+github.com/rickb777/acceptable v0.41.0 h1:CoR+jBvA3jo+zneNri5yjNWhNaPPipUSZ8cK4mJBMCo=
+github.com/rickb777/acceptable v0.41.0/go.mod h1:/KkBflODTuQkUC75UUYWWw8tQCU1vvfi7svIqpdZwjM=
 github.com/rickb777/process/v2 v2.0.4 h1:P1844Sbhw0NfJZp0NS7iv4IMRWan8zBG6xKHVKFi/6M=
 github.com/rickb777/process/v2 v2.0.4/go.mod h1:ud+KWheTWt2SdGsDEVRrjJLYdBvr6Y2qRO1yU9SUYLs=
 github.com/rogpeppe/go-internal v1.13.1 h1:KvO1DLK/DRN07sQ1LQKScxyZJuNnedQ5/wKSR38lUII=
