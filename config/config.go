@@ -19,6 +19,7 @@ type Config struct {
 	MaxDepth     uint                // download depth, 0 for unlimited
 	ImageQuality images.ImageQuality // image quality from 0 to 100%, 0 to disable reencoding
 	Timeout      time.Duration       // time limit to process each http request
+	RetryDelay   time.Duration       // initial value; will increase exponentially
 	Tries        int                 // download attempts, 0 for unlimited
 
 	OutputDirectory string
@@ -42,6 +43,10 @@ func (c *Config) SensibleDefaults() {
 
 	if c.MaxDepth < 1 {
 		c.MaxDepth = math.MaxUint
+	}
+
+	if c.RetryDelay < 1 {
+		c.RetryDelay = 5 * time.Second
 	}
 }
 

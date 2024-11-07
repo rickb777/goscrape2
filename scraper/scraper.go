@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/spf13/afero"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -31,6 +32,7 @@ type Scraper struct {
 
 	auth   string
 	client download.HttpClient
+	fs     afero.Fs // filesystem
 
 	includes filter.Filter
 	excludes filter.Filter
@@ -107,6 +109,7 @@ func New(cfg config.Config) (*Scraper, error) {
 		URL:     u,
 
 		client: client,
+		fs:     afero.NewOsFs(),
 
 		includes: includes,
 		excludes: excludes,
@@ -143,6 +146,7 @@ func (s *Scraper) Start(ctx context.Context) error {
 		StartURL: s.URL,
 		Auth:     s.auth,
 		Client:   s.client,
+		Fs:       s.fs,
 	}
 
 	redirect, firstPageReferences, err := d.ProcessURL(ctx, firstItem)

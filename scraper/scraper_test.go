@@ -69,9 +69,6 @@ func newTestScraper(t *testing.T, startURL string, stub *stubClient) *Scraper {
 	download.WriteFile = func(_ *url.URL, _ string, _ io.Reader) error {
 		return nil
 	}
-	download.FileExists = func(_ string) bool {
-		return false
-	}
 
 	return scraper
 }

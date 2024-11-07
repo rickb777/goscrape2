@@ -11,6 +11,7 @@ import (
 	"github.com/cornelk/gotokit/log"
 	"github.com/rickb777/acceptable/header"
 	"github.com/rickb777/acceptable/headername"
+	"github.com/spf13/afero"
 	"golang.org/x/net/html"
 	"io"
 	"net/http"
@@ -33,15 +34,22 @@ type Download struct {
 	Auth   string
 	Client HttpClient
 
+	Fs       afero.Fs // filesystem
 	Throttle Throttle // increases when server gives 429 (Too Many Requests) responses
 }
 
 func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, htmlindex.Refs, error) {
-	//logger.Info("Downloading", log.String("url", item.URL.String()))
+	var existingModified time.Time
 
-	var references htmlindex.Refs
+	filePath := d.getFilePath(item.URL, true)
+	if fileExists(d.Fs, filePath) {
+		fileInfo, err := os.Stat(filePath)
+		if err == nil && fileInfo != nil {
+			existingModified = fileInfo.ModTime()
+		}
+	}
 
-	resp, err := d.GET(ctx, item.URL)
+	resp, err := d.GET(ctx, item.URL, existingModified)
 	if err != nil {
 		logger.Error("Processing HTTP Request failed",
 			log.String("url", item.URL.String()),
@@ -70,7 +78,19 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, ht
 		logger.Info("No content", log.String("url", item.URL.String()), log.Int("code", resp.StatusCode))
 		// put this URL back into the work queue to be re-tried later
 		return nil, nil, nil
+
+	case http.StatusNotModified:
+		return d.processURL304(item, resp)
+
+	default:
+		return d.processURL200(item, resp)
 	}
+}
+
+//-------------------------------------------------------------------------------------------------
+
+func (d *Download) processURL200(item work.Item, resp *http.Response) (*url.URL, htmlindex.Refs, error) {
+	var references htmlindex.Refs
 
 	contentType := header.ParseContentTypeFromHeaders(resp.Header)
 	lastModified, _ := header.ParseHTTPDateTime(resp.Header.Get(headername.LastModified))
@@ -118,7 +138,7 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, ht
 	case contentType.Type == "text" && contentType.Subtype == "css":
 		data, err := bufferEntireResponse(resp)
 		if err != nil {
-			return nil, nil, fmt.Errorf("buffering text/scs: %w", err)
+			return nil, nil, fmt.Errorf("buffering text/css: %w", err)
 		}
 
 		data, references = d.checkCSSForUrls(item.URL, data)
@@ -139,7 +159,59 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, ht
 		d.storeDownload(item.URL, bytes.NewReader(data), lastModified, false)
 
 	default:
+		// store without buffering entire file into memory
 		d.storeDownload(item.URL, resp.Body, lastModified, false)
+	}
+
+	logger.Info("OK", log.String("url", item.URL.String()), log.Int("code", resp.StatusCode))
+
+	// use the URL that the website returned as new base url for the
+	// scrape, in case a redirect changed it (only for the start page)
+	return resp.Request.URL, references, nil
+}
+
+//-------------------------------------------------------------------------------------------------
+
+func (d *Download) processURL304(item work.Item, resp *http.Response) (*url.URL, htmlindex.Refs, error) {
+	var references htmlindex.Refs
+
+	contentType := header.ParseContentTypeFromHeaders(resp.Header)
+
+	isHtml := contentType.Type == "text" && contentType.Subtype == "html"
+	isXHtml := contentType.Type == "application" && contentType.Subtype == "xhtml+xml"
+
+	switch {
+	case isHtml || isXHtml:
+		filePath := d.getFilePath(item.URL, true)
+		data, err := readFile(d.Fs, d.StartURL, filePath)
+		if err != nil {
+			return nil, nil, fmt.Errorf("existing file %s: %w", contentType.String(), err)
+		}
+
+		doc, err := html.Parse(bytes.NewReader(data))
+		if err != nil {
+			return nil, nil, fmt.Errorf("parsing %s: %w", contentType.String(), err)
+		}
+
+		index := htmlindex.New()
+		index.Index(item.URL, doc)
+
+		references, err = d.findReferences(index)
+		if err != nil {
+			return nil, nil, err
+		}
+
+	case contentType.Type == "text" && contentType.Subtype == "css":
+		filePath := d.getFilePath(item.URL, false)
+		data, err := readFile(d.Fs, d.StartURL, filePath)
+		if err != nil {
+			return nil, nil, fmt.Errorf("existing file %s: %w", contentType.String(), err)
+		}
+
+		_, references = d.checkCSSForUrls(item.URL, data)
+
+	default:
+		// no further action
 	}
 
 	logger.Info("OK", log.String("url", item.URL.String()), log.Int("code", resp.StatusCode))
@@ -192,7 +264,7 @@ func (d *Download) findReferences(index *htmlindex.Index) (htmlindex.Refs, error
 func (d *Download) storeDownload(u *url.URL, data io.Reader, lastModified time.Time, isAPage bool) {
 	filePath := d.getFilePath(u, isAPage)
 
-	if !isAPage && FileExists(filePath) {
+	if !isAPage && fileExists(d.Fs, filePath) {
 		return
 	}
 
