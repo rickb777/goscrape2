@@ -3,15 +3,24 @@ package download
 import (
 	"bytes"
 	"fmt"
-	"github.com/spf13/afero"
 	"io"
+	"math/rand/v2"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/gotokit/log"
+	"github.com/spf13/afero"
 )
+
+// randomSuffix is appended to files temporarily whilst they are being written
+var randomSuffix string
+
+func init() {
+	randomSuffix = "." + strconv.FormatInt(rand.Int64N(2^20), 36)
+}
 
 // CreateDirectory creates the download path if it does not exist yet.
 var CreateDirectory = func(path string) error {
@@ -46,7 +55,8 @@ func writeFile(fs afero.Fs, startURL *url.URL, filePath string, data io.Reader) 
 	}
 
 	logger.Debug("Creating file", log.String("path", filePath))
-	f, err := fs.Create(filePath)
+	// writing the file may take much time, so write to a temporary file first
+	f, err := fs.Create(filePath + randomSuffix)
 	if err != nil {
 		return fmt.Errorf("creating file '%s': %w", filePath, err)
 	}
@@ -54,12 +64,17 @@ func writeFile(fs afero.Fs, startURL *url.URL, filePath string, data io.Reader) 
 	if _, err = io.Copy(f, data); err != nil {
 		// nolint: wrapcheck
 		_ = f.Close() // try to close and remove file but ignore any error
-		_ = fs.Remove(filePath)
+		_ = fs.Remove(filePath + randomSuffix)
 		return fmt.Errorf("writing to file: %w", err)
 	}
 
 	if err := f.Close(); err != nil {
 		return fmt.Errorf("closing file: %w", err)
+	}
+
+	// rename the file so it appears (almost) instantly in the filesystem
+	if err := fs.Rename(filePath+randomSuffix, filePath); err != nil {
+		return fmt.Errorf("renaming %s to %s: %w", filePath+randomSuffix, filePath, err)
 	}
 	return nil
 }
