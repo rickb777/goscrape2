@@ -76,20 +76,21 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 	}
 
 	switch resp.StatusCode {
-	case http.StatusTooManyRequests:
-		// put this URL back into the work queue to be re-tried later
-		repeat := &work.Result{Item: item, References: []*url.URL{item.URL}}
-		repeat.Item.Depth-- // because it gets incremented
-		return item.URL, repeat, nil
+	case http.StatusOK:
+		return d.response200(item, resp)
 
 	case http.StatusNotModified:
 		return d.response304(item, resp)
 
-	case http.StatusOK:
-		return d.response200(item, resp)
+	case http.StatusTooManyRequests:
+		// put this URL back into the work queue to be re-tried later
+		repeat := &work.Result{Item: item, References: []*url.URL{item.URL}}
+		repeat.Item.Depth-- // because it will get incremented
+		return item.URL, repeat, nil
 
 	default:
-		return item.URL, &work.Result{Item: item}, nil
+		noFurtherAction := &work.Result{Item: item}
+		return item.URL, noFurtherAction, nil
 	}
 }
 
