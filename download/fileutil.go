@@ -12,6 +12,8 @@ const (
 	PageDirIndex = "index" + PageExtension
 )
 
+const externalDomainPrefix = "_" // _ is a prefix for external domains on the filesystem
+
 // getFilePath returns a file path for a URL to store the URL content in.
 func (d *Download) getFilePath(url *url.URL, isAPage bool) string {
 	fileName := url.Path
@@ -21,7 +23,7 @@ func (d *Download) getFilePath(url *url.URL, isAPage bool) string {
 
 	var externalHost string
 	if url.Host != d.StartURL.Host {
-		externalHost = "_" + url.Host // _ is a prefix for external domains on the filesystem
+		externalHost = externalDomainPrefix + url.Host
 	}
 
 	return filepath.Join(d.Config.OutputDirectory, d.StartURL.Host, externalHost, fileName)

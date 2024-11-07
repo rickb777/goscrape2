@@ -78,9 +78,8 @@ func (d *Download) GET(ctx context.Context, u *url.URL, lastModified time.Time) 
 
 		// 4xx status code = client error
 		case resp.StatusCode >= 400:
-			logger.Error("HTTP client error", slog.String("url", u.String()),
-				slog.Int("code", resp.StatusCode), slog.String("status", http.StatusText(resp.StatusCode)))
-			return nil, nil // no error allows ongoing downloading
+			logger.Error(http.StatusText(resp.StatusCode), slog.String("url", u.String()), slog.Int("code", resp.StatusCode))
+			return resp, nil // no error allows ongoing downloading
 
 		// 304 not modified - no download but scan for links if possible
 		case resp.StatusCode == http.StatusNotModified:

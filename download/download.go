@@ -10,6 +10,8 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os"
+	"path"
+	"strings"
 	"time"
 
 	"github.com/cornelk/goscrape/config"
@@ -62,7 +64,7 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 	}
 
 	if resp == nil {
-		return nil, nil, nil //response was 304-not modified
+		panic("unexpected nil response")
 	}
 
 	defer closeResponseBody(resp)
@@ -80,15 +82,14 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 		repeat.Item.Depth-- // because it gets incremented
 		return item.URL, repeat, nil
 
-	case http.StatusNoContent:
-		// put this URL back into the work queue to be re-tried later
-		return nil, nil, nil
-
 	case http.StatusNotModified:
 		return d.response304(item, resp)
 
-	default:
+	case http.StatusOK:
 		return d.response200(item, resp)
+
+	default:
+		return item.URL, &work.Result{Item: item}, nil
 	}
 }
 
@@ -199,17 +200,19 @@ func (d *Download) image200(item work.Item, resp *http.Response, lastModified ti
 //-------------------------------------------------------------------------------------------------
 
 func (d *Download) response304(item work.Item, resp *http.Response) (*url.URL, *work.Result, error) {
-	contentType := header.ParseContentTypeFromHeaders(resp.Header)
+	ext := path.Ext(item.URL.Path)
 
-	switch {
-	case isHtml(contentType) || isXHtml(contentType):
-		return d.html304(item, resp, contentType)
+	switch ext {
+	case ".html", ".htm":
+		return d.html304(item, resp)
 
-	case contentType.Type == "text" && contentType.Subtype == "css":
-		return d.css304(item, contentType)
+	case ".css":
+		return d.css304(item)
 
 	default:
-		// no further action
+		if strings.HasSuffix(item.URL.Path, "/") {
+			return d.html304(item, resp)
+		}
 	}
 
 	// use the URL that the website returned as new base url for the
@@ -219,17 +222,18 @@ func (d *Download) response304(item work.Item, resp *http.Response) (*url.URL, *
 
 //-------------------------------------------------------------------------------------------------
 
-func (d *Download) html304(item work.Item, resp *http.Response, contentType header.ContentType) (*url.URL, *work.Result, error) {
+func (d *Download) html304(item work.Item, resp *http.Response) (*url.URL, *work.Result, error) {
 	var references work.Refs
+
 	filePath := d.getFilePath(item.URL, true)
 	data, err := ioutil.ReadFile(d.Fs, d.StartURL, filePath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("existing file %s: %w", contentType.String(), err)
+		return nil, nil, fmt.Errorf("existing HTML file: %w", err)
 	}
 
 	doc, err := html.Parse(bytes.NewReader(data))
 	if err != nil {
-		return nil, nil, fmt.Errorf("parsing %s: %w", contentType.String(), err)
+		return nil, nil, fmt.Errorf("parsing HTML: %w", err)
 	}
 
 	index := htmlindex.New()
@@ -247,12 +251,12 @@ func (d *Download) html304(item work.Item, resp *http.Response, contentType head
 
 //-------------------------------------------------------------------------------------------------
 
-func (d *Download) css304(item work.Item, contentType header.ContentType) (*url.URL, *work.Result, error) {
+func (d *Download) css304(item work.Item) (*url.URL, *work.Result, error) {
 	var references work.Refs
 	filePath := d.getFilePath(item.URL, false)
 	data, err := ioutil.ReadFile(d.Fs, d.StartURL, filePath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("existing file %s: %w", contentType.String(), err)
+		return nil, nil, fmt.Errorf("existing CSS file: %w", err)
 	}
 
 	_, references = d.checkCSSForUrls(item.URL, data)
