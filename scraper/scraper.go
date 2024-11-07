@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/spf13/afero"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/cornelk/goscrape/config"
 	"github.com/cornelk/goscrape/download"
+	"github.com/cornelk/goscrape/download/ioutil"
 	"github.com/cornelk/goscrape/filter"
 	"github.com/cornelk/goscrape/htmlindex"
 	"github.com/cornelk/goscrape/logger"
@@ -20,6 +20,7 @@ import (
 	"github.com/cornelk/gotokit/log"
 	"github.com/gammazero/workerpool"
 	"github.com/rickb777/process/v2"
+	"github.com/spf13/afero"
 	"golang.org/x/net/proxy"
 )
 
@@ -109,7 +110,7 @@ func New(cfg config.Config) (*Scraper, error) {
 		URL:     u,
 
 		client: client,
-		fs:     afero.NewOsFs(),
+		fs:     afero.NewOsFs(), // filesystem can be replaced with in-memory filesystem for testing
 
 		includes: includes,
 		excludes: excludes,
@@ -127,7 +128,7 @@ func New(cfg config.Config) (*Scraper, error) {
 
 // Start starts the scraping.
 func (s *Scraper) Start(ctx context.Context) error {
-	err := download.CreateDirectory(s.config.OutputDirectory)
+	err := ioutil.CreateDirectory(s.fs, s.config.OutputDirectory)
 	if err != nil {
 		return err
 	}

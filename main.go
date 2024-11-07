@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/cornelk/goscrape/download"
+	"maps"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -34,7 +37,8 @@ type arguments struct {
 	Concurrency  int64         `arg:"-c,--concurrency" help:"the number of concurrent downloads" default:"1"`
 	Depth        int64         `arg:"-d,--depth" help:"download depth limit, 0 for unlimited" default:"10"`
 	ImageQuality int64         `arg:"-q,--imagequality" help:"image quality reduction, 0 to disable re-encoding"`
-	Timeout      time.Duration `arg:"-t,--timeout" help:"time limit (with units, e.g. 1s) for each HTTP request to connect and read the response"`
+	Timeout      time.Duration `arg:"-t,--timeout" help:"time limit (with units, e.g. 1s) for each HTTP request to connect and read the response" default:"30s"`
+	RetryDelay   time.Duration `arg:"--retrydelay" help:"initial delay used when retrying any download (with units, e.g. 1s)" default:"5s"`
 	Tries        int64         `arg:"-n,--tries" help:"the number of tries to download each file if the server gives a 5xx error" default:"1"`
 
 	Serve      string `arg:"-s,--serve" help:"serve the website using a webserver"`
@@ -49,6 +53,7 @@ type arguments struct {
 	UserAgent string   `arg:"-a,--useragent" help:"user agent to use for scraping"`
 
 	Verbose bool `arg:"-v,--verbose" help:"verbose output"`
+	Debug   bool `arg:"-z,--debug" help:"debug output"`
 }
 
 func (arguments) Description() string {
@@ -69,8 +74,12 @@ func main() {
 	ctx := context.Background()
 	//ctx := app.Context() // provides signal handler cancellation
 
-	if args.Verbose {
+	if args.Debug {
 		log.SetDefaultLevel(log.DebugLevel)
+	} else if args.Verbose {
+		log.SetDefaultLevel(log.InfoLevel)
+	} else {
+		log.SetDefaultLevel(log.WarnLevel)
 	}
 
 	logger.Logger, err = createLogger()
@@ -153,6 +162,7 @@ func runScraper(ctx context.Context, args arguments) error {
 		MaxDepth:     uint(args.Depth),
 		ImageQuality: images.ImageQuality(imageQuality),
 		Timeout:      args.Timeout,
+		RetryDelay:   args.RetryDelay,
 		Tries:        int(args.Tries),
 
 		OutputDirectory: args.Output,
@@ -193,7 +203,17 @@ func scrapeURLs(ctx context.Context, cfg config.Config, args arguments) error {
 		}
 	}
 
+	reportHistogram()
 	return nil
+}
+
+func reportHistogram() {
+	m := download.Counters.Map()
+	keys := slices.Collect(maps.Keys(m))
+	slices.Sort(keys)
+	for _, key := range keys {
+		logger.Warn(fmt.Sprintf("%3d: %d", key, m[key]))
+	}
 }
 
 func runServer(ctx context.Context, args arguments) error {

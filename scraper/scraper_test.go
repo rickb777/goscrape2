@@ -4,17 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/rickb777/acceptable/headername"
 	"io"
 	"net/http"
-	"net/url"
 	"slices"
 	"testing"
 
 	"github.com/cornelk/goscrape/config"
-	"github.com/cornelk/goscrape/download"
 	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/gotokit/log"
+	"github.com/rickb777/acceptable/headername"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -62,13 +60,6 @@ func newTestScraper(t *testing.T, startURL string, stub *stubClient) *Scraper {
 	require.NotNil(t, scraper)
 
 	scraper.client = stub
-
-	download.CreateDirectory = func(_ string) error {
-		return nil
-	}
-	download.WriteFile = func(_ *url.URL, _ string, _ io.Reader) error {
-		return nil
-	}
 
 	return scraper
 }

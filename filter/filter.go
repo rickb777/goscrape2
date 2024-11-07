@@ -33,7 +33,7 @@ func New(regexps []string) ([]*regexp.Regexp, error) {
 func (filter Filter) Matches(url *url.URL, intent string) bool {
 	for _, re := range filter {
 		if re.MatchString(url.Path) {
-			logger.Info(intent,
+			logger.Debug(intent,
 				log.String("url", url.String()),
 				log.Stringer("expression", re))
 			return true

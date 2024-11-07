@@ -15,8 +15,8 @@ import (
 	"github.com/rickb777/acceptable/headername"
 )
 
-// Errors4xx accumulates 4xx HTTP errors.
-var Errors4xx = NewHistogram()
+// Counters accumulates HTTP response status codes.
+var Counters = NewHistogram()
 
 func (d *Download) GET(ctx context.Context, u *url.URL, lastModified time.Time) (resp *http.Response, err error) {
 
@@ -55,6 +55,7 @@ func (d *Download) GET(ctx context.Context, u *url.URL, lastModified time.Time) 
 			return nil, fmt.Errorf("sending HTTP GET %s: %w", u, err)
 		}
 
+		Counters.Increment(resp.StatusCode)
 		logger.Debug(http.MethodGet,
 			log.String("url", u.String()),
 			log.Int("status", resp.StatusCode),
@@ -78,7 +79,6 @@ func (d *Download) GET(ctx context.Context, u *url.URL, lastModified time.Time) 
 
 		// 4xx status code = client error
 		case resp.StatusCode >= 400:
-			Errors4xx.Increment(resp.StatusCode)
 			logger.Error("HTTP client error", log.String("url", u.String()),
 				log.Int("code", resp.StatusCode), log.String("status", http.StatusText(resp.StatusCode)))
 			return nil, nil // no error allows ongoing downloading

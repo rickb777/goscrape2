@@ -4,7 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/cookiejar"
+	"net/url"
+	"os"
+	"time"
+
 	"github.com/cornelk/goscrape/config"
+	"github.com/cornelk/goscrape/download/ioutil"
 	"github.com/cornelk/goscrape/htmlindex"
 	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/goscrape/work"
@@ -13,12 +21,6 @@ import (
 	"github.com/rickb777/acceptable/headername"
 	"github.com/spf13/afero"
 	"golang.org/x/net/html"
-	"io"
-	"net/http"
-	"net/http/cookiejar"
-	"net/url"
-	"os"
-	"time"
 )
 
 type HttpClient interface {
@@ -34,7 +36,7 @@ type Download struct {
 	Auth   string
 	Client HttpClient
 
-	Fs       afero.Fs // filesystem
+	Fs       afero.Fs // filesystem can be replaced with in-memory filesystem for testing
 	Throttle Throttle // increases when server gives 429 (Too Many Requests) responses
 }
 
@@ -42,7 +44,7 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, ht
 	var existingModified time.Time
 
 	filePath := d.getFilePath(item.URL, true)
-	if fileExists(d.Fs, filePath) {
+	if ioutil.FileExists(d.Fs, filePath) {
 		fileInfo, err := os.Stat(filePath)
 		if err == nil && fileInfo != nil {
 			existingModified = fileInfo.ModTime()
@@ -183,7 +185,7 @@ func (d *Download) processURL304(item work.Item, resp *http.Response) (*url.URL,
 	switch {
 	case isHtml || isXHtml:
 		filePath := d.getFilePath(item.URL, true)
-		data, err := readFile(d.Fs, d.StartURL, filePath)
+		data, err := ioutil.ReadFile(d.Fs, d.StartURL, filePath)
 		if err != nil {
 			return nil, nil, fmt.Errorf("existing file %s: %w", contentType.String(), err)
 		}
@@ -203,7 +205,7 @@ func (d *Download) processURL304(item work.Item, resp *http.Response) (*url.URL,
 
 	case contentType.Type == "text" && contentType.Subtype == "css":
 		filePath := d.getFilePath(item.URL, false)
-		data, err := readFile(d.Fs, d.StartURL, filePath)
+		data, err := ioutil.ReadFile(d.Fs, d.StartURL, filePath)
 		if err != nil {
 			return nil, nil, fmt.Errorf("existing file %s: %w", contentType.String(), err)
 		}
@@ -264,11 +266,11 @@ func (d *Download) findReferences(index *htmlindex.Index) (htmlindex.Refs, error
 func (d *Download) storeDownload(u *url.URL, data io.Reader, lastModified time.Time, isAPage bool) {
 	filePath := d.getFilePath(u, isAPage)
 
-	if !isAPage && fileExists(d.Fs, filePath) {
+	if !isAPage && ioutil.FileExists(d.Fs, filePath) {
 		return
 	}
 
-	if err := WriteFile(d.StartURL, filePath, data); err != nil {
+	if err := ioutil.WriteFileAtomically(d.Fs, d.StartURL, filePath, data); err != nil {
 		logger.Error("Writing to file failed",
 			log.String("URL", u.String()),
 			log.String("file", filePath),

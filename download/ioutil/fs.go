@@ -1,4 +1,4 @@
-package download
+package ioutil
 
 import (
 	"bytes"
@@ -23,12 +23,7 @@ func init() {
 }
 
 // CreateDirectory creates the download path if it does not exist yet.
-var CreateDirectory = func(path string) error {
-	return createDirectory(afero.NewOsFs(), path)
-}
-
-// CreateDirectory creates the download path if it does not exist yet.
-func createDirectory(fs afero.Fs, path string) error {
+func CreateDirectory(fs afero.Fs, path string) error {
 	if path == "" {
 		return nil
 	}
@@ -40,17 +35,13 @@ func createDirectory(fs afero.Fs, path string) error {
 	return nil
 }
 
-var WriteFile = func(startURL *url.URL, filePath string, data io.Reader) error {
-	return writeFile(afero.NewOsFs(), startURL, filePath, data)
-}
-
-func writeFile(fs afero.Fs, startURL *url.URL, filePath string, data io.Reader) error {
+func WriteFileAtomically(fs afero.Fs, startURL *url.URL, filePath string, data io.Reader) error {
 	dir := filepath.Dir(filePath)
 	if len(dir) < len(startURL.Host) { // nothing to append if it is the root dir
 		dir = filepath.Join(".", startURL.Host, dir)
 	}
 
-	if err := createDirectory(fs, dir); err != nil {
+	if err := CreateDirectory(fs, dir); err != nil {
 		return err
 	}
 
@@ -79,7 +70,7 @@ func writeFile(fs afero.Fs, startURL *url.URL, filePath string, data io.Reader) 
 	return nil
 }
 
-func readFile(fs afero.Fs, startURL *url.URL, filePath string) ([]byte, error) {
+func ReadFile(fs afero.Fs, startURL *url.URL, filePath string) ([]byte, error) {
 	dir := filepath.Dir(filePath)
 	if len(dir) < len(startURL.Host) { // nothing to append if it is the root dir
 		dir = filepath.Join(".", startURL.Host, dir)
@@ -101,7 +92,7 @@ func readFile(fs afero.Fs, startURL *url.URL, filePath string) ([]byte, error) {
 	return data.Bytes(), nil
 }
 
-func fileExists(fs afero.Fs, filePath string) bool {
+func FileExists(fs afero.Fs, filePath string) bool {
 	_, err := fs.Stat(filePath)
 	return !os.IsNotExist(err)
 }
