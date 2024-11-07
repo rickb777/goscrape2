@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/spf13/afero"
 	"io"
 	"net/http"
 	"slices"
@@ -58,6 +59,8 @@ func newTestScraper(t *testing.T, startURL string, stub *stubClient) *Scraper {
 	scraper, err := New(cfg)
 	require.NoError(t, err)
 	require.NotNil(t, scraper)
+
+	scraper.fs = afero.NewMemMapFs()
 
 	scraper.client = stub
 

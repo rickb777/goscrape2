@@ -7,18 +7,22 @@ import "github.com/cornelk/gotokit/log"
 // Logger is a global logger that is able to handle concurrent logging safely.
 var Logger *log.Logger
 
+func Log(level log.Level, msg string, args ...any) {
+	Logger.Log(nil, level, msg, args...)
+}
+
 func Debug(msg string, args ...any) {
-	Logger.Log(nil, log.DebugLevel, msg, args...)
+	Log(log.DebugLevel, msg, args...)
 }
 
 func Info(msg string, args ...any) {
-	Logger.Log(nil, log.InfoLevel, msg, args...)
+	Log(log.InfoLevel, msg, args...)
 }
 
 func Warn(msg string, args ...any) {
-	Logger.Log(nil, log.WarnLevel, msg, args...)
+	Log(log.WarnLevel, msg, args...)
 }
 
 func Error(msg string, args ...any) {
-	Logger.Log(nil, log.ErrorLevel, msg, args...)
+	Log(log.ErrorLevel, msg, args...)
 }

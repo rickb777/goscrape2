@@ -51,6 +51,7 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, ht
 		}
 	}
 
+	before := time.Now()
 	resp, err := d.GET(ctx, item.URL, existingModified)
 	if err != nil {
 		logger.Error("Processing HTTP Request failed",
@@ -64,6 +65,7 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, ht
 	}
 
 	defer closeResponseBody(resp)
+	defer logResponse(item.URL, resp, before)
 
 	if item.Depth == 0 {
 		// take account of redirection (only on the start page)
@@ -72,100 +74,86 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, ht
 
 	switch resp.StatusCode {
 	case http.StatusTooManyRequests:
-		logger.Warn("Too many requests", log.String("url", item.URL.String()), log.Int("code", resp.StatusCode))
 		// put this URL back into the work queue to be re-tried later
 		return item.URL, htmlindex.Refs{item.URL}, nil
 
 	case http.StatusNoContent:
-		logger.Info("No content", log.String("url", item.URL.String()), log.Int("code", resp.StatusCode))
 		// put this URL back into the work queue to be re-tried later
 		return nil, nil, nil
 
 	case http.StatusNotModified:
-		return d.processURL304(item, resp)
+		return d.response304(item.URL, resp, before)
 
 	default:
-		return d.processURL200(item, resp)
+		return d.response200(item.URL, resp, before)
 	}
 }
 
 //-------------------------------------------------------------------------------------------------
 
-func (d *Download) processURL200(item work.Item, resp *http.Response) (*url.URL, htmlindex.Refs, error) {
+func (d *Download) response200(item *url.URL, resp *http.Response, before time.Time) (*url.URL, htmlindex.Refs, error) {
 	var references htmlindex.Refs
 
 	contentType := header.ParseContentTypeFromHeaders(resp.Header)
 	lastModified, _ := header.ParseHTTPDateTime(resp.Header.Get(headername.LastModified))
 
-	isHtml := contentType.Type == "text" && contentType.Subtype == "html"
-	isXHtml := contentType.Type == "application" && contentType.Subtype == "xhtml+xml"
-
 	switch {
-	case isHtml || isXHtml:
-		data, err := bufferEntireResponse(resp)
-		if err != nil {
-			return nil, nil, fmt.Errorf("buffering %s: %w", contentType.String(), err)
-		}
-
-		doc, err := html.Parse(bytes.NewReader(data))
-		if err != nil {
-			return nil, nil, fmt.Errorf("parsing %s: %w", contentType.String(), err)
-		}
-
-		index := htmlindex.New()
-		index.Index(item.URL, doc)
-
-		fixed, hasChanges, err := d.fixURLReferences(item.URL, doc, index)
-		if err != nil {
-			logger.Error("Fixing file references failed",
-				log.String("url", item.URL.String()),
-				log.Err(err))
-			return nil, nil, nil
-		}
-
-		var rdr io.Reader
-		if hasChanges {
-			rdr = bytes.NewReader(fixed)
-		} else {
-			rdr = bytes.NewReader(data)
-		}
-
-		d.storeDownload(item.URL, rdr, lastModified, true)
-
-		references, err = d.findReferences(index)
-		if err != nil {
-			return nil, nil, err
-		}
+	case isHtml(contentType) || isXHtml(contentType):
+		return d.html200(item, resp, before, lastModified, contentType)
 
 	case contentType.Type == "text" && contentType.Subtype == "css":
-		data, err := bufferEntireResponse(resp)
-		if err != nil {
-			return nil, nil, fmt.Errorf("buffering text/css: %w", err)
-		}
-
-		data, references = d.checkCSSForUrls(item.URL, data)
-
-		d.storeDownload(item.URL, bytes.NewReader(data), lastModified, false)
+		return d.css200(item, resp, before, lastModified)
 
 	case contentType.Type == "image" && d.Config.ImageQuality != 0:
-		data, err := bufferEntireResponse(resp)
-		if err != nil {
-			return nil, nil, fmt.Errorf("buffering %s: %w", contentType.String(), err)
-		}
-
-		data = d.Config.ImageQuality.CheckImageForRecode(item.URL, data)
-		if d.Config.ImageQuality != 0 {
-			lastModified = time.Time{} // altered images can't be safely time-stamped
-		}
-
-		d.storeDownload(item.URL, bytes.NewReader(data), lastModified, false)
+		return d.image200(item, resp, before, lastModified, contentType)
 
 	default:
 		// store without buffering entire file into memory
-		d.storeDownload(item.URL, resp.Body, lastModified, false)
+		d.storeDownload(item, resp.Body, lastModified, false)
 	}
 
-	logger.Info("OK", log.String("url", item.URL.String()), log.Int("code", resp.StatusCode))
+	return nil, references, nil
+}
+
+//-------------------------------------------------------------------------------------------------
+
+func (d *Download) html200(item *url.URL, resp *http.Response, before time.Time, lastModified time.Time, contentType header.ContentType) (*url.URL, htmlindex.Refs, error) {
+	var references htmlindex.Refs
+
+	data, err := bufferEntireResponse(resp)
+	if err != nil {
+		return nil, nil, fmt.Errorf("buffering %s: %w", contentType.String(), err)
+	}
+
+	doc, err := html.Parse(bytes.NewReader(data))
+	if err != nil {
+		return nil, nil, fmt.Errorf("parsing %s: %w", contentType.String(), err)
+	}
+
+	index := htmlindex.New()
+	index.Index(item, doc)
+
+	fixed, hasChanges, err := d.fixURLReferences(item, doc, index)
+	if err != nil {
+		logger.Error("Fixing file references failed",
+			log.String("url", item.String()),
+			log.Err(err))
+		return nil, nil, nil
+	}
+
+	var rdr io.Reader
+	if hasChanges {
+		rdr = bytes.NewReader(fixed)
+	} else {
+		rdr = bytes.NewReader(data)
+	}
+
+	d.storeDownload(item, rdr, lastModified, true)
+
+	references, err = d.findReferences(item, index)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// use the URL that the website returned as new base url for the
 	// scrape, in case a redirect changed it (only for the start page)
@@ -174,53 +162,103 @@ func (d *Download) processURL200(item work.Item, resp *http.Response) (*url.URL,
 
 //-------------------------------------------------------------------------------------------------
 
-func (d *Download) processURL304(item work.Item, resp *http.Response) (*url.URL, htmlindex.Refs, error) {
+func (d *Download) css200(item *url.URL, resp *http.Response, before time.Time, lastModified time.Time) (*url.URL, htmlindex.Refs, error) {
+	var references htmlindex.Refs
+
+	data, err := bufferEntireResponse(resp)
+	if err != nil {
+		return nil, nil, fmt.Errorf("buffering text/css: %w", err)
+	}
+
+	data, references = d.checkCSSForUrls(item, data)
+
+	d.storeDownload(item, bytes.NewReader(data), lastModified, false)
+
+	return nil, references, nil
+}
+
+//-------------------------------------------------------------------------------------------------
+
+func (d *Download) image200(item *url.URL, resp *http.Response, before time.Time, lastModified time.Time, contentType header.ContentType) (*url.URL, htmlindex.Refs, error) {
+	data, err := bufferEntireResponse(resp)
+	if err != nil {
+		return nil, nil, fmt.Errorf("buffering %s: %w", contentType.String(), err)
+	}
+
+	data = d.Config.ImageQuality.CheckImageForRecode(item, data)
+	if d.Config.ImageQuality != 0 {
+		lastModified = time.Time{} // altered images can't be safely time-stamped
+	}
+
+	d.storeDownload(item, bytes.NewReader(data), lastModified, false)
+
+	return nil, nil, nil
+}
+
+//-------------------------------------------------------------------------------------------------
+
+func (d *Download) response304(item *url.URL, resp *http.Response, before time.Time) (*url.URL, htmlindex.Refs, error) {
 	var references htmlindex.Refs
 
 	contentType := header.ParseContentTypeFromHeaders(resp.Header)
 
-	isHtml := contentType.Type == "text" && contentType.Subtype == "html"
-	isXHtml := contentType.Type == "application" && contentType.Subtype == "xhtml+xml"
-
 	switch {
-	case isHtml || isXHtml:
-		filePath := d.getFilePath(item.URL, true)
-		data, err := ioutil.ReadFile(d.Fs, d.StartURL, filePath)
-		if err != nil {
-			return nil, nil, fmt.Errorf("existing file %s: %w", contentType.String(), err)
-		}
-
-		doc, err := html.Parse(bytes.NewReader(data))
-		if err != nil {
-			return nil, nil, fmt.Errorf("parsing %s: %w", contentType.String(), err)
-		}
-
-		index := htmlindex.New()
-		index.Index(item.URL, doc)
-
-		references, err = d.findReferences(index)
-		if err != nil {
-			return nil, nil, err
-		}
+	case isHtml(contentType) || isXHtml(contentType):
+		return d.html304(item, resp, before, contentType)
 
 	case contentType.Type == "text" && contentType.Subtype == "css":
-		filePath := d.getFilePath(item.URL, false)
-		data, err := ioutil.ReadFile(d.Fs, d.StartURL, filePath)
-		if err != nil {
-			return nil, nil, fmt.Errorf("existing file %s: %w", contentType.String(), err)
-		}
-
-		_, references = d.checkCSSForUrls(item.URL, data)
+		return d.css304(item, resp, before, contentType)
 
 	default:
 		// no further action
 	}
 
-	logger.Info("OK", log.String("url", item.URL.String()), log.Int("code", resp.StatusCode))
+	// use the URL that the website returned as new base url for the
+	// scrape, in case a redirect changed it (only for the start page)
+	return resp.Request.URL, references, nil
+}
+
+//-------------------------------------------------------------------------------------------------
+
+func (d *Download) html304(item *url.URL, resp *http.Response, before time.Time, contentType header.ContentType) (*url.URL, htmlindex.Refs, error) {
+	var references htmlindex.Refs
+	filePath := d.getFilePath(item, true)
+	data, err := ioutil.ReadFile(d.Fs, d.StartURL, filePath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("existing file %s: %w", contentType.String(), err)
+	}
+
+	doc, err := html.Parse(bytes.NewReader(data))
+	if err != nil {
+		return nil, nil, fmt.Errorf("parsing %s: %w", contentType.String(), err)
+	}
+
+	index := htmlindex.New()
+	index.Index(item, doc)
+
+	references, err = d.findReferences(item, index)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// use the URL that the website returned as new base url for the
 	// scrape, in case a redirect changed it (only for the start page)
 	return resp.Request.URL, references, nil
+}
+
+//-------------------------------------------------------------------------------------------------
+
+func (d *Download) css304(item *url.URL, resp *http.Response, before time.Time, contentType header.ContentType) (*url.URL, htmlindex.Refs, error) {
+	var references htmlindex.Refs
+	filePath := d.getFilePath(item, false)
+	data, err := ioutil.ReadFile(d.Fs, d.StartURL, filePath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("existing file %s: %w", contentType.String(), err)
+	}
+
+	_, references = d.checkCSSForUrls(item, data)
+
+	return nil, references, nil
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -232,12 +270,13 @@ var tagsWithReferences = []string{
 	htmlindex.BodyTag,
 }
 
-func (d *Download) findReferences(index *htmlindex.Index) (htmlindex.Refs, error) {
+func (d *Download) findReferences(item *url.URL, index *htmlindex.Index) (htmlindex.Refs, error) {
 	var result htmlindex.Refs
 	for _, tag := range tagsWithReferences {
 		references, err := index.URLs(tag)
 		if err != nil {
 			logger.Error("Getting node URLs failed",
+				log.String("url", item.String()),
 				log.String("node", tag),
 				log.Err(err))
 		}
@@ -250,7 +289,7 @@ func (d *Download) findReferences(index *htmlindex.Index) (htmlindex.Refs, error
 
 	references, err := index.URLs(htmlindex.ImgTag)
 	if err != nil {
-		logger.Error("Getting img node URLs failed", log.Err(err))
+		logger.Error("Getting <img> URLs failed", log.String("url", item.String()), log.Err(err))
 	}
 
 	for _, ur := range references {
@@ -286,4 +325,25 @@ func (d *Download) storeDownload(u *url.URL, data io.Reader, lastModified time.T
 				log.Err(err))
 		}
 	}
+}
+
+func isHtml(contentType header.ContentType) bool {
+	return contentType.Type == "text" && contentType.Subtype == "html"
+}
+
+func isXHtml(contentType header.ContentType) bool {
+	return contentType.Type == "application" && contentType.Subtype == "xhtml+xml"
+}
+
+func timeTaken(before time.Time) string {
+	return time.Now().Sub(before).Round(time.Millisecond).String()
+}
+
+func logResponse(item *url.URL, resp *http.Response, before time.Time) {
+	level := log.InfoLevel
+	switch {
+	case resp.StatusCode >= 400:
+		level = log.WarnLevel
+	}
+	logger.Log(level, http.StatusText(resp.StatusCode), log.String("url", item.String()), log.Int("code", resp.StatusCode), log.String("took", timeTaken(before)))
 }
