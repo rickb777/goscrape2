@@ -14,7 +14,6 @@ import (
 	"github.com/cornelk/goscrape/download"
 	"github.com/cornelk/goscrape/download/ioutil"
 	"github.com/cornelk/goscrape/filter"
-	"github.com/cornelk/goscrape/htmlindex"
 	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/goscrape/work"
 	"github.com/cornelk/gotokit/log"
@@ -150,7 +149,7 @@ func (s *Scraper) Start(ctx context.Context) error {
 		Fs:       s.fs,
 	}
 
-	redirect, firstPageReferences, err := d.ProcessURL(ctx, firstItem)
+	redirect, firstResult, err := d.ProcessURL(ctx, firstItem)
 	if err != nil {
 		return err
 	}
@@ -161,7 +160,7 @@ func (s *Scraper) Start(ctx context.Context) error {
 
 	// WorkQueue has unlimited buffering and so prevents deadlock
 	workQueueIn, workQueueOut := process.WorkQueue[work.Item](32)
-	refsQueue := make(chan htmlindex.Refs, s.config.Concurrency)
+	results := make(chan work.Result, s.config.Concurrency)
 
 	pool := process.NewGroup()
 
@@ -177,7 +176,7 @@ func (s *Scraper) Start(ctx context.Context) error {
 					if !open {
 						return nil // normal 'clean' termination
 					} else {
-						_, moreRefs, err := d.ProcessURL(ctx, item)
+						_, result, err := d.ProcessURL(ctx, item)
 						if err != nil {
 							if !errors.Is(err, context.Canceled) {
 								logger.Error("Failed", log.String("item", item.String()), log.Err(err))
@@ -185,7 +184,7 @@ func (s *Scraper) Start(ctx context.Context) error {
 							return err
 						}
 
-						refsQueue <- moreRefs
+						results <- *result
 					}
 				}
 			} else {
@@ -200,10 +199,10 @@ func (s *Scraper) Start(ctx context.Context) error {
 	// causing all the pool goroutines to terminate.
 	go func() {
 		todo := 1 // first page references
-		for refs := range refsQueue {
+		for result := range results {
 			todo--
-			for _, ref := range refs {
-				next := firstItem.Derive(ref)
+			for _, ref := range result.References {
+				next := result.Derive(ref)
 				if s.shouldURLBeDownloaded(next) {
 					workQueueIn <- next
 					todo++
@@ -217,7 +216,7 @@ func (s *Scraper) Start(ctx context.Context) error {
 	}()
 
 	// start the ball rolling: this creates the first batch of work items
-	refsQueue <- firstPageReferences
+	results <- *firstResult
 
 	// all the pool processes are busy until this unblocks.
 	pool.Wait()

@@ -40,7 +40,7 @@ type Download struct {
 	Throttle Throttle // increases when server gives 429 (Too Many Requests) responses
 }
 
-func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, htmlindex.Refs, error) {
+func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *work.Result, error) {
 	var existingModified time.Time
 
 	filePath := d.getFilePath(item.URL, true)
@@ -51,7 +51,8 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, ht
 		}
 	}
 
-	before := time.Now()
+	startTime := time.Now()
+
 	resp, err := d.GET(ctx, item.URL, existingModified)
 	if err != nil {
 		logger.Error("Processing HTTP Request failed",
@@ -65,7 +66,7 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, ht
 	}
 
 	defer closeResponseBody(resp)
-	defer logResponse(item.URL, resp, before)
+	defer logResponse(item.URL, resp, startTime)
 
 	if item.Depth == 0 {
 		// take account of redirection (only on the start page)
@@ -75,49 +76,49 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, ht
 	switch resp.StatusCode {
 	case http.StatusTooManyRequests:
 		// put this URL back into the work queue to be re-tried later
-		return item.URL, htmlindex.Refs{item.URL}, nil
+		repeat := &work.Result{Item: item, References: []*url.URL{item.URL}}
+		repeat.Item.Depth-- // because it gets incremented
+		return item.URL, repeat, nil
 
 	case http.StatusNoContent:
 		// put this URL back into the work queue to be re-tried later
 		return nil, nil, nil
 
 	case http.StatusNotModified:
-		return d.response304(item.URL, resp, before)
+		return d.response304(item, resp)
 
 	default:
-		return d.response200(item.URL, resp, before)
+		return d.response200(item, resp)
 	}
 }
 
 //-------------------------------------------------------------------------------------------------
 
-func (d *Download) response200(item *url.URL, resp *http.Response, before time.Time) (*url.URL, htmlindex.Refs, error) {
-	var references htmlindex.Refs
-
+func (d *Download) response200(item work.Item, resp *http.Response) (*url.URL, *work.Result, error) {
 	contentType := header.ParseContentTypeFromHeaders(resp.Header)
 	lastModified, _ := header.ParseHTTPDateTime(resp.Header.Get(headername.LastModified))
 
 	switch {
 	case isHtml(contentType) || isXHtml(contentType):
-		return d.html200(item, resp, before, lastModified, contentType)
+		return d.html200(item, resp, lastModified, contentType)
 
 	case contentType.Type == "text" && contentType.Subtype == "css":
-		return d.css200(item, resp, before, lastModified)
+		return d.css200(item, resp, lastModified)
 
 	case contentType.Type == "image" && d.Config.ImageQuality != 0:
-		return d.image200(item, resp, before, lastModified, contentType)
+		return d.image200(item, resp, lastModified, contentType)
 
 	default:
 		// store without buffering entire file into memory
-		d.storeDownload(item, resp.Body, lastModified, false)
+		d.storeDownload(item.URL, resp.Body, lastModified, false)
 	}
 
-	return nil, references, nil
+	return nil, &work.Result{Item: item}, nil
 }
 
 //-------------------------------------------------------------------------------------------------
 
-func (d *Download) html200(item *url.URL, resp *http.Response, before time.Time, lastModified time.Time, contentType header.ContentType) (*url.URL, htmlindex.Refs, error) {
+func (d *Download) html200(item work.Item, resp *http.Response, lastModified time.Time, contentType header.ContentType) (*url.URL, *work.Result, error) {
 	var references htmlindex.Refs
 
 	data, err := bufferEntireResponse(resp)
@@ -131,9 +132,9 @@ func (d *Download) html200(item *url.URL, resp *http.Response, before time.Time,
 	}
 
 	index := htmlindex.New()
-	index.Index(item, doc)
+	index.Index(item.URL, doc)
 
-	fixed, hasChanges, err := d.fixURLReferences(item, doc, index)
+	fixed, hasChanges, err := d.fixURLReferences(item.URL, doc, index)
 	if err != nil {
 		logger.Error("Fixing file references failed",
 			log.String("url", item.String()),
@@ -148,7 +149,7 @@ func (d *Download) html200(item *url.URL, resp *http.Response, before time.Time,
 		rdr = bytes.NewReader(data)
 	}
 
-	d.storeDownload(item, rdr, lastModified, true)
+	d.storeDownload(item.URL, rdr, lastModified, true)
 
 	references, err = d.findReferences(item, index)
 	if err != nil {
@@ -157,12 +158,12 @@ func (d *Download) html200(item *url.URL, resp *http.Response, before time.Time,
 
 	// use the URL that the website returned as new base url for the
 	// scrape, in case a redirect changed it (only for the start page)
-	return resp.Request.URL, references, nil
+	return resp.Request.URL, &work.Result{Item: item, References: references}, nil
 }
 
 //-------------------------------------------------------------------------------------------------
 
-func (d *Download) css200(item *url.URL, resp *http.Response, before time.Time, lastModified time.Time) (*url.URL, htmlindex.Refs, error) {
+func (d *Download) css200(item work.Item, resp *http.Response, lastModified time.Time) (*url.URL, *work.Result, error) {
 	var references htmlindex.Refs
 
 	data, err := bufferEntireResponse(resp)
@@ -170,44 +171,42 @@ func (d *Download) css200(item *url.URL, resp *http.Response, before time.Time, 
 		return nil, nil, fmt.Errorf("buffering text/css: %w", err)
 	}
 
-	data, references = d.checkCSSForUrls(item, data)
+	data, references = d.checkCSSForUrls(item.URL, data)
 
-	d.storeDownload(item, bytes.NewReader(data), lastModified, false)
+	d.storeDownload(item.URL, bytes.NewReader(data), lastModified, false)
 
-	return nil, references, nil
+	return nil, &work.Result{Item: item, References: references}, nil
 }
 
 //-------------------------------------------------------------------------------------------------
 
-func (d *Download) image200(item *url.URL, resp *http.Response, before time.Time, lastModified time.Time, contentType header.ContentType) (*url.URL, htmlindex.Refs, error) {
+func (d *Download) image200(item work.Item, resp *http.Response, lastModified time.Time, contentType header.ContentType) (*url.URL, *work.Result, error) {
 	data, err := bufferEntireResponse(resp)
 	if err != nil {
 		return nil, nil, fmt.Errorf("buffering %s: %w", contentType.String(), err)
 	}
 
-	data = d.Config.ImageQuality.CheckImageForRecode(item, data)
+	data = d.Config.ImageQuality.CheckImageForRecode(item.URL, data)
 	if d.Config.ImageQuality != 0 {
 		lastModified = time.Time{} // altered images can't be safely time-stamped
 	}
 
-	d.storeDownload(item, bytes.NewReader(data), lastModified, false)
+	d.storeDownload(item.URL, bytes.NewReader(data), lastModified, false)
 
-	return nil, nil, nil
+	return nil, &work.Result{Item: item}, nil
 }
 
 //-------------------------------------------------------------------------------------------------
 
-func (d *Download) response304(item *url.URL, resp *http.Response, before time.Time) (*url.URL, htmlindex.Refs, error) {
-	var references htmlindex.Refs
-
+func (d *Download) response304(item work.Item, resp *http.Response) (*url.URL, *work.Result, error) {
 	contentType := header.ParseContentTypeFromHeaders(resp.Header)
 
 	switch {
 	case isHtml(contentType) || isXHtml(contentType):
-		return d.html304(item, resp, before, contentType)
+		return d.html304(item, resp, contentType)
 
 	case contentType.Type == "text" && contentType.Subtype == "css":
-		return d.css304(item, resp, before, contentType)
+		return d.css304(item, contentType)
 
 	default:
 		// no further action
@@ -215,14 +214,14 @@ func (d *Download) response304(item *url.URL, resp *http.Response, before time.T
 
 	// use the URL that the website returned as new base url for the
 	// scrape, in case a redirect changed it (only for the start page)
-	return resp.Request.URL, references, nil
+	return resp.Request.URL, &work.Result{Item: item}, nil
 }
 
 //-------------------------------------------------------------------------------------------------
 
-func (d *Download) html304(item *url.URL, resp *http.Response, before time.Time, contentType header.ContentType) (*url.URL, htmlindex.Refs, error) {
+func (d *Download) html304(item work.Item, resp *http.Response, contentType header.ContentType) (*url.URL, *work.Result, error) {
 	var references htmlindex.Refs
-	filePath := d.getFilePath(item, true)
+	filePath := d.getFilePath(item.URL, true)
 	data, err := ioutil.ReadFile(d.Fs, d.StartURL, filePath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("existing file %s: %w", contentType.String(), err)
@@ -234,7 +233,7 @@ func (d *Download) html304(item *url.URL, resp *http.Response, before time.Time,
 	}
 
 	index := htmlindex.New()
-	index.Index(item, doc)
+	index.Index(item.URL, doc)
 
 	references, err = d.findReferences(item, index)
 	if err != nil {
@@ -243,22 +242,22 @@ func (d *Download) html304(item *url.URL, resp *http.Response, before time.Time,
 
 	// use the URL that the website returned as new base url for the
 	// scrape, in case a redirect changed it (only for the start page)
-	return resp.Request.URL, references, nil
+	return resp.Request.URL, &work.Result{Item: item, References: references}, nil
 }
 
 //-------------------------------------------------------------------------------------------------
 
-func (d *Download) css304(item *url.URL, resp *http.Response, before time.Time, contentType header.ContentType) (*url.URL, htmlindex.Refs, error) {
+func (d *Download) css304(item work.Item, contentType header.ContentType) (*url.URL, *work.Result, error) {
 	var references htmlindex.Refs
-	filePath := d.getFilePath(item, false)
+	filePath := d.getFilePath(item.URL, false)
 	data, err := ioutil.ReadFile(d.Fs, d.StartURL, filePath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("existing file %s: %w", contentType.String(), err)
 	}
 
-	_, references = d.checkCSSForUrls(item, data)
+	_, references = d.checkCSSForUrls(item.URL, data)
 
-	return nil, references, nil
+	return nil, &work.Result{Item: item, References: references}, nil
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -270,7 +269,7 @@ var tagsWithReferences = []string{
 	htmlindex.BodyTag,
 }
 
-func (d *Download) findReferences(item *url.URL, index *htmlindex.Index) (htmlindex.Refs, error) {
+func (d *Download) findReferences(item work.Item, index *htmlindex.Index) (htmlindex.Refs, error) {
 	var result htmlindex.Refs
 	for _, tag := range tagsWithReferences {
 		references, err := index.URLs(tag)

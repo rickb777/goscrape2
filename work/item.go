@@ -23,3 +23,8 @@ func (it Item) Derive(u *url.URL) Item {
 func (it Item) String() string {
 	return fmt.Sprintf("%s (depth:%d)", it.URL.String(), it.Depth)
 }
+
+type Result struct {
+	Item
+	References []*url.URL
+}
