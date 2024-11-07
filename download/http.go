@@ -56,12 +56,11 @@ func (d *Download) GET(ctx context.Context, u *url.URL, lastModified time.Time) 
 		}
 
 		Counters.Increment(resp.StatusCode)
-		logger.Debug(http.MethodGet,
-			slog.String("url", u.String()),
-			slog.Int("status", resp.StatusCode),
-			slog.String(headername.ContentType, resp.Header.Get(headername.ContentType)),
-			slog.String(headername.ContentLength, resp.Header.Get(headername.ContentLength)),
-			slog.String(headername.LastModified, resp.Header.Get(headername.LastModified)))
+		args := []any{slog.String("url", u.String()), slog.Int("status", resp.StatusCode)}
+		args = addHeaderValue(args, resp.Header, headername.ContentType)
+		args = addHeaderValue(args, resp.Header, headername.ContentLength)
+		args = addHeaderValue(args, resp.Header, headername.LastModified)
+		logger.Debug(http.MethodGet, args...)
 
 		switch {
 		// 1xx status codes are never returned
@@ -134,4 +133,12 @@ func bufferEntireResponse(resp *http.Response) ([]byte, error) {
 		return nil, fmt.Errorf("%s reading response body: %w", resp.Request.URL, err)
 	}
 	return buf.Bytes(), nil
+}
+
+func addHeaderValue(args []any, header http.Header, name string) []any {
+	value := header.Get(name)
+	if value != "" {
+		args = append(args, slog.String(name, value))
+	}
+	return args
 }

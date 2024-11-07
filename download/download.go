@@ -344,5 +344,6 @@ func logResponse(item *url.URL, resp *http.Response, before time.Time) {
 	case resp.StatusCode >= 400:
 		level = slog.LevelWarn
 	}
-	logger.Log(level, http.StatusText(resp.StatusCode), slog.String("url", item.String()), slog.Int("code", resp.StatusCode), slog.String("took", timeTaken(before)))
+	logger.Log(level, http.StatusText(resp.StatusCode), slog.String("url", item.String()),
+		slog.Int("code", resp.StatusCode), slog.String("took", timeTaken(before)))
 }
