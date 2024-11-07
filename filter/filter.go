@@ -2,11 +2,11 @@ package filter
 
 import (
 	"errors"
+	"log/slog"
 	"net/url"
 	"regexp"
 
 	"github.com/cornelk/goscrape/logger"
-	"github.com/cornelk/gotokit/log"
 )
 
 type Filter []*regexp.Regexp
@@ -34,8 +34,8 @@ func (filter Filter) Matches(url *url.URL, intent string) bool {
 	for _, re := range filter {
 		if re.MatchString(url.Path) {
 			logger.Debug(intent,
-				log.String("url", url.String()),
-				log.Stringer("expression", re))
+				slog.String("url", url.String()),
+				slog.Any("expression", re))
 			return true
 		}
 	}

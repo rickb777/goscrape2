@@ -5,12 +5,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"time"
 
 	"github.com/cornelk/goscrape/logger"
-	"github.com/cornelk/gotokit/log"
 	"github.com/rickb777/acceptable/header"
 	"github.com/rickb777/acceptable/headername"
 )
@@ -57,11 +57,11 @@ func (d *Download) GET(ctx context.Context, u *url.URL, lastModified time.Time) 
 
 		Counters.Increment(resp.StatusCode)
 		logger.Debug(http.MethodGet,
-			log.String("url", u.String()),
-			log.Int("status", resp.StatusCode),
-			log.String(headername.ContentType, resp.Header.Get(headername.ContentType)),
-			log.String(headername.ContentLength, resp.Header.Get(headername.ContentLength)),
-			log.String(headername.LastModified, resp.Header.Get(headername.LastModified)))
+			slog.String("url", u.String()),
+			slog.Int("status", resp.StatusCode),
+			slog.String(headername.ContentType, resp.Header.Get(headername.ContentType)),
+			slog.String(headername.ContentLength, resp.Header.Get(headername.ContentLength)),
+			slog.String(headername.LastModified, resp.Header.Get(headername.LastModified)))
 
 		switch {
 		// 1xx status codes are never returned
@@ -79,8 +79,8 @@ func (d *Download) GET(ctx context.Context, u *url.URL, lastModified time.Time) 
 
 		// 4xx status code = client error
 		case resp.StatusCode >= 400:
-			logger.Error("HTTP client error", log.String("url", u.String()),
-				log.Int("code", resp.StatusCode), log.String("status", http.StatusText(resp.StatusCode)))
+			logger.Error("HTTP client error", slog.String("url", u.String()),
+				slog.Int("code", resp.StatusCode), slog.String("status", http.StatusText(resp.StatusCode)))
 			return nil, nil // no error allows ongoing downloading
 
 		// 304 not modified - no download but scan for links if possible
@@ -99,10 +99,10 @@ func (d *Download) GET(ctx context.Context, u *url.URL, lastModified time.Time) 
 		}
 
 		logger.Warn("HTTP server error",
-			log.String("url", req.URL.String()),
-			log.Int("code", resp.StatusCode),
-			log.String("status", http.StatusText(resp.StatusCode)),
-			log.String("sleep", retryDelay.String()))
+			slog.String("url", req.URL.String()),
+			slog.Int("code", resp.StatusCode),
+			slog.String("status", http.StatusText(resp.StatusCode)),
+			slog.String("sleep", retryDelay.String()))
 
 		time.Sleep(retryDelay)
 	}
@@ -123,8 +123,8 @@ func backoff(t time.Duration) time.Duration {
 func closeResponseBody(resp *http.Response) {
 	if err := resp.Body.Close(); err != nil {
 		logger.Error("Closing HTTP response body failed",
-			log.String("url", resp.Request.URL.String()),
-			log.Err(err))
+			slog.String("url", resp.Request.URL.String()),
+			slog.Any("error", err))
 	}
 }
 

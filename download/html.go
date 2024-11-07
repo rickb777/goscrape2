@@ -3,12 +3,12 @@ package download
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"strings"
 
 	"github.com/cornelk/goscrape/htmlindex"
 	"github.com/cornelk/goscrape/logger"
-	"github.com/cornelk/gotokit/log"
 	"golang.org/x/net/html"
 )
 
@@ -100,8 +100,8 @@ func (d *Download) fixNodeURL(baseURL *url.URL, attributes []string, node *html.
 		}
 
 		logger.Debug("HTML node relinked",
-			log.String("value", value),
-			log.String("fixed_value", adjusted))
+			slog.String("value", value),
+			slog.String("fixed_value", adjusted))
 
 		attribute := &node.Attr[i]
 		attribute.Val = adjusted

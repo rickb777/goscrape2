@@ -2,20 +2,21 @@ package download
 
 import (
 	"bytes"
+	"io"
+	"log/slog"
 	"net/url"
 	"testing"
 
 	"github.com/cornelk/goscrape/config"
 	"github.com/cornelk/goscrape/htmlindex"
 	"github.com/cornelk/goscrape/logger"
-	"github.com/cornelk/gotokit/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/html"
 )
 
 func TestFixURLReferences(t *testing.T) {
-	logger.Logger = log.NewTestLogger(t)
+	logger.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	cfg := config.Config{
 		URL: "http://domain.com",
 	}

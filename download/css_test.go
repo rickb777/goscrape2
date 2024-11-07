@@ -1,17 +1,18 @@
 package download
 
 import (
+	"io"
+	"log/slog"
 	"net/url"
 	"testing"
 
 	"github.com/cornelk/goscrape/config"
 	"github.com/cornelk/goscrape/logger"
-	"github.com/cornelk/gotokit/log"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCheckCSSForURLs(t *testing.T) {
-	logger.Logger = log.NewTestLogger(t)
+	logger.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	cfg := config.Config{
 		URL: "http://localhost",
 	}

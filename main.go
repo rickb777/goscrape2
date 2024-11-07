@@ -5,21 +5,20 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/cornelk/goscrape/download"
+	"log/slog"
 	"maps"
 	"os"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/alexflint/go-arg"
 	"github.com/cornelk/goscrape/config"
+	"github.com/cornelk/goscrape/download"
 	"github.com/cornelk/goscrape/images"
 	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/goscrape/scraper"
-	"github.com/cornelk/gotokit/buildinfo"
-	"github.com/cornelk/gotokit/env"
-	"github.com/cornelk/gotokit/log"
 )
 
 var (
@@ -61,7 +60,7 @@ func (arguments) Description() string {
 }
 
 func (arguments) Version() string {
-	return fmt.Sprintf("Version: %s\n", buildinfo.Version(version, commit, date))
+	return fmt.Sprintf("formatVersion: %s\n", formatVersion(version, commit, date))
 }
 
 func main() {
@@ -74,19 +73,7 @@ func main() {
 	ctx := context.Background()
 	//ctx := app.Context() // provides signal handler cancellation
 
-	if args.Debug {
-		log.SetDefaultLevel(log.DebugLevel)
-	} else if args.Verbose {
-		log.SetDefaultLevel(log.InfoLevel)
-	} else {
-		log.SetDefaultLevel(log.WarnLevel)
-	}
-
-	logger.Logger, err = createLogger()
-	if err != nil {
-		fmt.Printf("Creating logger failed: %s\n", err)
-		os.Exit(1)
-	}
+	logger.Logger = createLogger(args)
 
 	if args.Serve != "" {
 		if err := runServer(ctx, args); err != nil {
@@ -187,7 +174,7 @@ func scrapeURLs(ctx context.Context, cfg config.Config, args arguments) error {
 			return fmt.Errorf("initializing scraper: %w", err)
 		}
 
-		logger.Info("Scraping", log.String("url", sc.URL.String()))
+		logger.Info("Scraping", slog.String("url", sc.URL.String()))
 		if err = sc.Start(ctx); err != nil {
 			if errors.Is(err, context.Canceled) {
 				os.Exit(0)
@@ -223,19 +210,18 @@ func runServer(ctx context.Context, args arguments) error {
 	return nil
 }
 
-func createLogger() (*log.Logger, error) {
-	logCfg, err := log.ConfigForEnv(env.Development)
-	if err != nil {
-		return nil, fmt.Errorf("initializing log config: %w", err)
-	}
-	logCfg.JSONOutput = false
-	logCfg.CallerInfo = false
+func createLogger(args arguments) *slog.Logger {
+	opts := &slog.HandlerOptions{}
 
-	lgr, err := log.NewWithConfig(logCfg)
-	if err != nil {
-		return nil, fmt.Errorf("initializing logger: %w", err)
+	if args.Debug {
+		opts.Level = slog.LevelDebug
+	} else if args.Verbose {
+		opts.Level = slog.LevelInfo
+	} else {
+		opts.Level = slog.LevelWarn
 	}
-	return lgr, nil
+
+	return slog.New(slog.NewTextHandler(os.Stdout, opts))
 }
 
 func readCookieFile(cookieFile string) ([]config.Cookie, error) {
@@ -270,4 +256,20 @@ func saveCookies(cookieFile string, cookies []config.Cookie) error {
 	}
 
 	return nil
+}
+
+// formatVersion builds a version string based on binary release information.
+func formatVersion(version, commit, date string) string {
+	buf := strings.Builder{}
+	buf.WriteString(version)
+
+	if commit != "" {
+		buf.WriteString(" commit: " + commit)
+	}
+	if date != "" {
+		buf.WriteString(" built at: " + date)
+	}
+	goVersion := runtime.Version()
+	buf.WriteString(" built with: " + goVersion)
+	return buf.String()
 }

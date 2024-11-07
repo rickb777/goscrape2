@@ -2,12 +2,13 @@ package download
 
 import (
 	"github.com/cornelk/goscrape/logger"
+	"io"
+	"log/slog"
 	"net/url"
 	"os"
 	"testing"
 
 	"github.com/cornelk/goscrape/config"
-	"github.com/cornelk/gotokit/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,7 +32,7 @@ func TestGetFilePath(t *testing.T) {
 	}
 
 	var cfg config.Config
-	logger.Logger = log.NewTestLogger(t)
+	logger.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	for _, fix := range fixtures {
 		cfg.URL = fix.BaseURL
 		u, _ := url.Parse(cfg.URL)

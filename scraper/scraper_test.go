@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"github.com/spf13/afero"
 	"io"
+	"log/slog"
 	"net/http"
 	"slices"
 	"testing"
 
 	"github.com/cornelk/goscrape/config"
 	"github.com/cornelk/goscrape/logger"
-	"github.com/cornelk/gotokit/log"
 	"github.com/rickb777/acceptable/headername"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -51,7 +51,7 @@ func (c *stubClient) Do(req *http.Request) (resp *http.Response, err error) {
 func newTestScraper(t *testing.T, startURL string, stub *stubClient) *Scraper {
 	t.Helper()
 
-	logger.Logger = log.NewTestLogger(t)
+	logger.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	cfg := config.Config{
 		URL:      startURL,
 		MaxDepth: 10,

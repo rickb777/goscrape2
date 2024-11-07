@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -16,7 +17,6 @@ import (
 	"github.com/cornelk/goscrape/htmlindex"
 	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/goscrape/work"
-	"github.com/cornelk/gotokit/log"
 	"github.com/rickb777/acceptable/header"
 	"github.com/rickb777/acceptable/headername"
 	"github.com/spf13/afero"
@@ -56,8 +56,8 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 	resp, err := d.GET(ctx, item.URL, existingModified)
 	if err != nil {
 		logger.Error("Processing HTTP Request failed",
-			log.String("url", item.URL.String()),
-			log.Err(err))
+			slog.String("url", item.URL.String()),
+			slog.Any("error", err))
 		return nil, nil, err
 	}
 
@@ -137,8 +137,8 @@ func (d *Download) html200(item work.Item, resp *http.Response, lastModified tim
 	fixed, hasChanges, err := d.fixURLReferences(item.URL, doc, index)
 	if err != nil {
 		logger.Error("Fixing file references failed",
-			log.String("url", item.String()),
-			log.Err(err))
+			slog.String("url", item.String()),
+			slog.Any("error", err))
 		return nil, nil, nil
 	}
 
@@ -275,9 +275,9 @@ func (d *Download) findReferences(item work.Item, index *htmlindex.Index) (htmli
 		references, err := index.URLs(tag)
 		if err != nil {
 			logger.Error("Getting node URLs failed",
-				log.String("url", item.String()),
-				log.String("node", tag),
-				log.Err(err))
+				slog.String("url", item.String()),
+				slog.String("node", tag),
+				slog.Any("error", err))
 		}
 
 		for _, ur := range references {
@@ -288,7 +288,7 @@ func (d *Download) findReferences(item work.Item, index *htmlindex.Index) (htmli
 
 	references, err := index.URLs(htmlindex.ImgTag)
 	if err != nil {
-		logger.Error("Getting <img> URLs failed", log.String("url", item.String()), log.Err(err))
+		logger.Error("Getting <img> URLs failed", slog.String("url", item.String()), slog.Any("error", err))
 	}
 
 	for _, ur := range references {
@@ -310,18 +310,18 @@ func (d *Download) storeDownload(u *url.URL, data io.Reader, lastModified time.T
 
 	if err := ioutil.WriteFileAtomically(d.Fs, d.StartURL, filePath, data); err != nil {
 		logger.Error("Writing to file failed",
-			log.String("URL", u.String()),
-			log.String("file", filePath),
-			log.Err(err))
+			slog.String("URL", u.String()),
+			slog.String("file", filePath),
+			slog.Any("error", err))
 		return
 	}
 
 	if !lastModified.IsZero() {
 		if err := os.Chtimes(filePath, lastModified, lastModified); err != nil {
 			logger.Error("Updating file timestamps failed",
-				log.String("URL", u.String()),
-				log.String("file", filePath),
-				log.Err(err))
+				slog.String("URL", u.String()),
+				slog.String("file", filePath),
+				slog.Any("error", err))
 		}
 	}
 }
@@ -339,10 +339,10 @@ func timeTaken(before time.Time) string {
 }
 
 func logResponse(item *url.URL, resp *http.Response, before time.Time) {
-	level := log.InfoLevel
+	level := slog.LevelInfo
 	switch {
 	case resp.StatusCode >= 400:
-		level = log.WarnLevel
+		level = slog.LevelWarn
 	}
-	logger.Log(level, http.StatusText(resp.StatusCode), log.String("url", item.String()), log.Int("code", resp.StatusCode), log.String("took", timeTaken(before)))
+	logger.Log(level, http.StatusText(resp.StatusCode), slog.String("url", item.String()), slog.Int("code", resp.StatusCode), slog.String("took", timeTaken(before)))
 }

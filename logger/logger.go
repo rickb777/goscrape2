@@ -2,27 +2,29 @@
 // code whilst also allowing a pluggable test logger.
 package logger
 
-import "github.com/cornelk/gotokit/log"
+import (
+	"log/slog"
+)
 
 // Logger is a global logger that is able to handle concurrent logging safely.
-var Logger *log.Logger
+var Logger = slog.Default()
 
-func Log(level log.Level, msg string, args ...any) {
+func Log(level slog.Level, msg string, args ...any) {
 	Logger.Log(nil, level, msg, args...)
 }
 
 func Debug(msg string, args ...any) {
-	Log(log.DebugLevel, msg, args...)
+	Log(slog.LevelDebug, msg, args...)
 }
 
 func Info(msg string, args ...any) {
-	Log(log.InfoLevel, msg, args...)
+	Log(slog.LevelInfo, msg, args...)
 }
 
 func Warn(msg string, args ...any) {
-	Log(log.WarnLevel, msg, args...)
+	Log(slog.LevelWarn, msg, args...)
 }
 
 func Error(msg string, args ...any) {
-	Log(log.ErrorLevel, msg, args...)
+	Log(slog.LevelError, msg, args...)
 }

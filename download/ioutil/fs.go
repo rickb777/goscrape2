@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log/slog"
 	"math/rand/v2"
 	"net/url"
 	"os"
@@ -11,7 +12,6 @@ import (
 	"strconv"
 
 	"github.com/cornelk/goscrape/logger"
-	"github.com/cornelk/gotokit/log"
 	"github.com/spf13/afero"
 )
 
@@ -28,7 +28,7 @@ func CreateDirectory(fs afero.Fs, path string) error {
 		return nil
 	}
 
-	logger.Debug("Creating dir", log.String("path", path))
+	logger.Debug("Creating dir", slog.String("path", path))
 	if err := fs.MkdirAll(path, os.ModePerm); err != nil {
 		return fmt.Errorf("creating directory '%s': %w", path, err)
 	}
@@ -45,7 +45,7 @@ func WriteFileAtomically(fs afero.Fs, startURL *url.URL, filePath string, data i
 		return err
 	}
 
-	logger.Debug("Creating file", log.String("path", filePath))
+	logger.Debug("Creating file", slog.String("path", filePath))
 	// writing the file may take much time, so write to a temporary file first
 	f, err := fs.Create(filePath + randomSuffix)
 	if err != nil {

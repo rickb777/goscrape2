@@ -2,6 +2,7 @@ package download
 
 import (
 	"fmt"
+	"log/slog"
 	"net/url"
 	"path"
 	"regexp"
@@ -9,7 +10,6 @@ import (
 
 	"github.com/cornelk/goscrape/htmlindex"
 	"github.com/cornelk/goscrape/logger"
-	"github.com/cornelk/gotokit/log"
 	"github.com/gorilla/css/scanner"
 )
 
@@ -44,8 +44,8 @@ func (d *Download) checkCSSForUrls(cssURL *url.URL, data []byte) ([]byte, htmlin
 		u, err := cssURL.Parse(src)
 		if err != nil {
 			logger.Logger.Error("Parsing URL failed",
-				log.String("url", src),
-				log.Err(err))
+				slog.String("url", src),
+				slog.Any("error", err))
 			continue
 		}
 
@@ -67,8 +67,8 @@ func (d *Download) checkCSSForUrls(cssURL *url.URL, data []byte) ([]byte, htmlin
 		fixed := fmt.Sprintf("url(%s)", filePath)
 		str = strings.ReplaceAll(str, original, fixed)
 		logger.Debug("CSS element relinked",
-			log.String("url", original),
-			log.String("fixed_url", fixed))
+			slog.String("url", original),
+			slog.String("fixed_url", fixed))
 	}
 
 	return []byte(str), refs

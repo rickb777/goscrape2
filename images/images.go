@@ -6,10 +6,10 @@ import (
 	"image"
 	"image/jpeg"
 	"image/png"
+	"log/slog"
 	"net/url"
 
 	"github.com/cornelk/goscrape/logger"
-	"github.com/cornelk/gotokit/log"
 	"github.com/h2non/filetype"
 	"github.com/h2non/filetype/matchers"
 	"github.com/h2non/filetype/types"
@@ -24,8 +24,8 @@ func (q ImageQuality) CheckImageForRecode(url *url.URL, data []byte) []byte {
 	}
 
 	logger.Debug("File type detected",
-		log.String("type", kind.MIME.Type),
-		log.String("sub_type", kind.MIME.Subtype))
+		slog.String("type", kind.MIME.Type),
+		slog.String("sub_type", kind.MIME.Subtype))
 
 	if kind.MIME.Type == matchers.TypeJpeg.MIME.Type && kind.MIME.Subtype == matchers.TypeJpeg.MIME.Subtype {
 		if recoded := q.recodeJPEG(url, data); recoded != nil {
@@ -71,9 +71,9 @@ func (q ImageQuality) recodeJPEG(url fmt.Stringer, data []byte) []byte {
 	}
 
 	logger.Debug("Recoded JPEG",
-		log.String("url", url.String()),
-		log.Int("size_original", len(data)),
-		log.Int("size_recoded", len(encoded)))
+		slog.String("url", url.String()),
+		slog.Int("size_original", len(data)),
+		slog.Int("size_recoded", len(encoded)))
 	return encoded
 }
 
@@ -91,8 +91,8 @@ func (q ImageQuality) recodePNG(url fmt.Stringer, data []byte) []byte {
 	}
 
 	logger.Debug("Recoded PNG",
-		log.String("url", url.String()),
-		log.Int("size_original", len(data)),
-		log.Int("size_recoded", len(encoded)))
+		slog.String("url", url.String()),
+		slog.Int("size_original", len(data)),
+		slog.Int("size_recoded", len(encoded)))
 	return encoded
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -16,7 +17,6 @@ import (
 	"github.com/cornelk/goscrape/filter"
 	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/goscrape/work"
-	"github.com/cornelk/gotokit/log"
 	"github.com/gammazero/workerpool"
 	"github.com/rickb777/process/v2"
 	"github.com/spf13/afero"
@@ -179,7 +179,7 @@ func (s *Scraper) Start(ctx context.Context) error {
 						_, result, err := d.ProcessURL(ctx, item)
 						if err != nil {
 							if !errors.Is(err, context.Canceled) {
-								logger.Error("Failed", log.String("item", item.String()), log.Err(err))
+								logger.Error("Failed", slog.String("item", item.String()), slog.Any("error", err))
 							}
 							return err
 						}

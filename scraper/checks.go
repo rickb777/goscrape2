@@ -3,7 +3,7 @@ package scraper
 import (
 	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/goscrape/work"
-	"github.com/cornelk/gotokit/log"
+	"log/slog"
 )
 
 // shouldURLBeDownloaded checks whether a page should be downloaded.
@@ -26,12 +26,12 @@ func (s *Scraper) shouldURLBeDownloaded(item work.Item) bool {
 	}
 
 	if item.URL.Host != s.URL.Host {
-		logger.Debug("Skipping external host page", log.String("url", item.URL.String()))
+		logger.Debug("Skipping external host page", slog.String("url", item.URL.String()))
 		return false
 	}
 
 	if item.Depth >= s.config.MaxDepth {
-		logger.Debug("Skipping too deep level page", log.String("url", item.URL.String()))
+		logger.Debug("Skipping too deep level page", slog.String("url", item.URL.String()))
 		return false
 	}
 
@@ -43,6 +43,6 @@ func (s *Scraper) shouldURLBeDownloaded(item work.Item) bool {
 		return false
 	}
 
-	logger.Debug("New URL to download", log.String("url", item.URL.String()))
+	logger.Debug("New URL to download", slog.String("url", item.URL.String()))
 	return true
 }

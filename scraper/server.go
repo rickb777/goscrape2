@@ -3,11 +3,11 @@ package scraper
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"mime"
 	"net/http"
 
 	"github.com/cornelk/goscrape/logger"
-	"github.com/cornelk/gotokit/log"
 )
 
 // set more mime types in the browser, this for example fixes .asp files not being
@@ -30,8 +30,8 @@ func ServeDirectory(ctx context.Context, path string, port int16) error {
 
 	fullAddr := fmt.Sprintf("http://127.0.0.1:%d", port)
 	logger.Info("Serving directory...",
-		log.String("path", path),
-		log.String("address", fullAddr))
+		slog.String("path", path),
+		slog.String("address", fullAddr))
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", port),
