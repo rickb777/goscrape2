@@ -8,15 +8,15 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/cornelk/goscrape/htmlindex"
 	"github.com/cornelk/goscrape/logger"
+	"github.com/cornelk/goscrape/work"
 	"github.com/gorilla/css/scanner"
 )
 
 var cssURLRe = regexp.MustCompile(`^url\(['"]?(.*?)['"]?\)$`)
 
-func (d *Download) checkCSSForUrls(cssURL *url.URL, data []byte) ([]byte, htmlindex.Refs) {
-	var refs htmlindex.Refs
+func (d *Download) checkCSSForUrls(cssURL *url.URL, data []byte) ([]byte, work.Refs) {
+	var refs work.Refs
 	urls := make(map[string]string)
 	str := string(data)
 	css := scanner.New(str)

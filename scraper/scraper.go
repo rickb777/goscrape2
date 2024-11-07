@@ -136,7 +136,7 @@ func (s *Scraper) Start(ctx context.Context) error {
 
 	firstItem := work.Item{URL: s.URL}
 
-	if !s.shouldURLBeDownloaded(firstItem) {
+	if !s.shouldURLBeDownloaded(firstItem.URL, 0) {
 		return errors.New("start page is excluded from downloading")
 	}
 
@@ -201,13 +201,13 @@ func (s *Scraper) Start(ctx context.Context) error {
 		todo := 1 // first page references
 		for result := range results {
 			todo--
+			newDepth := result.Item.Depth + 1
+			s.partitionResult(&result, newDepth)
+			logger.Debug("Partitioned", slog.Any("item", result.Item), slog.Any("include", result.References), slog.Any("exclude", result.Excluded))
 			for _, ref := range result.References {
-				next := result.Derive(ref)
-				if s.shouldURLBeDownloaded(next) {
-					workQueueIn <- next
-					todo++
-				}
+				workQueueIn <- work.Item{URL: ref, Referrer: result.Item.URL, Depth: newDepth}
 			}
+			todo += len(result.References)
 			if todo == 0 {
 				break
 			}

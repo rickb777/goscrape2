@@ -119,7 +119,7 @@ func (d *Download) response200(item work.Item, resp *http.Response) (*url.URL, *
 //-------------------------------------------------------------------------------------------------
 
 func (d *Download) html200(item work.Item, resp *http.Response, lastModified time.Time, contentType header.ContentType) (*url.URL, *work.Result, error) {
-	var references htmlindex.Refs
+	var references work.Refs
 
 	data, err := bufferEntireResponse(resp)
 	if err != nil {
@@ -164,7 +164,7 @@ func (d *Download) html200(item work.Item, resp *http.Response, lastModified tim
 //-------------------------------------------------------------------------------------------------
 
 func (d *Download) css200(item work.Item, resp *http.Response, lastModified time.Time) (*url.URL, *work.Result, error) {
-	var references htmlindex.Refs
+	var references work.Refs
 
 	data, err := bufferEntireResponse(resp)
 	if err != nil {
@@ -220,7 +220,7 @@ func (d *Download) response304(item work.Item, resp *http.Response) (*url.URL, *
 //-------------------------------------------------------------------------------------------------
 
 func (d *Download) html304(item work.Item, resp *http.Response, contentType header.ContentType) (*url.URL, *work.Result, error) {
-	var references htmlindex.Refs
+	var references work.Refs
 	filePath := d.getFilePath(item.URL, true)
 	data, err := ioutil.ReadFile(d.Fs, d.StartURL, filePath)
 	if err != nil {
@@ -248,7 +248,7 @@ func (d *Download) html304(item work.Item, resp *http.Response, contentType head
 //-------------------------------------------------------------------------------------------------
 
 func (d *Download) css304(item work.Item, contentType header.ContentType) (*url.URL, *work.Result, error) {
-	var references htmlindex.Refs
+	var references work.Refs
 	filePath := d.getFilePath(item.URL, false)
 	data, err := ioutil.ReadFile(d.Fs, d.StartURL, filePath)
 	if err != nil {
@@ -269,8 +269,8 @@ var tagsWithReferences = []string{
 	htmlindex.BodyTag,
 }
 
-func (d *Download) findReferences(item work.Item, index *htmlindex.Index) (htmlindex.Refs, error) {
-	var result htmlindex.Refs
+func (d *Download) findReferences(item work.Item, index *htmlindex.Index) (work.Refs, error) {
+	var result work.Refs
 	for _, tag := range tagsWithReferences {
 		references, err := index.URLs(tag)
 		if err != nil {

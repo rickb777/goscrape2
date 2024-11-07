@@ -3,6 +3,7 @@ package work
 import (
 	"fmt"
 	"net/url"
+	"strings"
 )
 
 // Item is comparable
@@ -24,7 +25,22 @@ func (it Item) String() string {
 	return fmt.Sprintf("%s (depth:%d)", it.URL.String(), it.Depth)
 }
 
+type Refs []*url.URL
+
 type Result struct {
 	Item
-	References []*url.URL
+	References Refs
+	Excluded   Refs
+}
+
+func (refs Refs) String() string {
+	buf := &strings.Builder{}
+	spacer := ""
+	for _, ref := range refs {
+		buf.WriteString(spacer)
+		buf.WriteString(ref.Host)
+		buf.WriteString(ref.Path)
+		spacer = " "
+	}
+	return buf.String()
 }
