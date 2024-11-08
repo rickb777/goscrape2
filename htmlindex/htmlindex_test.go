@@ -2,13 +2,13 @@ package htmlindex
 
 import (
 	"bytes"
-	"golang.org/x/net/html"
-	"golang.org/x/net/html/atom"
 	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/net/html"
+	"golang.org/x/net/html/atom"
 )
 
 func TestIndex(t *testing.T) {

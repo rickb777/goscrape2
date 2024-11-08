@@ -2,12 +2,12 @@ package htmlindex
 
 import (
 	"fmt"
-	"golang.org/x/net/html/atom"
 	"net/url"
 	"sort"
 	"strings"
 
 	"golang.org/x/net/html"
+	"golang.org/x/net/html/atom"
 )
 
 type Refs []*url.URL

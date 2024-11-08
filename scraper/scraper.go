@@ -17,7 +17,6 @@ import (
 	"github.com/cornelk/goscrape/filter"
 	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/goscrape/work"
-	"github.com/gammazero/workerpool"
 	"github.com/rickb777/process/v2"
 	"github.com/spf13/afero"
 	"golang.org/x/net/proxy"
@@ -36,8 +35,6 @@ type Scraper struct {
 
 	includes filter.Filter
 	excludes filter.Filter
-
-	workers *workerpool.WorkerPool
 
 	// key is the URL of page or asset
 	processed *work.Set[string]
@@ -114,7 +111,6 @@ func New(cfg config.Config) (*Scraper, error) {
 		includes: includes,
 		excludes: excludes,
 
-		workers:   workerpool.New(cfg.Concurrency),
 		processed: work.NewSet[string](),
 	}
 

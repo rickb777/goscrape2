@@ -1,7 +1,6 @@
 package document
 
 import (
-	"github.com/cornelk/goscrape/logger"
 	"io"
 	"log/slog"
 	"net/url"
@@ -9,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/cornelk/goscrape/config"
+	"github.com/cornelk/goscrape/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
