@@ -1,7 +1,7 @@
 package document
 
 import (
-	url "net/url"
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
