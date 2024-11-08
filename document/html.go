@@ -1,4 +1,4 @@
-package download
+package document
 
 import (
 	"bytes"
@@ -22,17 +22,36 @@ var ignoredURLPrefixes = []string{
 	"mailto:", // mail address
 }
 
-// fixURLReferences fixes URL references to point to relative file names.
+type Document struct {
+	u        *url.URL
+	startURL *url.URL
+	doc      *html.Node
+	index    *htmlindex.Index
+}
+
+func ParseHTML(u, startURL *url.URL, data []byte) (*Document, error) {
+	doc, err := html.Parse(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("parsing: %w", err)
+	}
+
+	index := htmlindex.New()
+	index.Index(u, doc)
+
+	return &Document{u: u, startURL: startURL, doc: doc, index: index}, nil
+}
+
+// FixURLReferences fixes URL references to point to relative file names.
 // It returns a bool that indicates that no reference needed to be fixed,
 // in this case the returned HTML string will be empty.
-func (d *Download) fixURLReferences(u *url.URL, doc *html.Node, index *htmlindex.Index) ([]byte, bool, error) {
-	relativeToRoot := urlRelativeToRoot(u)
-	if !fixHTMLNodeURLs(u, d.StartURL.Host, relativeToRoot, index) {
+func (d *Document) FixURLReferences() ([]byte, bool, error) {
+	relativeToRoot := urlRelativeToRoot(d.u)
+	if !fixHTMLNodeURLs(d.u, d.startURL.Host, relativeToRoot, d.index) {
 		return nil, false, nil
 	}
 
 	var rendered bytes.Buffer
-	if err := html.Render(&rendered, doc); err != nil {
+	if err := html.Render(&rendered, d.doc); err != nil {
 		return nil, false, fmt.Errorf("rendering html: %w", err)
 	}
 	if strings.Contains(rendered.String(), `html5media`) {

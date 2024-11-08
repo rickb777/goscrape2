@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/spf13/afero"
 	"io"
 	"log/slog"
 	"net/http"
@@ -14,6 +13,7 @@ import (
 	"github.com/cornelk/goscrape/config"
 	"github.com/cornelk/goscrape/logger"
 	"github.com/rickb777/acceptable/headername"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

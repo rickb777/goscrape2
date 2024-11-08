@@ -1,4 +1,4 @@
-package download
+package document
 
 import (
 	"net/url"
@@ -63,7 +63,7 @@ func urlRelativeToRoot(u *url.URL) string {
 
 func urlRelativeToOther(src, base *url.URL) string {
 	srcSplits := strings.Split(src.Path, "/")
-	baseSplits := strings.Split(getPageFilePath(base), "/")
+	baseSplits := strings.Split(GetPageFilePath(base), "/")
 
 	for {
 		if len(srcSplits) == 0 || len(baseSplits) == 0 {

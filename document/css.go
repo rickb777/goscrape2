@@ -1,4 +1,4 @@
-package download
+package document
 
 import (
 	"fmt"
@@ -15,7 +15,7 @@ import (
 
 var cssURLRe = regexp.MustCompile(`^url\(['"]?(.*?)['"]?\)$`)
 
-func (d *Download) checkCSSForUrls(cssURL *url.URL, data []byte) ([]byte, work.Refs) {
+func CheckCSSForUrls(cssURL *url.URL, startURLHost string, data []byte) ([]byte, work.Refs) {
 	var refs work.Refs
 	urls := make(map[string]string)
 	str := string(data)
@@ -55,7 +55,7 @@ func (d *Download) checkCSSForUrls(cssURL *url.URL, data []byte) ([]byte, work.R
 
 		cssPath := *cssURL
 		cssPath.Path = path.Dir(cssPath.Path) + "/"
-		resolved := resolveURL(&cssPath, src, d.StartURL.Host, "")
+		resolved := resolveURL(&cssPath, src, startURLHost, "")
 		urls[token.Value] = resolved
 	}
 

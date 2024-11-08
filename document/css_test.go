@@ -1,4 +1,4 @@
-package download
+package document
 
 import (
 	"io"
@@ -7,20 +7,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cornelk/goscrape/config"
 	"github.com/cornelk/goscrape/logger"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCheckCSSForURLs(t *testing.T) {
 	logger.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
-	cfg := config.Config{
-		URL: "http://localhost",
-	}
-	u, _ := url.Parse(cfg.URL)
-	d := Download{Config: cfg, StartURL: u}
 
-	fixtures := []struct{ input, resolved, ref string }{
+	cases := []struct{ input, resolved, ref string }{
 		{
 			input:    "url('http://localhost/uri/between/single/quote')",
 			resolved: "url(../../uri/between/single/quote)",
@@ -62,8 +56,9 @@ func TestCheckCSSForURLs(t *testing.T) {
 	}
 
 	cssURL, _ := url.Parse("http://localhost/css/x/page.css")
-	for _, c := range fixtures {
-		revised, refs := d.checkCSSForUrls(cssURL, []byte(c.input))
+
+	for _, c := range cases {
+		revised, refs := CheckCSSForUrls(cssURL, "localhost", []byte(c.input))
 
 		if c.ref == "" {
 			assert.Empty(t, refs)

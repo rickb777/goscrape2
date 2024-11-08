@@ -1,15 +1,16 @@
 package download
 
 import (
+	"github.com/cornelk/goscrape/document"
 	"net/url"
 	"path/filepath"
 )
 
 const (
 	// PageExtension is the file extension that downloaded pages get.
-	PageExtension = ".html"
+	PageExtension = document.PageExtension
 	// PageDirIndex is the file name of the index file for every dir.
-	PageDirIndex = "index" + PageExtension
+	PageDirIndex = document.PageDirIndex
 )
 
 const externalDomainPrefix = "_" // _ is a prefix for external domains on the filesystem
@@ -18,7 +19,7 @@ const externalDomainPrefix = "_" // _ is a prefix for external domains on the fi
 func (d *Download) getFilePath(url *url.URL, isAPage bool) string {
 	fileName := url.Path
 	if isAPage {
-		fileName = getPageFilePath(url)
+		fileName = document.GetPageFilePath(url)
 	}
 
 	var externalHost string
@@ -27,28 +28,4 @@ func (d *Download) getFilePath(url *url.URL, isAPage bool) string {
 	}
 
 	return filepath.Join(d.Config.OutputDirectory, d.StartURL.Host, externalHost, fileName)
-}
-
-// getPageFilePath returns a filename for a URL that represents a page.
-func getPageFilePath(url *url.URL) string {
-	fileName := url.Path
-
-	// root of domain will be index.html
-	switch {
-	case fileName == "" || fileName == "/":
-		fileName = PageDirIndex
-		// directory index will be index.html in the directory
-
-	case fileName[len(fileName)-1] == '/':
-		fileName += PageDirIndex
-
-	default:
-		ext := filepath.Ext(fileName)
-		// if file extension is missing add .html, otherwise keep the existing file extension
-		if ext == "" {
-			fileName += PageExtension
-		}
-	}
-
-	return fileName
 }

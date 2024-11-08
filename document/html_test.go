@@ -1,18 +1,15 @@
-package download
+package document
 
 import (
-	"bytes"
 	"io"
 	"log/slog"
 	"net/url"
 	"testing"
 
 	"github.com/cornelk/goscrape/config"
-	"github.com/cornelk/goscrape/htmlindex"
 	"github.com/cornelk/goscrape/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/html"
 )
 
 func TestFixURLReferences(t *testing.T) {
@@ -21,7 +18,6 @@ func TestFixURLReferences(t *testing.T) {
 		URL: "http://domain.com",
 	}
 	u, _ := url.Parse(cfg.URL)
-	d := Download{Config: cfg, StartURL: u}
 
 	b := []byte(`
 <html lang="es">
@@ -30,17 +26,10 @@ func TestFixURLReferences(t *testing.T) {
 </html>
 `)
 
-	buf := &bytes.Buffer{}
-	_, err := buf.Write(b)
+	doc, err := ParseHTML(u, u, b)
 	require.NoError(t, err)
 
-	doc, err := html.Parse(buf)
-	require.NoError(t, err)
-
-	index := htmlindex.New()
-	index.Index(d.StartURL, doc)
-
-	ref, fixed, err := d.fixURLReferences(d.StartURL, doc, index)
+	ref, fixed, err := doc.FixURLReferences()
 	require.NoError(t, err)
 	assert.True(t, fixed)
 

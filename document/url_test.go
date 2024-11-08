@@ -1,4 +1,4 @@
-package download
+package document
 
 import (
 	url "net/url"

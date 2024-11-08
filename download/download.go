@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"golang.org/x/net/html/atom"
 	"io"
 	"log/slog"
 	"net/http"
@@ -16,14 +15,13 @@ import (
 	"time"
 
 	"github.com/cornelk/goscrape/config"
+	"github.com/cornelk/goscrape/document"
 	"github.com/cornelk/goscrape/download/ioutil"
-	"github.com/cornelk/goscrape/htmlindex"
 	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/goscrape/work"
 	"github.com/rickb777/acceptable/header"
 	"github.com/rickb777/acceptable/headername"
 	"github.com/spf13/afero"
-	"golang.org/x/net/html"
 )
 
 type HttpClient interface {
@@ -129,15 +127,12 @@ func (d *Download) html200(item work.Item, resp *http.Response, lastModified tim
 		return nil, nil, fmt.Errorf("buffering %s: %w", contentType.String(), err)
 	}
 
-	doc, err := html.Parse(bytes.NewReader(data))
+	doc, err := document.ParseHTML(item.URL, d.StartURL, data)
 	if err != nil {
-		return nil, nil, fmt.Errorf("parsing %s: %w", contentType.String(), err)
+		return nil, nil, fmt.Errorf("%s: %w", contentType.String(), err)
 	}
 
-	index := htmlindex.New()
-	index.Index(item.URL, doc)
-
-	fixed, hasChanges, err := d.fixURLReferences(item.URL, doc, index)
+	fixed, hasChanges, err := doc.FixURLReferences()
 	if err != nil {
 		logger.Error("Fixing file references failed",
 			slog.String("url", item.String()),
@@ -154,7 +149,7 @@ func (d *Download) html200(item work.Item, resp *http.Response, lastModified tim
 
 	d.storeDownload(item.URL, rdr, lastModified, true)
 
-	references, err = d.findReferences(item, index)
+	references, err = doc.FindReferences()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -174,7 +169,7 @@ func (d *Download) css200(item work.Item, resp *http.Response, lastModified time
 		return nil, nil, fmt.Errorf("buffering text/css: %w", err)
 	}
 
-	data, references = d.checkCSSForUrls(item.URL, data)
+	data, references = document.CheckCSSForUrls(item.URL, d.StartURL.Host, data)
 
 	d.storeDownload(item.URL, bytes.NewReader(data), lastModified, false)
 
@@ -233,15 +228,12 @@ func (d *Download) html304(item work.Item, resp *http.Response) (*url.URL, *work
 		return nil, nil, fmt.Errorf("existing HTML file: %w", err)
 	}
 
-	doc, err := html.Parse(bytes.NewReader(data))
+	doc, err := document.ParseHTML(item.URL, d.StartURL, data)
 	if err != nil {
 		return nil, nil, fmt.Errorf("parsing HTML: %w", err)
 	}
 
-	index := htmlindex.New()
-	index.Index(item.URL, doc)
-
-	references, err = d.findReferences(item, index)
+	references, err = doc.FindReferences()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -261,49 +253,12 @@ func (d *Download) css304(item work.Item) (*url.URL, *work.Result, error) {
 		return nil, nil, fmt.Errorf("existing CSS file: %w", err)
 	}
 
-	_, references = d.checkCSSForUrls(item.URL, data)
+	_, references = document.CheckCSSForUrls(item.URL, d.StartURL.Host, data)
 
 	return nil, &work.Result{Item: item, References: references}, nil
 }
 
 //-------------------------------------------------------------------------------------------------
-
-var tagsWithReferences = []atom.Atom{
-	atom.A,
-	atom.Link,
-	atom.Script,
-	atom.Body,
-}
-
-func (d *Download) findReferences(item work.Item, index *htmlindex.Index) (work.Refs, error) {
-	var result work.Refs
-	for _, tag := range tagsWithReferences {
-		references, err := index.URLs(tag)
-		if err != nil {
-			logger.Error("Getting node URLs failed",
-				slog.String("url", item.String()),
-				slog.String("node", tag.String()),
-				slog.Any("error", err))
-		}
-
-		for _, ur := range references {
-			ur.Fragment = ""
-			result = append(result, ur)
-		}
-	}
-
-	references, err := index.URLs(atom.Img)
-	if err != nil {
-		logger.Error("Getting <img> URLs failed", slog.String("url", item.String()), slog.Any("error", err))
-	}
-
-	for _, ur := range references {
-		ur.Fragment = ""
-		result = append(result, ur)
-	}
-
-	return result, nil
-}
 
 // storeDownload writes the download to a file, if a known binary file is detected,
 // processing of the file as page to look for links is skipped.

@@ -8,8 +8,7 @@ type nodeAttributeParser func(attribute, value string) ([]string, bool)
 
 type Node struct {
 	Attributes []string
-
-	parser nodeAttributeParser
+	parser     nodeAttributeParser
 }
 
 const (
