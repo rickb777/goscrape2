@@ -44,7 +44,7 @@ type Download struct {
 func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *work.Result, error) {
 	var existingModified time.Time
 
-	filePath := d.getFilePath(item.URL, true)
+	filePath := document.GetFilePath(item.URL, d.StartURL, d.Config.OutputDirectory, true)
 	if ioutil.FileExists(d.Fs, filePath) {
 		fileInfo, err := os.Stat(filePath)
 		if err == nil && fileInfo != nil {
@@ -222,7 +222,7 @@ func (d *Download) response304(item work.Item, resp *http.Response) (*url.URL, *
 func (d *Download) html304(item work.Item, resp *http.Response) (*url.URL, *work.Result, error) {
 	var references work.Refs
 
-	filePath := d.getFilePath(item.URL, true)
+	filePath := document.GetFilePath(item.URL, d.StartURL, d.Config.OutputDirectory, true)
 	data, err := ioutil.ReadFile(d.Fs, d.StartURL, filePath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("existing HTML file: %w", err)
@@ -247,7 +247,7 @@ func (d *Download) html304(item work.Item, resp *http.Response) (*url.URL, *work
 
 func (d *Download) css304(item work.Item) (*url.URL, *work.Result, error) {
 	var references work.Refs
-	filePath := d.getFilePath(item.URL, false)
+	filePath := document.GetFilePath(item.URL, d.StartURL, d.Config.OutputDirectory, false)
 	data, err := ioutil.ReadFile(d.Fs, d.StartURL, filePath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("existing CSS file: %w", err)
@@ -263,7 +263,7 @@ func (d *Download) css304(item work.Item) (*url.URL, *work.Result, error) {
 // storeDownload writes the download to a file, if a known binary file is detected,
 // processing of the file as page to look for links is skipped.
 func (d *Download) storeDownload(u *url.URL, data io.Reader, lastModified time.Time, isAPage bool) {
-	filePath := d.getFilePath(u, isAPage)
+	filePath := document.GetFilePath(u, d.StartURL, d.Config.OutputDirectory, isAPage)
 
 	if !isAPage && ioutil.FileExists(d.Fs, filePath) {
 		return
