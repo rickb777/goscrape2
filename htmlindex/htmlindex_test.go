@@ -13,9 +13,11 @@ import (
 func TestIndex(t *testing.T) {
 	input := []byte(`
 <html lang="es">
+<script src="//api.html5media.info/1.1.8/html5media.min.js"></script>
 <a href="https://domain.com/wp-content/uploads/document%2Bindex.pdf" rel="doc">Guide</a>
 <a href="https://domain.com/about.html">About</a>
 <img src="/test%24file.jpg"/> 
+<script src="/func.min.js"></script> 
 </html>
 `)
 
@@ -51,6 +53,18 @@ func TestIndex(t *testing.T) {
 		tagURL := "https://domain.com/test%24file.jpg"
 		assert.Equal(t, tagURL, references[0].String())
 		assert.Equal(t, "/test$file.jpg", references[0].Path)
+	}
+	// check script tag
+	{
+		references, err := idx.URLs("script")
+		require.NoError(t, err)
+		require.Len(t, references, 2)
+
+		tagURL1 := "https://api.html5media.info/1.1.8/html5media.min.js"
+		assert.Equal(t, tagURL1, references[0].String())
+
+		tagURL2 := "https://domain.com/func.min.js"
+		assert.Equal(t, tagURL2, references[1].String())
 	}
 	// check for non-existent tag
 	{
