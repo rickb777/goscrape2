@@ -2,6 +2,7 @@ package htmlindex
 
 import (
 	"fmt"
+	"golang.org/x/net/html/atom"
 	"net/url"
 	"sort"
 	"strings"
@@ -14,18 +15,67 @@ type Refs []*url.URL
 // Index provides an index for all HTML tags of relevance for scraping.
 type Index struct {
 	// key is HTML tag, value is a map of all its urls and the HTML nodes for it
-	data map[string]map[string][]*html.Node
+	data map[atom.Atom]map[string][]*html.Node
 }
 
 // New returns a new index.
 func New() *Index {
 	return &Index{
-		data: make(map[string]map[string][]*html.Node),
+		data: make(map[atom.Atom]map[string][]*html.Node),
 	}
 }
 
 // Index the given HTML document.
 func (h *Index) Index(baseURL *url.URL, node *html.Node) {
+	if explicitBaseURL := h.findBaseHref(node); explicitBaseURL != nil {
+		h.indexChildren(explicitBaseURL, node)
+	} else {
+		h.indexChildren(baseURL, node)
+	}
+}
+
+// findBaseHref finds the URL from the <base href="..."/> element, if there is one.
+func (h *Index) findBaseHref(node *html.Node) (baseURL *url.URL) {
+	if node.FirstChild == nil {
+		return nil
+	}
+
+	for child := node.FirstChild; child != nil; child = child.NextSibling {
+		if child.Type != html.ElementNode {
+			continue
+		}
+
+		if child.DataAtom == atom.Base && node.DataAtom == atom.Head {
+			var references []string
+
+			info, ok := Nodes[atom.Base]
+			if ok {
+				references = nodeAttributeURLs(nil, child, info.parser, info.Attributes...)
+			}
+
+			if len(references) == 1 {
+				if newBase, err := url.Parse(references[0]); err == nil {
+					return newBase
+				} else {
+					return nil
+				}
+			}
+		}
+
+		if baseURL = h.findBaseHref(child); baseURL != nil {
+			return baseURL
+		}
+	}
+
+	return baseURL
+}
+
+// indexChildren indexes all the children of node. References are resolved relative to baseURL.
+func (h *Index) indexChildren(baseURL *url.URL, node *html.Node) {
+	if node.FirstChild == nil {
+		return
+	}
+
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
 		if child.Type != html.ElementNode {
 			continue
@@ -33,29 +83,27 @@ func (h *Index) Index(baseURL *url.URL, node *html.Node) {
 
 		var references []string
 
-		info, ok := Nodes[child.Data]
+		info, ok := Nodes[child.DataAtom]
 		if ok {
 			references = nodeAttributeURLs(baseURL, child, info.parser, info.Attributes...)
 		}
 
-		m, ok := h.data[child.Data]
+		m, ok := h.data[child.DataAtom]
 		if !ok {
 			m = map[string][]*html.Node{}
-			h.data[child.Data] = m
+			h.data[child.DataAtom] = m
 		}
 
 		for _, reference := range references {
 			m[reference] = append(m[reference], child)
 		}
 
-		if node.FirstChild != nil {
-			h.Index(baseURL, child)
-		}
+		h.indexChildren(baseURL, child)
 	}
 }
 
 // URLs returns all URLs of the references found for a specific tag.
-func (h *Index) URLs(tag string) (Refs, error) {
+func (h *Index) URLs(tag atom.Atom) (Refs, error) {
 	m, ok := h.data[tag]
 	if !ok {
 		return nil, nil
@@ -80,7 +128,7 @@ func (h *Index) URLs(tag string) (Refs, error) {
 }
 
 // Nodes returns a map of all URLs and their HTML nodes.
-func (h *Index) Nodes(tag string) map[string][]*html.Node {
+func (h *Index) Nodes(tag atom.Atom) map[string][]*html.Node {
 	m, ok := h.data[tag]
 	if ok {
 		return m
@@ -122,7 +170,9 @@ func nodeAttributeURLs(baseURL *url.URL, node *html.Node,
 				continue
 			}
 
-			ur = baseURL.ResolveReference(ur)
+			if baseURL != nil {
+				ur = baseURL.ResolveReference(ur)
+			}
 			results = append(results, ur.String())
 		}
 	}

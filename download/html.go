@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/cornelk/goscrape/htmlindex"
 	"github.com/cornelk/goscrape/logger"
 	"golang.org/x/net/html"
+	"golang.org/x/net/html/atom"
 )
 
 // ignoredURLPrefixes contains a list of URL prefixes that do not need to bo adjusted.
@@ -25,7 +27,7 @@ var ignoredURLPrefixes = []string{
 // in this case the returned HTML string will be empty.
 func (d *Download) fixURLReferences(u *url.URL, doc *html.Node, index *htmlindex.Index) ([]byte, bool, error) {
 	relativeToRoot := urlRelativeToRoot(u)
-	if !d.fixHTMLNodeURLs(u, relativeToRoot, index) {
+	if !fixHTMLNodeURLs(u, d.StartURL.Host, relativeToRoot, index) {
 		return nil, false, nil
 	}
 
@@ -33,21 +35,22 @@ func (d *Download) fixURLReferences(u *url.URL, doc *html.Node, index *htmlindex
 	if err := html.Render(&rendered, doc); err != nil {
 		return nil, false, fmt.Errorf("rendering html: %w", err)
 	}
+	if strings.Contains(rendered.String(), `html5media`) {
+		logger.Debug("FOUND")
+	}
 	return rendered.Bytes(), true, nil
 }
 
 // fixHTMLNodeURLs processes all HTML nodes that contain URLs that need to be fixed
 // to link to downloaded files. It returns whether any URLS have been fixed.
-func (d *Download) fixHTMLNodeURLs(baseURL *url.URL, relativeToRoot string, index *htmlindex.Index) bool {
-	var changed bool
-
+func fixHTMLNodeURLs(baseURL *url.URL, startURLHost string, relativeToRoot string, index *htmlindex.Index) (changed bool) {
 	for tag, nodeInfo := range htmlindex.Nodes {
-		isHyperlink := tag == htmlindex.ATag
+		isHyperlink := tag == atom.A
 
 		urls := index.Nodes(tag)
 		for _, nodes := range urls {
 			for _, node := range nodes {
-				if d.fixNodeURL(baseURL, nodeInfo.Attributes, node, isHyperlink, relativeToRoot) {
+				if fixNodeURL(baseURL, nodeInfo.Attributes, node, startURLHost, isHyperlink, relativeToRoot) {
 					changed = true
 				}
 			}
@@ -58,21 +61,10 @@ func (d *Download) fixHTMLNodeURLs(baseURL *url.URL, relativeToRoot string, inde
 }
 
 // fixNodeURL fixes the URL references of a HTML node to point to a relative file name.
-// It returns whether any attribute value bas been adjusted.
-func (d *Download) fixNodeURL(baseURL *url.URL, attributes []string, node *html.Node,
-	isHyperlink bool, relativeToRoot string) bool {
-
-	var changed bool
-
+// It returns true if any attribute value bas been adjusted.
+func fixNodeURL(baseURL *url.URL, attributes []string, node *html.Node, startURLHost string, isHyperlink bool, relativeToRoot string) (changed bool) {
 	for i, attr := range node.Attr {
-		var process bool
-		for _, name := range attributes {
-			if attr.Key == name {
-				process = true
-				break
-			}
-		}
-		if !process {
+		if !slices.Contains(attributes, attr.Key) {
 			continue
 		}
 
@@ -90,35 +82,33 @@ func (d *Download) fixNodeURL(baseURL *url.URL, attributes []string, node *html.
 		var adjusted string
 
 		if _, isSrcSet := htmlindex.SrcSetAttributes[attr.Key]; isSrcSet {
-			adjusted = resolveSrcSetURLs(baseURL, value, d.StartURL.Host, isHyperlink, relativeToRoot)
+			adjusted = resolveSrcSetURLs(baseURL, value, startURLHost, isHyperlink, relativeToRoot)
 		} else {
-			adjusted = resolveURL(baseURL, value, d.StartURL.Host, isHyperlink, relativeToRoot)
+			adjusted = resolveURL(baseURL, value, startURLHost, relativeToRoot)
 		}
 
-		if adjusted == value { // check for no change
-			continue
+		if adjusted != value { // check for no change
+			attribute := &node.Attr[i]
+			attribute.Val = adjusted
+			changed = true
+
+			logger.Debug("HTML node relinked",
+				slog.String("value", value),
+				slog.String("fixed_value", adjusted))
 		}
-
-		logger.Debug("HTML node relinked",
-			slog.String("value", value),
-			slog.String("fixed_value", adjusted))
-
-		attribute := &node.Attr[i]
-		attribute.Val = adjusted
-		changed = true
 	}
 
 	return changed
 }
 
-func resolveSrcSetURLs(base *url.URL, srcSetValue, mainPageHost string, isHyperlink bool, relativeToRoot string) string {
+func resolveSrcSetURLs(base *url.URL, srcSetValue, startURLHost string, isHyperlink bool, relativeToRoot string) string {
 	// split the set of responsive images
 	values := strings.Split(srcSetValue, ",")
 
 	for i, value := range values {
 		value = strings.TrimSpace(value)
 		parts := strings.Split(value, " ")
-		parts[0] = resolveURL(base, parts[0], mainPageHost, isHyperlink, relativeToRoot)
+		parts[0] = resolveURL(base, parts[0], startURLHost, relativeToRoot)
 		values[i] = strings.Join(parts, " ")
 	}
 

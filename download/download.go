@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"golang.org/x/net/html/atom"
 	"io"
 	"log/slog"
 	"net/http"
@@ -267,11 +268,11 @@ func (d *Download) css304(item work.Item) (*url.URL, *work.Result, error) {
 
 //-------------------------------------------------------------------------------------------------
 
-var tagsWithReferences = []string{
-	htmlindex.ATag,
-	htmlindex.LinkTag,
-	htmlindex.ScriptTag,
-	htmlindex.BodyTag,
+var tagsWithReferences = []atom.Atom{
+	atom.A,
+	atom.Link,
+	atom.Script,
+	atom.Body,
 }
 
 func (d *Download) findReferences(item work.Item, index *htmlindex.Index) (work.Refs, error) {
@@ -281,7 +282,7 @@ func (d *Download) findReferences(item work.Item, index *htmlindex.Index) (work.
 		if err != nil {
 			logger.Error("Getting node URLs failed",
 				slog.String("url", item.String()),
-				slog.String("node", tag),
+				slog.String("node", tag.String()),
 				slog.Any("error", err))
 		}
 
@@ -291,7 +292,7 @@ func (d *Download) findReferences(item work.Item, index *htmlindex.Index) (work.
 		}
 	}
 
-	references, err := index.URLs(htmlindex.ImgTag)
+	references, err := index.URLs(atom.Img)
 	if err != nil {
 		logger.Error("Getting <img> URLs failed", slog.String("url", item.String()), slog.Any("error", err))
 	}

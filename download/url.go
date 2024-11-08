@@ -3,34 +3,22 @@ package download
 import (
 	"net/url"
 	"path"
-	"path/filepath"
 	"strings"
 )
 
-func resolveURL(base *url.URL, reference, mainPageHost string, isHyperlink bool, relativeToRoot string) string {
+func resolveURL(base *url.URL, reference, startURLHost, relativeToRoot string) string {
 	ur, err := url.Parse(reference)
 	if err != nil {
 		return ""
 	}
 
-	var resolvedURL *url.URL
-	if ur.Host != "" && ur.Host != mainPageHost {
-		if isHyperlink { // do not change links to external websites
-			return reference
-		}
-
-		resolvedURL = base.ResolveReference(ur)
-		resolvedURL.Path = filepath.Join("_"+ur.Host, resolvedURL.Path)
-	} else {
-		if isHyperlink {
-			ur.Path = getPageFilePath(ur)
-			resolvedURL = base.ResolveReference(ur)
-		} else {
-			resolvedURL = base.ResolveReference(ur)
-		}
+	if ur.Host != "" && ur.Host != startURLHost {
+		return reference // points to a different website - leave unchanged
 	}
 
-	if resolvedURL.Host == mainPageHost {
+	resolvedURL := base.ResolveReference(ur)
+
+	if resolvedURL.Host == startURLHost {
 		resolvedURL.Path = urlRelativeToOther(resolvedURL, base)
 		relativeToRoot = ""
 	}
@@ -49,14 +37,12 @@ func resolveURL(base *url.URL, reference, mainPageHost string, isHyperlink bool,
 		}
 	}
 
-	if isHyperlink {
-		if resolved[len(resolved)-1] == '/' {
-			resolved += PageDirIndex // link dir index to index.html
-		} else {
-			l := strings.LastIndexByte(resolved, '/')
-			if l != -1 && l < len(resolved) && resolved[l+1] == '#' {
-				resolved = resolved[:l+1] + PageDirIndex + resolved[l+1:] // link fragment correct
-			}
+	if resolved[len(resolved)-1] == '/' {
+		resolved += PageDirIndex // link dir index to index.html
+	} else {
+		l := strings.LastIndexByte(resolved, '/')
+		if 0 <= l && l < len(resolved)-1 && resolved[l+1] == '#' {
+			resolved = resolved[:l+1] + PageDirIndex + resolved[l+1:] // link fragment correct
 		}
 	}
 

@@ -71,7 +71,7 @@ func TestScraperLinks(t *testing.T) {
 	indexPage := `
 <html>
 <head>
-<link href=' https://example.org/style.css#fragment' rel='stylesheet' type='text/css'>
+<link href=' //example.org/style.css#fragment' rel='stylesheet' type='text/css'>
 </head>
 <body>
 <a href="https://example.org/page2">Example</a>

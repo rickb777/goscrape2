@@ -2,12 +2,13 @@ package htmlindex
 
 import (
 	"bytes"
+	"golang.org/x/net/html"
+	"golang.org/x/net/html/atom"
 	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/html"
 )
 
 func TestIndex(t *testing.T) {
@@ -21,11 +22,16 @@ func TestIndex(t *testing.T) {
 </html>
 `)
 
-	idx := testSetup(t, input)
+	idx := New()
+
+	doc, err := html.Parse(bytes.NewReader(input))
+	require.NoError(t, err)
+
+	idx.Index(mustParse("https://domain.com/"), doc)
 
 	// check a tag
 	{
-		references, err := idx.URLs("a")
+		references, err := idx.URLs(atom.A)
 		require.NoError(t, err)
 		require.Len(t, references, 2)
 
@@ -37,7 +43,7 @@ func TestIndex(t *testing.T) {
 		assert.Equal(t, u1, references[1].String())
 		assert.Equal(t, "/wp-content/uploads/document+index.pdf", references[1].Path)
 
-		urls := idx.Nodes("a")
+		urls := idx.Nodes(atom.A)
 		require.Len(t, urls, 2)
 		nodes, ok := urls[u1]
 		require.True(t, ok)
@@ -46,7 +52,7 @@ func TestIndex(t *testing.T) {
 	}
 	// check img tag
 	{
-		references, err := idx.URLs("img")
+		references, err := idx.URLs(atom.Img)
 		require.NoError(t, err)
 		require.Len(t, references, 1)
 
@@ -56,7 +62,7 @@ func TestIndex(t *testing.T) {
 	}
 	// check script tag
 	{
-		references, err := idx.URLs("script")
+		references, err := idx.URLs(atom.Script)
 		require.NoError(t, err)
 		require.Len(t, references, 2)
 
@@ -68,11 +74,44 @@ func TestIndex(t *testing.T) {
 	}
 	// check for non-existent tag
 	{
-		references, err := idx.URLs("not-existing")
+		references, err := idx.URLs(0)
 		require.NoError(t, err)
 		require.Empty(t, references)
-		urls := idx.Nodes("not-existing")
+		urls := idx.Nodes(0)
 		require.Empty(t, urls)
+	}
+}
+
+func TestIndexWithBase(t *testing.T) {
+	input := []byte(`
+<html lang="es"><head><base href=' https://domain.com '/></head>
+<body><a href=" /about.html ">About</a></body>
+</html>
+`)
+
+	idx := New()
+
+	doc, err := html.Parse(bytes.NewReader(input))
+	require.NoError(t, err)
+
+	idx.Index(mustParse("https://www.domain.com/"), doc)
+
+	// check a tag
+	{
+		references, err := idx.URLs(atom.A)
+		require.NoError(t, err)
+		require.Len(t, references, 1)
+
+		u1 := "https://domain.com/about.html"
+		assert.Equal(t, u1, references[0].String())
+		assert.Equal(t, "/about.html", references[0].Path)
+
+		urls := idx.Nodes(atom.A)
+		require.Len(t, urls, 1)
+		nodes, ok := urls[u1]
+		require.True(t, ok)
+		require.Len(t, nodes, 1)
+		assert.Equal(t, "a", nodes[0].Data)
 	}
 }
 
@@ -85,9 +124,15 @@ func TestIndexImg(t *testing.T) {
 </html>
 `)
 
-	idx := testSetup(t, input)
+	idx := New()
+
+	doc, err := html.Parse(bytes.NewReader(input))
+	require.NoError(t, err)
+
+	idx.Index(mustParse("https://domain.com/"), doc)
+
 	{
-		references, err := idx.URLs(ImgTag)
+		references, err := idx.URLs(atom.Img)
 		require.NoError(t, err)
 		require.Len(t, references, 3)
 		assert.Equal(t, "https://domain.com/test-480w.jpg", references[0].String())
@@ -95,28 +140,17 @@ func TestIndexImg(t *testing.T) {
 		assert.Equal(t, "https://domain.com/test.jpg", references[2].String())
 	}
 	{
-		references, err := idx.URLs(BodyTag)
+		references, err := idx.URLs(atom.Body)
 		require.NoError(t, err)
 		require.Len(t, references, 1)
 		assert.Equal(t, "https://domain.com/bg.jpg", references[0].String())
 	}
 }
 
-func testSetup(t *testing.T, input []byte) *Index {
-	t.Helper()
-
-	buf := &bytes.Buffer{}
-	_, err := buf.Write(input)
-	require.NoError(t, err)
-
-	doc, err := html.Parse(buf)
-	require.NoError(t, err)
-
-	ur, err := url.Parse("https://domain.com/")
-	require.NoError(t, err)
-
-	idx := New()
-	idx.Index(ur, doc)
-
-	return idx
+func mustParse(s string) *url.URL {
+	u, err := url.Parse(s)
+	if err != nil {
+		panic(err)
+	}
+	return u
 }

@@ -1,19 +1,18 @@
 package download
 
 import (
-	"net/url"
+	url "net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestResolveURL(t *testing.T) {
-	type filePathFixture struct {
-		BaseURL        url.URL
-		Reference      string
-		IsHyperlink    bool
-		RelativeToRoot string
-		Resolved       string
+	type filePathCase struct {
+		baseURL        url.URL
+		reference      string
+		relativeToRoot string
+		resolved       string
 	}
 
 	pathlessURL := url.URL{
@@ -28,57 +27,58 @@ func TestResolveURL(t *testing.T) {
 		Path:   "/earth/",
 	}
 
-	var fixtures = []filePathFixture{
-		{pathlessURL, "", true, "", "index.html"},
-		{pathlessURL, "#contents", true, "", "#contents"},
-		{URL, "brasil/index.html", true, "", "brasil/index.html"},
-		{URL, "brasil/rio/index.html", true, "", "brasil/rio/index.html"},
-		{URL, "../argentina/cat.jpg", false, "", "../argentina/cat.jpg"},
+	var cases = []filePathCase{
+		{baseURL: pathlessURL, resolved: "index.html"},
+		{baseURL: pathlessURL, reference: "#contents", resolved: "#contents"},
+		{baseURL: pathlessURL, reference: "//any.other.xyz/a/path", resolved: "//any.other.xyz/a/path"},
+		{baseURL: URL, reference: "brasil/index.html", resolved: "brasil/index.html"},
+		{baseURL: URL, reference: "brasil/rio/index.html", resolved: "brasil/rio/index.html"},
+		{baseURL: URL, reference: "../argentina/cat.jpg", resolved: "../argentina/cat.jpg"},
 	}
 
-	for _, fix := range fixtures {
-		resolved := resolveURL(&fix.BaseURL, fix.Reference, URL.Host, fix.IsHyperlink, fix.RelativeToRoot)
-		assert.Equal(t, fix.Resolved, resolved)
+	for _, c := range cases {
+		resolved := resolveURL(&c.baseURL, c.reference, URL.Host, c.relativeToRoot)
+		assert.Equal(t, c.resolved, resolved)
 	}
 }
 
 func Test_urlRelativeToOther(t *testing.T) {
-	type filePathFixture struct {
-		SrcURL          url.URL
-		BaseURL         url.URL
-		ExpectedSrcPath string
+	type filePathCase struct {
+		srcURL          url.URL
+		baseURL         url.URL
+		expectedSrcPath string
 	}
 
-	var fixtures = []filePathFixture{
-		{url.URL{Path: "/earth/brasil/rio/cat.jpg"}, url.URL{Path: "/earth/brasil/rio/"}, "cat.jpg"},
-		{url.URL{Path: "/earth/brasil/rio/cat.jpg"}, url.URL{Path: "/earth/"}, "brasil/rio/cat.jpg"},
-		{url.URL{Path: "/earth/cat.jpg"}, url.URL{Path: "/earth/brasil/rio/"}, "../../cat.jpg"},
-		{url.URL{Path: "/earth/argentina/cat.jpg"}, url.URL{Path: "/earth/brasil/rio/"}, "../../argentina/cat.jpg"},
-		{url.URL{Path: "/earth/brasil/rio/cat.jpg"}, url.URL{Path: "/mars/dogtown/"}, "../../earth/brasil/rio/cat.jpg"},
-		{url.URL{Path: "///earth//////cat.jpg"}, url.URL{Path: "///earth/brasil//rio////////"}, "../../cat.jpg"},
+	var cases = []filePathCase{
+		{srcURL: url.URL{Path: "/earth/brasil/rio/cat.jpg"}, baseURL: url.URL{Path: "/earth/brasil/rio/"}, expectedSrcPath: "cat.jpg"},
+		{srcURL: url.URL{Path: "/earth/brasil/rio/cat.jpg"}, baseURL: url.URL{Path: "/earth/"}, expectedSrcPath: "brasil/rio/cat.jpg"},
+		{srcURL: url.URL{Path: "/earth/cat.jpg"}, baseURL: url.URL{Path: "/earth/brasil/rio/"}, expectedSrcPath: "../../cat.jpg"},
+		{srcURL: url.URL{Path: "/earth/argentina/cat.jpg"}, baseURL: url.URL{Path: "/earth/brasil/rio/"}, expectedSrcPath: "../../argentina/cat.jpg"},
+		{srcURL: url.URL{Path: "/earth/brasil/rio/cat.jpg"}, baseURL: url.URL{Path: "/mars/dogtown/"}, expectedSrcPath: "../../earth/brasil/rio/cat.jpg"},
+		{srcURL: url.URL{Path: "///earth//////cat.jpg"}, baseURL: url.URL{Path: "///earth/brasil//rio////////"}, expectedSrcPath: "../../cat.jpg"},
 	}
 
-	for _, fix := range fixtures {
-		relativeURL := urlRelativeToOther(&fix.SrcURL, &fix.BaseURL)
-		assert.Equal(t, fix.ExpectedSrcPath, relativeURL)
+	for _, c := range cases {
+		relativeURL := urlRelativeToOther(&c.srcURL, &c.baseURL)
+		assert.Equal(t, c.expectedSrcPath, relativeURL)
 	}
 }
 
 func Test_urlRelativeToRoot(t *testing.T) {
-	type urlFixture struct {
-		SrcURL   url.URL
-		Expected string
+	type urlCases struct {
+		srcURL   url.URL
+		expected string
 	}
 
-	var fixtures = []urlFixture{
-		{url.URL{Path: "/earth/brasil/rio/cat.jpg"}, "../../../"},
-		{url.URL{Path: "cat.jpg"}, ""},
-		{url.URL{Path: "/earth/argentina"}, "../"},
-		{url.URL{Path: "///earth//////cat.jpg"}, "../"},
+	var cases = []urlCases{
+		{srcURL: url.URL{Path: "/earth/brasil/rio/cat.jpg"}, expected: "../../../"},
+		{srcURL: url.URL{Path: "cat.jpg"}},
+		{srcURL: url.URL{Path: "/earth/argentina"}, expected: "../"},
+		{srcURL: url.URL{Path: "///earth//////cat.jpg"}, expected: "../"},
 	}
 
-	for _, fix := range fixtures {
-		relativeURL := urlRelativeToRoot(&fix.SrcURL)
-		assert.Equal(t, fix.Expected, relativeURL)
+	for _, c := range cases {
+		relativeURL := urlRelativeToRoot(&c.srcURL)
+		assert.Equal(t, c.expected, relativeURL)
 	}
 }

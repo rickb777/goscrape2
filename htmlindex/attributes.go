@@ -1,5 +1,7 @@
 package htmlindex
 
+import "golang.org/x/net/html/atom"
+
 // nodeAttributeParser returns the URL values of the attribute of the node and
 // whether the attribute has been processed.
 type nodeAttributeParser func(attribute, value string) ([]string, bool)
@@ -11,46 +13,66 @@ type Node struct {
 }
 
 const (
-	BackgroundAttribute = "background"
-	HrefAttribute       = "href"
+	background = "background"
+	href       = "href"
+	dataSrc    = "data-src"
+	src        = "src"
+	poster     = "poster"
 
-	DataSrcAttribute = "data-src"
-	SrcAttribute     = "src"
-
-	DataSrcSetAttribute = "data-srcset"
-	SrcSetAttribute     = "srcset"
-)
-
-const (
-	ATag      = "a"
-	BodyTag   = "body"
-	ImgTag    = "img"
-	LinkTag   = "link"
-	ScriptTag = "script"
+	// sets
+	dataSrcSet = "data-srcset"
+	srcSet     = "srcset"
 )
 
 // Nodes describes the HTML tags and their attributes that can contain URL.
-var Nodes = map[string]Node{
-	ATag: {
-		Attributes: []string{HrefAttribute},
+// See https://html.spec.whatwg.org/multipage/indices.html#attributes-3
+// and https://html.spec.whatwg.org/multipage/indices.html#elements-3
+// Not yet present: style attribute can contain CSS links
+var Nodes = map[atom.Atom]Node{
+	atom.A: {
+		Attributes: []string{href},
 	},
-	BodyTag: {
-		Attributes: []string{BackgroundAttribute},
+	atom.Area: {
+		Attributes: []string{href},
 	},
-	ImgTag: {
-		Attributes: []string{SrcAttribute, DataSrcAttribute, SrcSetAttribute, DataSrcSetAttribute},
+	atom.Base: {
+		Attributes: []string{href},
+	},
+	atom.Audio: {
+		Attributes: []string{src},
+	},
+	atom.Body: {
+		Attributes: []string{background},
+	},
+	atom.Embed: {
+		Attributes: []string{src},
+	},
+	atom.Iframe: {
+		Attributes: []string{src},
+	},
+	atom.Img: {
+		Attributes: []string{src, dataSrc, srcSet, dataSrcSet},
 		parser:     srcSetValueSplitter,
 	},
-	LinkTag: {
-		Attributes: []string{HrefAttribute},
+	atom.Input: {
+		Attributes: []string{src},
 	},
-	ScriptTag: {
-		Attributes: []string{SrcAttribute},
+	atom.Link: {
+		Attributes: []string{href},
+	},
+	atom.Script: {
+		Attributes: []string{src},
+	},
+	atom.Source: {
+		Attributes: []string{src},
+	},
+	atom.Video: {
+		Attributes: []string{poster},
 	},
 }
 
 // SrcSetAttributes contains the attributes that contain srcset values.
 var SrcSetAttributes = map[string]struct{}{
-	DataSrcSetAttribute: {},
-	SrcSetAttribute:     {},
+	dataSrcSet: {},
+	srcSet:     {},
 }

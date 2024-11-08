@@ -55,7 +55,7 @@ func (d *Download) checkCSSForUrls(cssURL *url.URL, data []byte) ([]byte, work.R
 
 		cssPath := *cssURL
 		cssPath.Path = path.Dir(cssPath.Path) + "/"
-		resolved := resolveURL(&cssPath, src, d.StartURL.Host, false, "")
+		resolved := resolveURL(&cssPath, src, d.StartURL.Host, "")
 		urls[token.Value] = resolved
 	}
 

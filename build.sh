@@ -1,5 +1,5 @@
 #!/bin/sh -ex
-
+rm -f goscrape
 go test ./...
 go vet ./...
 go install .
