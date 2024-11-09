@@ -13,6 +13,7 @@ type Node struct {
 
 const (
 	background = "background"
+	data       = "data"
 	href       = "href"
 	dataSrc    = "data-src"
 	src        = "src"
@@ -58,6 +59,9 @@ var Nodes = map[atom.Atom]Node{
 	},
 	atom.Link: {
 		Attributes: []string{href},
+	},
+	atom.Object: {
+		Attributes: []string{data},
 	},
 	atom.Script: {
 		Attributes: []string{src},
