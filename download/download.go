@@ -2,6 +2,7 @@ package download
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
@@ -66,7 +67,7 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 		panic("unexpected nil response")
 	}
 
-	defer closeResponseBody(resp)
+	defer closeResponseBody(resp.Body, resp.Request.URL)
 	defer logResponse(item.URL, resp, startTime)
 
 	if item.Depth == 0 {
@@ -98,31 +99,29 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 func (d *Download) response200(item work.Item, resp *http.Response) (*url.URL, *work.Result, error) {
 	contentType := header.ParseContentTypeFromHeaders(resp.Header)
 	lastModified, _ := header.ParseHTTPDateTime(resp.Header.Get(headername.LastModified))
+	isGzip := resp.Header.Get(headername.ContentEncoding) == "gzip"
 
 	switch {
 	case isHtml(contentType) || isXHtml(contentType):
-		return d.html200(item, resp, lastModified, contentType)
+		return d.html200(item, resp, lastModified, contentType, isGzip)
 
 	case contentType.Type == "text" && contentType.Subtype == "css":
-		return d.css200(item, resp, lastModified)
+		return d.css200(item, resp, lastModified, isGzip)
 
 	case contentType.Type == "image" && d.Config.ImageQuality != 0:
-		return d.image200(item, resp, lastModified, contentType)
+		return d.image200(item, resp, lastModified, contentType, isGzip)
 
 	default:
-		// store without buffering entire file into memory
-		d.storeDownload(item.URL, resp.Body, lastModified, false)
+		return d.other200(item, resp, lastModified, isGzip)
 	}
-
-	return nil, &work.Result{Item: item}, nil
 }
 
 //-------------------------------------------------------------------------------------------------
 
-func (d *Download) html200(item work.Item, resp *http.Response, lastModified time.Time, contentType header.ContentType) (*url.URL, *work.Result, error) {
+func (d *Download) html200(item work.Item, resp *http.Response, lastModified time.Time, contentType header.ContentType, isGzip bool) (*url.URL, *work.Result, error) {
 	var references work.Refs
 
-	data, err := bufferEntireResponse(resp)
+	data, err := bufferEntireResponse(resp, isGzip)
 	if err != nil {
 		return nil, nil, fmt.Errorf("buffering %s: %w", contentType.String(), err)
 	}
@@ -140,13 +139,10 @@ func (d *Download) html200(item work.Item, resp *http.Response, lastModified tim
 		return nil, nil, nil
 	}
 
-	var rdr io.Reader
 	if hasChanges {
-		rdr = bytes.NewReader(fixed)
-	} else {
-		rdr = bytes.NewReader(data)
+		data = fixed
 	}
-
+	rdr := bytes.NewReader(data)
 	d.storeDownload(item.URL, rdr, lastModified, true)
 
 	references, err = doc.FindReferences()
@@ -161,10 +157,10 @@ func (d *Download) html200(item work.Item, resp *http.Response, lastModified tim
 
 //-------------------------------------------------------------------------------------------------
 
-func (d *Download) css200(item work.Item, resp *http.Response, lastModified time.Time) (*url.URL, *work.Result, error) {
+func (d *Download) css200(item work.Item, resp *http.Response, lastModified time.Time, isGzip bool) (*url.URL, *work.Result, error) {
 	var references work.Refs
 
-	data, err := bufferEntireResponse(resp)
+	data, err := bufferEntireResponse(resp, isGzip)
 	if err != nil {
 		return nil, nil, fmt.Errorf("buffering text/css: %w", err)
 	}
@@ -178,8 +174,8 @@ func (d *Download) css200(item work.Item, resp *http.Response, lastModified time
 
 //-------------------------------------------------------------------------------------------------
 
-func (d *Download) image200(item work.Item, resp *http.Response, lastModified time.Time, contentType header.ContentType) (*url.URL, *work.Result, error) {
-	data, err := bufferEntireResponse(resp)
+func (d *Download) image200(item work.Item, resp *http.Response, lastModified time.Time, contentType header.ContentType, isGzip bool) (*url.URL, *work.Result, error) {
+	data, err := bufferEntireResponse(resp, isGzip)
 	if err != nil {
 		return nil, nil, fmt.Errorf("buffering %s: %w", contentType.String(), err)
 	}
@@ -190,6 +186,28 @@ func (d *Download) image200(item work.Item, resp *http.Response, lastModified ti
 	}
 
 	d.storeDownload(item.URL, bytes.NewReader(data), lastModified, false)
+
+	return nil, &work.Result{Item: item}, nil
+}
+
+//-------------------------------------------------------------------------------------------------
+
+func (d *Download) other200(item work.Item, resp *http.Response, lastModified time.Time, isGzip bool) (*url.URL, *work.Result, error) {
+	rdr := resp.Body
+	if isGzip {
+		var err error
+		rdr, err = gzip.NewReader(rdr)
+		if err != nil {
+			logger.Error("Decompressing gzip response failed",
+				slog.Any("url", resp.Request.URL),
+				slog.Any("error", err))
+			return nil, nil, err
+		}
+		defer rdr.Close() // this only closes the gzipper, not the response body
+	}
+
+	// store without buffering entire file into memory
+	d.storeDownload(item.URL, rdr, lastModified, false)
 
 	return nil, &work.Result{Item: item}, nil
 }

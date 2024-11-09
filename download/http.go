@@ -2,6 +2,7 @@ package download
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
@@ -24,6 +25,7 @@ func (d *Download) GET(ctx context.Context, u *url.URL, lastModified time.Time) 
 	if err != nil {
 		return nil, fmt.Errorf("creating HTTP request: %w", err)
 	}
+	req.Header.Set(headername.AcceptEncoding, "gzip")
 
 	if d.Config.UserAgent != "" {
 		req.Header.Set(headername.UserAgent, d.Config.UserAgent)
@@ -60,6 +62,8 @@ func (d *Download) GET(ctx context.Context, u *url.URL, lastModified time.Time) 
 		args = addHeaderValue(args, resp.Header, headername.ContentType)
 		args = addHeaderValue(args, resp.Header, headername.ContentLength)
 		args = addHeaderValue(args, resp.Header, headername.LastModified)
+		args = addHeaderValue(args, resp.Header, headername.ContentEncoding)
+		args = addHeaderValue(args, resp.Header, headername.Vary)
 		logger.Debug(http.MethodGet, args...)
 
 		switch {
@@ -118,17 +122,31 @@ func backoff(t time.Duration) time.Duration {
 	return time.Duration(t*factor) / divisor
 }
 
-func closeResponseBody(resp *http.Response) {
-	if err := resp.Body.Close(); err != nil {
+func closeResponseBody(c io.Closer, u *url.URL) {
+	if err := c.Close(); err != nil {
 		logger.Error("Closing HTTP response body failed",
-			slog.String("url", resp.Request.URL.String()),
+			slog.Any("url", u),
 			slog.Any("error", err))
 	}
 }
 
-func bufferEntireResponse(resp *http.Response) ([]byte, error) {
+func bufferEntireResponse(resp *http.Response, isGzip bool) ([]byte, error) {
 	buf := &bytes.Buffer{}
-	if _, err := io.Copy(buf, resp.Body); err != nil {
+	var err error
+
+	rdr := resp.Body
+	if isGzip {
+		rdr, err = gzip.NewReader(rdr)
+		if err != nil {
+			logger.Error("Decompressing gzip response failed",
+				slog.Any("url", resp.Request.URL),
+				slog.Any("error", err))
+			return nil, err
+		}
+		defer rdr.Close() // this only closes the gzipper, not the response body
+	}
+
+	if _, err := io.Copy(buf, rdr); err != nil {
 		return nil, fmt.Errorf("%s reading response body: %w", resp.Request.URL, err)
 	}
 	return buf.Bytes(), nil
