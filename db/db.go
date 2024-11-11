@@ -44,7 +44,7 @@ const FileName = "goscrape.db"
 func OpenDB(dir string) *DB {
 	file := filepath.Join(dir, FileName)
 
-	store, err := bolt.Open(file, 644, nil)
+	store, err := bolt.Open(file, 0644, nil)
 	if err != nil {
 		logger.Error("Cannot access ETag database", slog.String("file", "file"))
 		return nil
