@@ -145,7 +145,7 @@ func splitPath(path string) ([]string, string) {
 
 func nonBlankKey(s string) []byte {
 	if s == "" {
-		return []byte{1} // safe alternative to a string
+		return []byte{'/'}
 	}
 	return []byte(s)
 }
