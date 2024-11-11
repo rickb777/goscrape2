@@ -48,7 +48,7 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 		}
 	}
 
-	startTime := time.Now()
+	item.StartTime = time.Now()
 
 	resp, err := d.httpGet(ctx, item.URL, existingModified)
 	if err != nil {
@@ -71,21 +71,19 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 		item.URL = resp.Request.URL
 	}
 
-	logThisResponse := logResponse(item.URL, startTime)
-
 	switch resp.StatusCode {
 	case http.StatusOK:
-		return logThisResponse(d.response200(item, resp))
+		return d.response200(item, resp)
 
 	case http.StatusNotModified:
-		return logThisResponse(d.response304(item, resp))
+		return d.response304(item, resp)
 
 	case http.StatusTooManyRequests:
-		return logThisResponse(d.response429(item, resp))
+		return d.response429(item, resp)
 
 	default:
 		discardData(resp.Body) // didn't want it
-		return logThisResponse(item.URL, &work.Result{Item: item}, nil)
+		return item.URL, &work.Result{Item: item}, nil
 	}
 }
 
@@ -101,36 +99,6 @@ func (d *Download) response429(item work.Item, resp *http.Response) (*url.URL, *
 }
 
 //-------------------------------------------------------------------------------------------------
-
-func timeTaken(before time.Time) string {
-	return time.Now().Sub(before).Round(time.Millisecond).String()
-}
-
-func logResponse(item *url.URL, before time.Time) func(*url.URL, *work.Result, error) (*url.URL, *work.Result, error) {
-	// using a func result so that it can be applied transparently to the major method call sites, above
-	return func(u *url.URL, result *work.Result, err error) (*url.URL, *work.Result, error) {
-		var args = []any{
-			slog.String("url", item.String()),
-			slog.Int("code", result.StatusCode),
-			slog.String("took", timeTaken(before)),
-		}
-		if result.ContentLength > 0 {
-			args = append(args, slog.Int64("length", result.ContentLength))
-		}
-		if result.FileSize > 0 {
-			args = append(args, slog.Int64("fileSize", result.FileSize))
-		}
-		logger.Log(chooseLevel(result.StatusCode), http.StatusText(result.StatusCode), args...)
-		return u, result, err
-	}
-}
-
-func chooseLevel(statusCode int) slog.Level {
-	if statusCode >= 400 {
-		return slog.LevelWarn
-	}
-	return slog.LevelInfo
-}
 
 func discardData(rdr io.Reader) {
 	// Consume any response body - necessary for correct operation of the TCP connection pool

@@ -4,13 +4,15 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // Item is comparable
 type Item struct {
-	URL      *url.URL
-	Referrer *url.URL
-	Depth    uint
+	URL       *url.URL
+	StartTime time.Time
+	Referrer  *url.URL
+	Depth     uint
 }
 
 func (it Item) Derive(u *url.URL) Item {

@@ -44,6 +44,8 @@ type Scraper struct {
 	ETagsDB *db.DB
 }
 
+//-------------------------------------------------------------------------------------------------
+
 // New creates a new Scraper instance.
 // nolint: funlen
 func New(cfg config.Config) (*Scraper, error) {
@@ -125,6 +127,8 @@ func New(cfg config.Config) (*Scraper, error) {
 	return s, nil
 }
 
+//-------------------------------------------------------------------------------------------------
+
 // Start starts the scraping.
 func (s *Scraper) Start(ctx context.Context) error {
 	err := ioutil.CreateDirectory(s.fs, s.config.OutputDirectory)
@@ -185,6 +189,8 @@ func (s *Scraper) Start(ctx context.Context) error {
 							return err
 						}
 
+						logResult(result)
+
 						results <- *result
 					}
 				}
@@ -222,4 +228,33 @@ func (s *Scraper) Start(ctx context.Context) error {
 	// all the pool processes are busy until this unblocks.
 	pool.Wait()
 	return pool.Err()
+}
+
+//-------------------------------------------------------------------------------------------------
+
+func logResult(result *work.Result) {
+	// using a func result so that it can be applied transparently to the major method call sites, above
+	var args = []any{
+		slog.String("url", result.Item.String()),
+		slog.Int("code", result.StatusCode),
+		slog.String("took", timeTaken(result.Item.StartTime)),
+	}
+	if result.ContentLength > 0 {
+		args = append(args, slog.Int64("length", result.ContentLength))
+	}
+	if result.FileSize > 0 {
+		args = append(args, slog.Int64("fileSize", result.FileSize))
+	}
+	logger.Log(chooseLevel(result.StatusCode), http.StatusText(result.StatusCode), args...)
+}
+
+func timeTaken(before time.Time) string {
+	return time.Now().Sub(before).Round(time.Millisecond).String()
+}
+
+func chooseLevel(statusCode int) slog.Level {
+	if statusCode >= 400 {
+		return slog.LevelWarn
+	}
+	return slog.LevelInfo
 }
