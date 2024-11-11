@@ -1,23 +1,25 @@
 package db
 
 import (
+	"github.com/boltdb/bolt"
+	"github.com/cornelk/goscrape/logger"
+	"github.com/rickb777/acceptable/header"
 	"log/slog"
 	"net/url"
 	"os"
 	pathpkg "path"
 	"path/filepath"
 	"strings"
-
-	"github.com/boltdb/bolt"
-	"github.com/cornelk/goscrape/logger"
-	"github.com/rickb777/acceptable/header"
+	"sync"
 )
 
 // DB provides a persistent store for HTTP ETags to reduce network traffic when repeating
 // a download session. If the store is unavailable for some reason, its methods are no-ops.
 type DB struct {
-	db   *bolt.DB
-	file string
+	db    *bolt.DB
+	file  string
+	count int
+	mu    sync.Mutex
 }
 
 func Open() *DB {
@@ -43,17 +45,27 @@ const FileName = "goscrape.db"
 
 func OpenDB(dir string) *DB {
 	file := filepath.Join(dir, FileName)
+	store := open(file)
+	if store == nil {
+		return nil
+	}
 
+	return &DB{db: store, file: file}
+}
+
+func open(file string) *bolt.DB {
 	store, err := bolt.Open(file, 0644, nil)
 	if err != nil {
 		logger.Error("Cannot access ETag database", slog.String("file", "file"))
 		return nil
 	}
-	return &DB{db: store, file: file}
+
+	store.NoSync = true // cached data will be flushed explicitly
+	return store
 }
 
 func (store *DB) Close() error {
-	if store == nil {
+	if store == nil || store.db == nil {
 		return nil // no-op if absent
 	}
 	return store.db.Close()
@@ -61,7 +73,7 @@ func (store *DB) Close() error {
 
 // Lookup finds the ETags for a given URL.
 func (store *DB) Lookup(u *url.URL) (etags header.ETags) {
-	if store == nil {
+	if store == nil || store.db == nil {
 		return nil // no-op if absent
 	}
 
@@ -93,9 +105,12 @@ func (store *DB) Lookup(u *url.URL) (etags header.ETags) {
 
 // Store stores the ETags for a given URL.
 func (store *DB) Store(u *url.URL, etags header.ETags) {
-	if store == nil {
+	if store == nil || store.db == nil {
 		return // no-op if absent
 	}
+
+	store.mu.Lock()
+	defer store.mu.Unlock()
 
 	err := store.db.Update(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucketIfNotExists(nonBlankKey(u.Host))
@@ -121,8 +136,27 @@ func (store *DB) Store(u *url.URL, etags header.ETags) {
 
 		return nil
 	})
+
 	if err != nil {
 		logger.Warn("Cannot update DB", slog.Any("err", err))
+	} else {
+		store.sync()
+	}
+}
+
+// numberOfStoresPerSync balances the cost of writing to disk against the lost stores that
+// could happen when the whole app is interrupted.
+const numberOfStoresPerSync = 100
+
+// sync flushes changes to the disk but only after several store operations have happened.
+// The mutex must be already locked.
+func (store *DB) sync() {
+	store.count++
+	if store.count >= numberOfStoresPerSync {
+		store.count = 0
+		store.db.Sync() // a relatively expensive operation
+		store.db.Close()
+		store.db = open(store.file)
 	}
 }
 
