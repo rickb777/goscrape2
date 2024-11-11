@@ -26,7 +26,7 @@ Features and advantages over existing tools like wget, httrack, Teleport Pro:
 
 ## Installation
 
-There are 2 options to install goscrape:
+There are 2 options to install `goscrape`:
 
 1. Download and unpack a binary release from [Releases](https://github.com/cornelk/goscrape/releases)
 
@@ -57,29 +57,35 @@ goscrape --serve website.com
 ```
 Scrape a website and create an offline browsable version on the disk.
 
-Usage: goscrape [--include INCLUDE] [--exclude EXCLUDE] [--output OUTPUT] [--depth DEPTH] [--imagequality IMAGEQUALITY] [--timeout TIMEOUT] [--serve SERVE] [--serverport SERVERPORT] [--cookiefile COOKIEFILE] [--savecookiefile SAVECOOKIEFILE] [--header HEADER] [--proxy PROXY] [--user USER] [--useragent USERAGENT] [--verbose] [URLS [URLS ...]]
+Usage: goscrape [--include INCLUDE] [--exclude EXCLUDE] [--output OUTPUT] [--concurrency CONCURRENCY] [--depth DEPTH] [--imagequality IMAGEQUALITY] [--timeout TIMEOUT] [--retrydelay RETRYDELAY] [--tries TRIES] [--serve SERVE] [--serverport SERVERPORT] [--cookiefile COOKIEFILE] [--savecookiefile SAVECOOKIEFILE] [--header HEADER] [--proxy PROXY] [--user USER] [--useragent USERAGENT] [--verbose] [--debug] [URLS [URLS ...]]
 
 Positional arguments:
   URLS
 
 Options:
-  --include INCLUDE, -n INCLUDE
-                         only include URLs with PERL Regular Expressions support
+  --include INCLUDE, -i INCLUDE
+                         only include URLs that match a regular expression
   --exclude EXCLUDE, -x EXCLUDE
-                         exclude URLs with PERL Regular Expressions support
+                         exclude URLs that match a regular expression
   --output OUTPUT, -o OUTPUT
                          output directory to write files to
+  --concurrency CONCURRENCY, -c CONCURRENCY
+                         the number of concurrent downloads [default: 1]
   --depth DEPTH, -d DEPTH
-                         download depth, 0 for unlimited [default: 10]
-  --imagequality IMAGEQUALITY, -i IMAGEQUALITY
-                         image quality, 0 to disable reencoding
+                         download depth limit, 0 for unlimited [default: 10]
+  --imagequality IMAGEQUALITY, -q IMAGEQUALITY
+                         image quality reduction, 0 to disable re-encoding
   --timeout TIMEOUT, -t TIMEOUT
-                         time limit in seconds for each HTTP request to connect and read the request body
+                         time limit (with units, e.g. 1s) for each HTTP request to connect and read the response [default: 30s]
+  --retrydelay RETRYDELAY
+                         initial delay used when retrying any download (with units, e.g. 1s) [default: 5s]
+  --tries TRIES, -n TRIES
+                         the number of tries to download each file if the server gives a 5xx error [default: 1]
   --serve SERVE, -s SERVE
                          serve the website using a webserver
   --serverport SERVERPORT, -r SERVERPORT
                          port to use for the webserver [default: 8080]
-  --cookiefile COOKIEFILE, -c COOKIEFILE
+  --cookiefile COOKIEFILE
                          file containing the cookie content
   --savecookiefile SAVECOOKIEFILE
                          file to save the cookie content
@@ -91,9 +97,10 @@ Options:
   --useragent USERAGENT, -a USERAGENT
                          user agent to use for scraping
   --verbose, -v          verbose output
+  --debug, -z            debug output
   --help, -h             display this help and exit
   --version              display version and exit
-```
+  ```
 
 ## Cookies
 
@@ -103,3 +110,16 @@ cookies in the following format:
 ```
 [{"name":"user","value":"123"},{"name":"sessioe","value":"sid"}]
 ```
+
+## Conditional requests: ETags and last-modified
+
+HTTP uses ETags to tag the version of each resource. Each ETag is a hash constructed by 
+the server somehow. Also, each file usually has a last-modified date.
+
+`goscrape` will use both of these items provided by the server to reduce the amount of
+work needed if multiple sessions of downloading are run on the same start URL. Any file 
+that is not modified doesn't need to be downloaded more than once.
+
+A small database containing ETags is stored in ~/.config/goscrape.db, which can be manually
+deleted to purge this cache. It is automatically purged if the output directory doesn't
+exist when `goscrape` is started.

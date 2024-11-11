@@ -31,10 +31,11 @@ var (
 )
 
 type arguments struct {
-	Include []string `arg:"-i,--include" help:"only include URLs with PERL Regular Expressions support"`
-	Exclude []string `arg:"-x,--exclude" help:"exclude URLs with PERL Regular Expressions support"`
+	Include []string `arg:"-i,--include" help:"only include URLs that match a regular expression"`
+	Exclude []string `arg:"-x,--exclude" help:"exclude URLs that match a regular expression"`
 	Output  string   `arg:"-o,--output" help:"output directory to write files to"`
-	URLs    []string `arg:"positional"`
+
+	URLs []string `arg:"positional"`
 
 	Concurrency  int64         `arg:"-c,--concurrency" help:"the number of concurrent downloads" default:"1"`
 	Depth        int64         `arg:"-d,--depth" help:"download depth limit, 0 for unlimited" default:"10"`
