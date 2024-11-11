@@ -40,8 +40,8 @@ type Scraper struct {
 	// key is the URL of page or asset
 	processed *work.Set[string]
 
-	// db stores ETags (hashes of file state) for each URL
-	ETags *db.DB
+	// ETagsDB stores ETags (hashes of file state) for each URL
+	ETagsDB *db.DB
 }
 
 // New creates a new Scraper instance.
@@ -143,6 +143,7 @@ func (s *Scraper) Start(ctx context.Context) error {
 	d := &download.Download{
 		Config:   s.config,
 		Cookies:  s.cookies,
+		ETagsDB:  s.ETagsDB,
 		StartURL: s.URL,
 		Auth:     s.auth,
 		Client:   s.client,

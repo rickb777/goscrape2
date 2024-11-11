@@ -13,6 +13,8 @@ import (
 	"github.com/rickb777/acceptable/header"
 )
 
+// DB provides a persistent store for HTTP ETags to reduce network traffic when repeating
+// a download session. If the store is unavailable for some reason, its methods are no-ops.
 type DB struct {
 	db   *bolt.DB
 	file string
@@ -21,7 +23,7 @@ type DB struct {
 func Open() *DB {
 	dir := os.Getenv("XDG_CONFIG_HOME")
 	if dir != "" {
-		return openDB(dir)
+		return OpenDB(dir)
 	}
 
 	home, err := os.UserHomeDir()
@@ -30,17 +32,17 @@ func Open() *DB {
 	}
 
 	if home != "" {
-		return openDB(filepath.Join(home, ".config"))
+		return OpenDB(filepath.Join(home, ".config"))
 	}
 
 	logger.Warn("Cannot access ETag database in $XDG_CONFIG_HOME or $HOME/.config")
 	return nil // this will hurt performance but downloading will still work
 }
 
-const dbName = "goscrape.db"
+const FileName = "goscrape.db"
 
-func openDB(dir string) *DB {
-	file := filepath.Join(dir, dbName)
+func OpenDB(dir string) *DB {
+	file := filepath.Join(dir, FileName)
 
 	store, err := bolt.Open(file, 644, nil)
 	if err != nil {
@@ -51,14 +53,15 @@ func openDB(dir string) *DB {
 }
 
 func (store *DB) Close() error {
-	if store.db == nil {
+	if store == nil {
 		return nil // no-op if absent
 	}
 	return store.db.Close()
 }
 
+// Lookup finds the ETags for a given URL.
 func (store *DB) Lookup(u *url.URL) (etags header.ETags) {
-	if store.db == nil {
+	if store == nil {
 		return nil // no-op if absent
 	}
 
@@ -88,8 +91,9 @@ func (store *DB) Lookup(u *url.URL) (etags header.ETags) {
 	return etags
 }
 
-func (store *DB) Store(u *url.URL, etags ...header.ETag) {
-	if store.db == nil {
+// Store stores the ETags for a given URL.
+func (store *DB) Store(u *url.URL, etags header.ETags) {
+	if store == nil {
 		return // no-op if absent
 	}
 

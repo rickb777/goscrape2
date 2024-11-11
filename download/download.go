@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/cornelk/goscrape/config"
+	"github.com/cornelk/goscrape/db"
 	"github.com/cornelk/goscrape/document"
 	"github.com/cornelk/goscrape/download/ioutil"
 	"github.com/cornelk/goscrape/logger"
@@ -26,6 +27,7 @@ type HttpClient interface {
 type Download struct {
 	Config   config.Config
 	Cookies  *cookiejar.Jar
+	ETagsDB  *db.DB
 	StartURL *url.URL
 
 	Auth   string

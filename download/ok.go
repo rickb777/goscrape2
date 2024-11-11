@@ -23,6 +23,7 @@ func (d *Download) response200(item work.Item, resp *http.Response) (*url.URL, *
 	contentType := header.ParseContentTypeFromHeaders(resp.Header)
 	lastModified, _ := header.ParseHTTPDateTime(resp.Header.Get(headername.LastModified))
 	isGzip := resp.Header.Get(headername.ContentEncoding) == "gzip"
+	d.ETagsDB.Store(item.URL, header.ETagsOf(resp.Header.Get(headername.ETag)))
 
 	switch {
 	case isHtml(contentType) || isXHtml(contentType):

@@ -178,7 +178,7 @@ func scrapeURLs(ctx context.Context, cfg config.Config, args arguments) error {
 			return fmt.Errorf("initializing scraper: %w", err)
 		}
 
-		sc.ETags = etagStore
+		sc.ETagsDB = etagStore
 
 		logger.Info("Scraping", slog.String("url", sc.URL.String()))
 		if err = sc.Start(ctx); err != nil {

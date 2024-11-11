@@ -9,24 +9,24 @@ import (
 )
 
 func TestDB(t *testing.T) {
-	store := openDB(".")
-	defer os.Remove("./" + dbName)
+	store := OpenDB(".")
+	defer os.Remove("./" + FileName)
 	defer store.Close()
 
 	u1 := mustParse("http://example.org/")
-	store.Store(u1, header.ETag{Hash: "h1a"}, header.ETag{Hash: "h1b"})
+	store.Store(u1, header.ETags{{Hash: "h1a"}, {Hash: "h1b"}})
 
 	u2 := mustParse("http://example.org/a/b/c/")
-	store.Store(u2, header.ETag{
+	store.Store(u2, header.ETags{{
 		Hash: "h2",
 		Weak: false,
-	})
+	}})
 
 	u3 := mustParse("http://example.org/a/b/c/style.css")
-	store.Store(u3, header.ETag{
+	store.Store(u3, header.ETags{{
 		Hash: "h3",
 		Weak: true,
-	})
+	}})
 
 	v1 := store.Lookup(u1)
 	assert.Equal(t, v1, header.ETags{{Hash: "h1a"}, {Hash: "h1b"}})
