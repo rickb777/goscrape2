@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/cornelk/goscrape/db"
 	"log/slog"
 	"maps"
 	"os"
@@ -167,12 +168,17 @@ func runScraper(ctx context.Context, args arguments) error {
 
 func scrapeURLs(ctx context.Context, cfg config.Config, args arguments) error {
 
+	etagStore := db.Open()
+	defer etagStore.Close()
+
 	for _, url := range args.URLs {
 		cfg.URL = url
 		sc, err := scraper.New(cfg)
 		if err != nil {
 			return fmt.Errorf("initializing scraper: %w", err)
 		}
+
+		sc.ETags = etagStore
 
 		logger.Info("Scraping", slog.String("url", sc.URL.String()))
 		if err = sc.Start(ctx); err != nil {

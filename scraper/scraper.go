@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/cornelk/goscrape/config"
+	"github.com/cornelk/goscrape/db"
 	"github.com/cornelk/goscrape/download"
 	"github.com/cornelk/goscrape/download/ioutil"
 	"github.com/cornelk/goscrape/filter"
@@ -38,6 +39,9 @@ type Scraper struct {
 
 	// key is the URL of page or asset
 	processed *work.Set[string]
+
+	// db stores ETags (hashes of file state) for each URL
+	ETags *db.DB
 }
 
 // New creates a new Scraper instance.
