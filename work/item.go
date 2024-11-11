@@ -29,8 +29,11 @@ type Refs []*url.URL
 
 type Result struct {
 	Item
-	References Refs
-	Excluded   Refs
+	StatusCode    int
+	References    Refs
+	Excluded      Refs
+	ContentLength int64
+	FileSize      int64
 }
 
 func (refs Refs) String() string {

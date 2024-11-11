@@ -53,6 +53,8 @@ func (d *Download) html200(item work.Item, resp *http.Response, lastModified tim
 		return nil, nil, fmt.Errorf("buffering %s: %w", contentType.String(), err)
 	}
 
+	contentLength := int64(len(data))
+
 	doc, err := document.ParseHTML(item.URL, d.StartURL, bytes.NewReader(data))
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s: %w", contentType.String(), err)
@@ -70,7 +72,7 @@ func (d *Download) html200(item work.Item, resp *http.Response, lastModified tim
 		data = fixed
 	}
 	rdr := bytes.NewReader(data)
-	d.storeDownload(item.URL, rdr, lastModified, true)
+	fileSize := d.storeDownload(item.URL, rdr, lastModified, true)
 
 	references, err = doc.FindReferences()
 	if err != nil {
@@ -79,7 +81,7 @@ func (d *Download) html200(item work.Item, resp *http.Response, lastModified tim
 
 	// use the URL that the website returned as new base url for the
 	// scrape, in case a redirect changed it (only for the start page)
-	return resp.Request.URL, &work.Result{Item: item, References: references}, nil
+	return resp.Request.URL, &work.Result{Item: item, StatusCode: resp.StatusCode, ContentLength: contentLength, FileSize: fileSize, References: references}, nil
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -131,11 +133,13 @@ func (d *Download) css200(item work.Item, resp *http.Response, lastModified time
 		return nil, nil, fmt.Errorf("buffering text/css: %w", err)
 	}
 
+	contentLength := int64(len(data))
+
 	data, references = document.CheckCSSForUrls(item.URL, d.StartURL.Host, data)
 
-	d.storeDownload(item.URL, bytes.NewReader(data), lastModified, false)
+	fileSize := d.storeDownload(item.URL, bytes.NewReader(data), lastModified, false)
 
-	return nil, &work.Result{Item: item, References: references}, nil
+	return nil, &work.Result{Item: item, StatusCode: resp.StatusCode, ContentLength: contentLength, FileSize: fileSize, References: references}, nil
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -146,14 +150,16 @@ func (d *Download) image200(item work.Item, resp *http.Response, lastModified ti
 		return nil, nil, fmt.Errorf("buffering %s: %w", contentType.String(), err)
 	}
 
+	contentLength := int64(len(data))
+
 	data = d.Config.ImageQuality.CheckImageForRecode(item.URL, data)
 	if d.Config.ImageQuality != 0 {
 		lastModified = time.Time{} // altered images can't be safely time-stamped
 	}
 
-	d.storeDownload(item.URL, bytes.NewReader(data), lastModified, false)
+	fileSize := d.storeDownload(item.URL, bytes.NewReader(data), lastModified, false)
 
-	return nil, &work.Result{Item: item}, nil
+	return nil, &work.Result{Item: item, StatusCode: resp.StatusCode, ContentLength: contentLength, FileSize: fileSize}, nil
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -173,28 +179,29 @@ func (d *Download) other200(item work.Item, resp *http.Response, lastModified ti
 	}
 
 	// store without buffering entire file into memory
-	d.storeDownload(item.URL, rdr, lastModified, false)
+	fileSize := d.storeDownload(item.URL, rdr, lastModified, false)
 
-	return nil, &work.Result{Item: item}, nil
+	return nil, &work.Result{Item: item, StatusCode: resp.StatusCode, FileSize: fileSize}, nil
 }
 
 //-------------------------------------------------------------------------------------------------
 
 // storeDownload writes the download to a file, if a known binary file is detected,
 // processing of the file as page to look for links is skipped.
-func (d *Download) storeDownload(u *url.URL, data io.Reader, lastModified time.Time, isAPage bool) {
+func (d *Download) storeDownload(u *url.URL, data io.Reader, lastModified time.Time, isAPage bool) (fileSize int64) {
 	filePath := document.GetFilePath(u, d.StartURL, d.Config.OutputDirectory, isAPage)
 
 	if !isAPage && ioutil.FileExists(d.Fs, filePath) {
-		return
+		return 0
 	}
 
-	if err := ioutil.WriteFileAtomically(d.Fs, d.StartURL, filePath, data); err != nil {
+	var err error
+	if fileSize, err = ioutil.WriteFileAtomically(d.Fs, d.StartURL, filePath, data); err != nil {
 		logger.Error("Writing to file failed",
 			slog.String("URL", u.String()),
 			slog.String("file", filePath),
 			slog.Any("error", err))
-		return
+		return fileSize
 	}
 
 	if !lastModified.IsZero() {
@@ -205,6 +212,8 @@ func (d *Download) storeDownload(u *url.URL, data io.Reader, lastModified time.T
 				slog.Any("error", err))
 		}
 	}
+
+	return fileSize
 }
 
 //-------------------------------------------------------------------------------------------------

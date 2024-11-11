@@ -35,39 +35,40 @@ func CreateDirectory(fs afero.Fs, path string) error {
 	return nil
 }
 
-func WriteFileAtomically(fs afero.Fs, startURL *url.URL, filePath string, data io.Reader) error {
+func WriteFileAtomically(fs afero.Fs, startURL *url.URL, filePath string, data io.Reader) (int64, error) {
 	dir := filepath.Dir(filePath)
 	if len(dir) < len(startURL.Host) { // nothing to append if it is the root dir
 		dir = filepath.Join(".", startURL.Host, dir)
 	}
 
 	if err := CreateDirectory(fs, dir); err != nil {
-		return err
+		return 0, err
 	}
 
 	logger.Debug("Creating file", slog.String("path", filePath))
 	// writing the file may take much time, so write to a temporary file first
 	f, err := fs.Create(filePath + randomSuffix)
 	if err != nil {
-		return fmt.Errorf("creating file '%s': %w", filePath, err)
+		return 0, fmt.Errorf("creating file '%s': %w", filePath, err)
 	}
 
-	if _, err = io.Copy(f, data); err != nil {
+	var length int64
+	if length, err = io.Copy(f, data); err != nil {
 		// nolint: wrapcheck
 		_ = f.Close() // try to close and remove file but ignore any error
 		_ = fs.Remove(filePath + randomSuffix)
-		return fmt.Errorf("writing to file: %w", err)
+		return length, fmt.Errorf("writing to file: %w", err)
 	}
 
 	if err := f.Close(); err != nil {
-		return fmt.Errorf("closing file: %w", err)
+		return length, fmt.Errorf("closing file: %w", err)
 	}
 
 	// rename the file so it appears (almost) instantly in the filesystem
 	if err := fs.Rename(filePath+randomSuffix, filePath); err != nil {
-		return fmt.Errorf("renaming %s to %s: %w", filePath+randomSuffix, filePath, err)
+		return length, fmt.Errorf("renaming %s to %s: %w", filePath+randomSuffix, filePath, err)
 	}
-	return nil
+	return length, nil
 }
 
 //func OpenFile(fs afero.Fs, startURL *url.URL, filePath string) (io.ReadCloser, error) {

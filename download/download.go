@@ -62,29 +62,30 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 		panic("unexpected nil response")
 	}
 
-	// n.b. for correct connection pooling in the HTTP client, every response must be
-	// fully consumed and closed
+	// n.b. for correct connection pooling in the HTTP client, every response must
+	// be fully consumed and closed
 	defer closeResponseBody(resp.Body, resp.Request.URL)
-	defer logResponse(item.URL, resp, startTime)
 
 	if item.Depth == 0 {
 		// take account of redirection (only on the start page)
 		item.URL = resp.Request.URL
 	}
 
+	logThisResponse := logResponse(item.URL, startTime)
+
 	switch resp.StatusCode {
 	case http.StatusOK:
-		return d.response200(item, resp)
+		return logThisResponse(d.response200(item, resp))
 
 	case http.StatusNotModified:
-		return d.response304(item, resp)
+		return logThisResponse(d.response304(item, resp))
 
 	case http.StatusTooManyRequests:
-		return d.response429(item, resp)
+		return logThisResponse(d.response429(item, resp))
 
 	default:
 		discardData(resp.Body) // didn't want it
-		return item.URL, &work.Result{Item: item}, nil
+		return logThisResponse(item.URL, &work.Result{Item: item}, nil)
 	}
 }
 
@@ -94,7 +95,7 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 func (d *Download) response429(item work.Item, resp *http.Response) (*url.URL, *work.Result, error) {
 	discardData(resp.Body) // the body is normally empty, but we discard anything present
 	// put this URL back into the work queue to be re-tried later
-	repeat := &work.Result{Item: item, References: []*url.URL{item.URL}}
+	repeat := &work.Result{Item: item, StatusCode: http.StatusTooManyRequests, References: []*url.URL{item.URL}}
 	repeat.Item.Depth-- // because it will get incremented and we need the retry depth to be unchanged
 	return item.URL, repeat, nil
 }
@@ -105,14 +106,30 @@ func timeTaken(before time.Time) string {
 	return time.Now().Sub(before).Round(time.Millisecond).String()
 }
 
-func logResponse(item *url.URL, resp *http.Response, before time.Time) {
-	level := slog.LevelInfo
-	switch {
-	case resp.StatusCode >= 400:
-		level = slog.LevelWarn
+func logResponse(item *url.URL, before time.Time) func(*url.URL, *work.Result, error) (*url.URL, *work.Result, error) {
+	// using a func result so that it can be applied transparently to the major method call sites, above
+	return func(u *url.URL, result *work.Result, err error) (*url.URL, *work.Result, error) {
+		var args = []any{
+			slog.String("url", item.String()),
+			slog.Int("code", result.StatusCode),
+			slog.String("took", timeTaken(before)),
+		}
+		if result.ContentLength > 0 {
+			args = append(args, slog.Int64("length", result.ContentLength))
+		}
+		if result.FileSize > 0 {
+			args = append(args, slog.Int64("fileSize", result.FileSize))
+		}
+		logger.Log(chooseLevel(result.StatusCode), http.StatusText(result.StatusCode), args...)
+		return u, result, err
 	}
-	logger.Log(level, http.StatusText(resp.StatusCode), slog.String("url", item.String()),
-		slog.Int("code", resp.StatusCode), slog.String("took", timeTaken(before)))
+}
+
+func chooseLevel(statusCode int) slog.Level {
+	if statusCode >= 400 {
+		return slog.LevelWarn
+	}
+	return slog.LevelInfo
 }
 
 func discardData(rdr io.Reader) {
