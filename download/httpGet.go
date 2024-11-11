@@ -80,6 +80,7 @@ func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Ti
 
 		// 5xx status code = server error - retry the specified number of times
 		case resp.StatusCode >= 500:
+			d.Throttle.SpeedUp()
 			retryDelay = backoff(retryDelay)
 			// retry logic continues below
 
@@ -90,6 +91,7 @@ func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Ti
 
 		// 4xx status code = client error
 		case resp.StatusCode >= 400:
+			d.Throttle.SpeedUp()
 			logger.Error(http.StatusText(resp.StatusCode), slog.String("url", u.String()), slog.Int("code", resp.StatusCode))
 			return resp, nil // no error allows ongoing downloading of other URLs
 
