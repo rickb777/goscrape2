@@ -22,23 +22,12 @@ type DB struct {
 	mu    sync.Mutex
 }
 
+func DeleteFile() {
+	_ = os.Remove(filepath.Join(configDir(), FileName))
+}
+
 func Open() *DB {
-	dir := os.Getenv("XDG_CONFIG_HOME")
-	if dir != "" {
-		return OpenDB(dir)
-	}
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		home = os.Getenv("HOME")
-	}
-
-	if home != "" {
-		return OpenDB(filepath.Join(home, ".config"))
-	}
-
-	logger.Warn("Cannot access ETag database in $XDG_CONFIG_HOME or $HOME/.config")
-	return nil // this will hurt performance but downloading will still work
+	return OpenDB(configDir())
 }
 
 const FileName = "goscrape.db"
@@ -62,6 +51,24 @@ func open(file string) *bolt.DB {
 
 	store.NoSync = true // cached data will be flushed explicitly
 	return store
+}
+
+func configDir() string {
+	dir := os.Getenv("XDG_CONFIG_HOME")
+	if dir != "" {
+		return dir
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = os.Getenv("HOME")
+	}
+
+	if home != "" {
+		return filepath.Join(home, ".config")
+	}
+
+	return ""
 }
 
 func (store *DB) Close() error {

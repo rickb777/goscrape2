@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/cornelk/goscrape/db"
+	"github.com/cornelk/goscrape/download/ioutil"
+	"github.com/spf13/afero"
 	"log/slog"
 	"maps"
 	"os"
@@ -167,6 +169,10 @@ func runScraper(ctx context.Context, args arguments) error {
 }
 
 func scrapeURLs(ctx context.Context, cfg config.Config, args arguments) error {
+
+	if !ioutil.FileExists(afero.NewOsFs(), cfg.OutputDirectory) {
+		db.DeleteFile() // get rid of stale cache
+	}
 
 	etagStore := db.Open()
 	defer etagStore.Close()
