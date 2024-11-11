@@ -19,7 +19,10 @@ import (
 // Counters accumulates HTTP response status codes.
 var Counters = NewHistogram()
 
-func (d *Download) GET(ctx context.Context, u *url.URL, lastModified time.Time) (resp *http.Response, err error) {
+// httpGet performs one HTTP 'get' request, with as many retries as needed, up to the
+// configured limit. Unless an error arises, the response body must be fully
+// consumed and then closed.
+func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Time) (resp *http.Response, err error) {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
@@ -83,7 +86,7 @@ func (d *Download) GET(ctx context.Context, u *url.URL, lastModified time.Time) 
 		// 4xx status code = client error
 		case resp.StatusCode >= 400:
 			logger.Error(http.StatusText(resp.StatusCode), slog.String("url", u.String()), slog.Int("code", resp.StatusCode))
-			return resp, nil // no error allows ongoing downloading
+			return resp, nil // no error allows ongoing downloading of other URLs
 
 		// 304 not modified - no download but scan for links if possible
 		case resp.StatusCode == http.StatusNotModified:
@@ -106,13 +109,12 @@ func (d *Download) GET(ctx context.Context, u *url.URL, lastModified time.Time) 
 			slog.String("status", http.StatusText(resp.StatusCode)),
 			slog.String("sleep", retryDelay.String()))
 
-		time.Sleep(retryDelay)
+		if i+1 < d.Config.Tries {
+			time.Sleep(retryDelay) // delay before retrying (this URL only)
+		}
 	}
 
-	if resp == nil {
-		return nil, fmt.Errorf("%s response status unknown", u)
-	}
-	return nil, fmt.Errorf("%s response status %d %s", resp.Request.URL, resp.StatusCode, http.StatusText(resp.StatusCode))
+	return resp, nil // allow this URL to be abandoned
 }
 
 func backoff(t time.Duration) time.Duration {
