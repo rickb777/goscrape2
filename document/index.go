@@ -14,7 +14,7 @@ const (
 	PageDirIndex = "index" + PageExtension
 )
 
-func (d *Document) FindReferences() (work.Refs, error) {
+func (d *HTMLDocument) FindReferences() (work.Refs, error) {
 	var result work.Refs
 	for tag := range htmlindex.Nodes {
 		references, err := d.index.URLs(tag)

@@ -1,6 +1,7 @@
 package document
 
 import (
+	"bytes"
 	"io"
 	"log/slog"
 	"net/url"
@@ -26,7 +27,7 @@ func TestFixURLReferences(t *testing.T) {
 </html>
 `)
 
-	doc, err := ParseHTML(u, u, b)
+	doc, err := ParseHTML(u, u, bytes.NewReader(b))
 	require.NoError(t, err)
 
 	ref, fixed, err := doc.FixURLReferences()

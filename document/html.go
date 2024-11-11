@@ -3,6 +3,7 @@ package document
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/url"
 	"slices"
@@ -22,15 +23,15 @@ var ignoredURLPrefixes = []string{
 	"mailto:", // mail address
 }
 
-type Document struct {
+type HTMLDocument struct {
 	u        *url.URL
 	startURL *url.URL
 	doc      *html.Node
 	index    *htmlindex.Index
 }
 
-func ParseHTML(u, startURL *url.URL, data []byte) (*Document, error) {
-	doc, err := html.Parse(bytes.NewReader(data))
+func ParseHTML(u, startURL *url.URL, rdr io.Reader) (*HTMLDocument, error) {
+	doc, err := html.Parse(rdr)
 	if err != nil {
 		return nil, fmt.Errorf("parsing: %w", err)
 	}
@@ -38,13 +39,13 @@ func ParseHTML(u, startURL *url.URL, data []byte) (*Document, error) {
 	index := htmlindex.New()
 	index.Index(u, doc)
 
-	return &Document{u: u, startURL: startURL, doc: doc, index: index}, nil
+	return &HTMLDocument{u: u, startURL: startURL, doc: doc, index: index}, nil
 }
 
 // FixURLReferences fixes URL references to point to relative file names.
 // It returns a bool that indicates that no reference needed to be fixed,
 // in this case the returned HTML string will be empty.
-func (d *Document) FixURLReferences() ([]byte, bool, error) {
+func (d *HTMLDocument) FixURLReferences() ([]byte, bool, error) {
 	relativeToRoot := urlRelativeToRoot(d.u)
 	if !fixHTMLNodeURLs(d.u, d.startURL.Host, relativeToRoot, d.index) {
 		return nil, false, nil

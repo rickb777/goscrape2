@@ -105,8 +105,11 @@ func (d *Download) response200(item work.Item, resp *http.Response) (*url.URL, *
 	case isHtml(contentType) || isXHtml(contentType):
 		return d.html200(item, resp, lastModified, contentType, isGzip)
 
-	case contentType.Type == "text" && contentType.Subtype == "css":
+	case isCSS(contentType):
 		return d.css200(item, resp, lastModified, isGzip)
+
+	//case isSVG(contentType):
+	//	return d.svg200(item, resp, lastModified, isGzip)
 
 	case contentType.Type == "image" && d.Config.ImageQuality != 0:
 		return d.image200(item, resp, lastModified, contentType, isGzip)
@@ -126,7 +129,7 @@ func (d *Download) html200(item work.Item, resp *http.Response, lastModified tim
 		return nil, nil, fmt.Errorf("buffering %s: %w", contentType.String(), err)
 	}
 
-	doc, err := document.ParseHTML(item.URL, d.StartURL, data)
+	doc, err := document.ParseHTML(item.URL, d.StartURL, bytes.NewReader(data))
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s: %w", contentType.String(), err)
 	}
@@ -154,6 +157,45 @@ func (d *Download) html200(item work.Item, resp *http.Response, lastModified tim
 	// scrape, in case a redirect changed it (only for the start page)
 	return resp.Request.URL, &work.Result{Item: item, References: references}, nil
 }
+
+//-------------------------------------------------------------------------------------------------
+
+//func (d *Download) svg200(item work.Item, resp *http.Response, lastModified time.Time, isGzip bool) (*url.URL, *work.Result, error) {
+//	var references work.Refs
+//
+//	data, err := bufferEntireResponse(resp, isGzip)
+//	if err != nil {
+//		return nil, nil, fmt.Errorf("buffering SVG: %w", err)
+//	}
+//
+//	doc, err := document.ParseSVG(item.URL, d.StartURL, bytes.NewReader(data))
+//	if err != nil {
+//		return nil, nil, fmt.Errorf("SVG: %w", err)
+//	}
+//
+//	fixed, hasChanges, err := doc.FixURLReferences()
+//	if err != nil {
+//		logger.Error("Fixing file references failed",
+//			slog.String("url", item.String()),
+//			slog.Any("error", err))
+//		return nil, nil, nil
+//	}
+//
+//	if hasChanges {
+//		data = fixed
+//	}
+//	rdr := bytes.NewReader(data)
+//	d.storeDownload(item.URL, rdr, lastModified, true)
+//
+//	references, err = doc.FindReferences()
+//	if err != nil {
+//		return nil, nil, err
+//	}
+//
+//	// use the URL that the website returned as new base url for the
+//	// scrape, in case a redirect changed it (only for the start page)
+//	return resp.Request.URL, &work.Result{Item: item, References: references}, nil
+//}
 
 //-------------------------------------------------------------------------------------------------
 
@@ -246,7 +288,7 @@ func (d *Download) html304(item work.Item, resp *http.Response) (*url.URL, *work
 		return nil, nil, fmt.Errorf("existing HTML file: %w", err)
 	}
 
-	doc, err := document.ParseHTML(item.URL, d.StartURL, data)
+	doc, err := document.ParseHTML(item.URL, d.StartURL, bytes.NewReader(data))
 	if err != nil {
 		return nil, nil, fmt.Errorf("parsing HTML: %w", err)
 	}
@@ -305,12 +347,22 @@ func (d *Download) storeDownload(u *url.URL, data io.Reader, lastModified time.T
 	}
 }
 
+//-------------------------------------------------------------------------------------------------
+
 func isHtml(contentType header.ContentType) bool {
 	return contentType.Type == "text" && contentType.Subtype == "html"
 }
 
 func isXHtml(contentType header.ContentType) bool {
 	return contentType.Type == "application" && contentType.Subtype == "xhtml+xml"
+}
+
+func isCSS(contentType header.ContentType) bool {
+	return contentType.Type == "text" && contentType.Subtype == "css"
+}
+
+func isSVG(contentType header.ContentType) bool {
+	return contentType.Type == "image" && contentType.Subtype == "svg+xml"
 }
 
 func timeTaken(before time.Time) string {
