@@ -9,9 +9,9 @@ type Throttle int64
 
 const (
 	// speed up gently
-	throttleDecrement = 10 * time.Millisecond
+	throttleDecrement = 100 * time.Millisecond
 	// slow down sharply
-	throttleIncrement = 100 * throttleDecrement
+	throttleIncrement = 10 * throttleDecrement
 )
 
 func (t *Throttle) SlowDown() {
