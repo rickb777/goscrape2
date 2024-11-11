@@ -57,7 +57,7 @@ goscrape --serve website.com
 ```
 Scrape a website and create an offline browsable version on the disk.
 
-Usage: goscrape [--include INCLUDE] [--exclude EXCLUDE] [--output OUTPUT] [--concurrency CONCURRENCY] [--depth DEPTH] [--imagequality IMAGEQUALITY] [--timeout TIMEOUT] [--retrydelay RETRYDELAY] [--tries TRIES] [--serve SERVE] [--serverport SERVERPORT] [--cookiefile COOKIEFILE] [--savecookiefile SAVECOOKIEFILE] [--header HEADER] [--proxy PROXY] [--user USER] [--useragent USERAGENT] [--verbose] [--debug] [URLS [URLS ...]]
+Usage: goscrape [--include INCLUDE] [--exclude EXCLUDE] [--output OUTPUT] [--concurrency CONCURRENCY] [--depth DEPTH] [--imagequality IMAGEQUALITY] [--timeout TIMEOUT] [--retrydelay RETRYDELAY] [--throttle THROTTLE] [--tries TRIES] [--serve SERVE] [--serverport SERVERPORT] [--cookiefile COOKIEFILE] [--savecookiefile SAVECOOKIEFILE] [--header HEADER] [--proxy PROXY] [--user USER] [--useragent USERAGENT] [--verbose] [--debug] [URLS [URLS ...]]
 
 Positional arguments:
   URLS
@@ -70,7 +70,7 @@ Options:
   --output OUTPUT, -o OUTPUT
                          output directory to write files to
   --concurrency CONCURRENCY, -c CONCURRENCY
-                         the number of concurrent downloads [default: 1]
+                         the number of concurrent downloads (ignored unless --throttle is zero) [default: 1]
   --depth DEPTH, -d DEPTH
                          download depth limit, 0 for unlimited [default: 10]
   --imagequality IMAGEQUALITY, -q IMAGEQUALITY
@@ -79,6 +79,7 @@ Options:
                          time limit (with units, e.g. 1s) for each HTTP request to connect and read the response [default: 30s]
   --retrydelay RETRYDELAY
                          initial delay used when retrying any download (with units, e.g. 1s) [default: 5s]
+  --throttle THROTTLE    minimum delay used between any two downloads (with units, e.g. 1s) [default: 0s]
   --tries TRIES, -n TRIES
                          the number of tries to download each file if the server gives a 5xx error [default: 1]
   --serve SERVE, -s SERVE
@@ -100,7 +101,7 @@ Options:
   --debug, -z            debug output
   --help, -h             display this help and exit
   --version              display version and exit
-  ```
+```
 
 ## Cookies
 

@@ -154,6 +154,8 @@ func (s *Scraper) Start(ctx context.Context) error {
 		Fs:       s.fs,
 	}
 
+	d.Throttle.Reset()
+
 	redirect, firstResult, err := d.ProcessURL(ctx, firstItem)
 	if err != nil {
 		return err

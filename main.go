@@ -37,12 +37,13 @@ type arguments struct {
 
 	URLs []string `arg:"positional"`
 
-	Concurrency  int64         `arg:"-c,--concurrency" help:"the number of concurrent downloads" default:"1"`
-	Depth        int64         `arg:"-d,--depth" help:"download depth limit, 0 for unlimited" default:"10"`
-	ImageQuality int64         `arg:"-q,--imagequality" help:"image quality reduction, 0 to disable re-encoding"`
-	Timeout      time.Duration `arg:"-t,--timeout" help:"time limit (with units, e.g. 1s) for each HTTP request to connect and read the response" default:"30s"`
-	RetryDelay   time.Duration `arg:"--retrydelay" help:"initial delay used when retrying any download (with units, e.g. 1s)" default:"5s"`
-	Tries        int64         `arg:"-n,--tries" help:"the number of tries to download each file if the server gives a 5xx error" default:"1"`
+	Concurrency     int64         `arg:"-c,--concurrency" help:"the number of concurrent downloads (ignored unless --throttle is zero)" default:"1"`
+	Depth           int64         `arg:"-d,--depth" help:"download depth limit, 0 for unlimited" default:"10"`
+	ImageQuality    int64         `arg:"-q,--imagequality" help:"image quality reduction, 0 to disable re-encoding"`
+	Timeout         time.Duration `arg:"-t,--timeout" help:"time limit (with units, e.g. 1s) for each HTTP request to connect and read the response" default:"30s"`
+	RetryDelay      time.Duration `arg:"--retrydelay" help:"initial delay used when retrying any download (with units, e.g. 1s)" default:"5s"`
+	MinimumThrottle time.Duration `arg:"--throttle" help:"minimum delay used between any two downloads (with units, e.g. 1s)" default:"0s"`
+	Tries           int64         `arg:"-n,--tries" help:"the number of tries to download each file if the server gives a 5xx error" default:"1"`
 
 	Serve      string `arg:"-s,--serve" help:"serve the website using a webserver"`
 	ServerPort int16  `arg:"-r,--serverport" help:"port to use for the webserver" default:"8080"`
@@ -143,6 +144,11 @@ func runScraper(ctx context.Context, args arguments) error {
 	cookies, err := readCookieFile(args.CookieFile)
 	if err != nil {
 		return fmt.Errorf("reading cookie: %w", err)
+	}
+
+	if args.MinimumThrottle > 0 {
+		download.MinimumThrottle = args.MinimumThrottle
+		args.Concurrency = 1
 	}
 
 	cfg := config.Config{

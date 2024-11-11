@@ -19,6 +19,6 @@ func TestThrottle(t *testing.T) {
 	throttle.SlowDown()
 	assert.Equal(t, Throttle(34*time.Second), throttle)
 
-	throttle.SpeedUp()
+	throttle.Reset()
 	assert.Equal(t, Throttle(0), throttle)
 }
