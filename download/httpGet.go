@@ -54,9 +54,13 @@ func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Ti
 	}
 
 	retryDelay := d.Config.RetryDelay // used every retry for this URL only
+	tries := d.Config.Tries
+	if tries < 1 {
+		tries = 1
+	}
 
 	// this loop provides retries if 5xx server errors arise
-	for i := 0; i < d.Config.Tries; i++ {
+	for i := 0; i < tries; i++ {
 		d.Throttle.Sleep() // throttle every URL
 
 		resp, err = d.Client.Do(req)
@@ -91,8 +95,8 @@ func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Ti
 		// 4xx status code = client error
 		case resp.StatusCode >= 400:
 			d.Throttle.Reset()
-			logger.Error(http.StatusText(resp.StatusCode), slog.String("url", u.String()), slog.Int("code", resp.StatusCode))
-			return resp, nil // no error allows ongoing downloading of other URLs
+			// returning no error allows ongoing downloading of other URLs
+			return resp, nil // this url will be logged then discarded
 
 		// 304 not modified - no download but scan for links if possible
 		case resp.StatusCode == http.StatusNotModified:
@@ -109,13 +113,12 @@ func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Ti
 			return nil, fmt.Errorf("unexpected HTTP response %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
 		}
 
-		logger.Warn("HTTP server error",
-			slog.String("url", req.URL.String()),
-			slog.Int("code", resp.StatusCode),
-			slog.String("status", http.StatusText(resp.StatusCode)),
-			slog.String("sleep", retryDelay.String()))
+		if i+1 < tries {
+			logger.Warn(http.StatusText(resp.StatusCode),
+				slog.String("url", req.URL.String()),
+				slog.Int("code", resp.StatusCode),
+				slog.String("sleep", retryDelay.String()))
 
-		if i+1 < d.Config.Tries {
 			time.Sleep(retryDelay) // delay before retrying (this URL only)
 		}
 	}

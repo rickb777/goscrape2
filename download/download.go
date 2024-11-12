@@ -83,7 +83,7 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 
 	default:
 		discardData(resp.Body) // didn't want it
-		return item.URL, &work.Result{Item: item}, nil
+		return item.URL, &work.Result{Item: item, StatusCode: resp.StatusCode}, nil
 	}
 }
 
