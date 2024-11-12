@@ -123,7 +123,13 @@ func (store *DB) Store(u *urlpkg.URL, etags header.ETags) {
 
 	v := *u
 	v.Fragment = ""
-	store.records[v.String()] = etags.String()
+	key := v.String()
+	value := etags.String()
+	if value != "" {
+		store.records[key] = value
+	} else {
+		delete(store.records, key)
+	}
 	store.syncPeriodically()
 }
 

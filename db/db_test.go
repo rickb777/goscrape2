@@ -45,6 +45,8 @@ func TestDB(t *testing.T) {
 	//-------------------------------------------
 
 	store2 := OpenDB(".", fs)
+	store2.Store(u3, nil)
+
 	w1 := store2.Lookup(u1)
 	assert.Equal(t, w1, header.ETags{{Hash: "h1a"}, {Hash: "h1b"}})
 
@@ -52,7 +54,7 @@ func TestDB(t *testing.T) {
 	assert.Equal(t, w2, header.ETags{{Hash: "h2", Weak: false}})
 
 	w3 := store2.Lookup(u3)
-	assert.Equal(t, w3, header.ETags{{Hash: "h3", Weak: true}})
+	assert.Nil(t, w3)
 }
 
 func mustParse(s string) *url.URL {
