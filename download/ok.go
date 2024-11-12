@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
+	"github.com/cornelk/goscrape/db"
 	"io"
 	"log/slog"
 	"net/http"
@@ -22,7 +23,12 @@ func (d *Download) response200(item work.Item, resp *http.Response) (*url.URL, *
 	contentType := header.ParseContentTypeFromHeaders(resp.Header)
 	lastModified, _ := header.ParseHTTPDateTime(resp.Header.Get(headername.LastModified))
 	isGzip := resp.Header.Get(headername.ContentEncoding) == "gzip"
-	d.ETagsDB.Store(item.URL, header.ETagsOf(resp.Header.Get(headername.ETag)))
+
+	metadata := db.Item{ETags: resp.Header.Get(headername.ETag)}
+	if expires := resp.Header.Get(headername.Expires); expires != "" {
+		metadata.Expires, _ = header.ParseHTTPDateTime(expires)
+	}
+	d.ETagsDB.Store(item.URL, metadata)
 
 	switch {
 	case isHtml(contentType) || isXHtml(contentType):

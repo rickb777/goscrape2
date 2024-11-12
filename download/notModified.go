@@ -14,8 +14,6 @@ import (
 )
 
 func (d *Download) response304(item work.Item, resp *http.Response) (*url.URL, *work.Result, error) {
-	discardData(resp.Body) // the body is normally empty, but we discard anything present
-
 	ext := strings.ToLower(path.Ext(item.URL.Path))
 
 	switch ext {

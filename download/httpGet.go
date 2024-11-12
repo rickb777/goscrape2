@@ -38,12 +38,24 @@ func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Ti
 		req.Header.Set(headername.Authorization, d.Auth)
 	}
 
+	// lastModified is only set when a locally-cached file exists
 	if !lastModified.IsZero() {
 		req.Header.Set(headername.IfModifiedSince, lastModified.Format(header.RFC1123))
 
-		etags := d.ETagsDB.Lookup(u)
-		if len(etags) > 0 {
-			req.Header.Set(headername.IfNoneMatch, etags.String())
+		metadata := d.ETagsDB.Lookup(u)
+		if metadata.Expires.After(time.Now()) {
+			// not yet expired so no need for any HTTP traffic - report as 'teapot'
+			return &http.Response{
+				Status:        http.StatusText(http.StatusTeapot),
+				StatusCode:    http.StatusTeapot,
+				Header:        http.Header{},
+				Body:          io.NopCloser(&bytes.Buffer{}),
+				ContentLength: 0,
+			}, nil
+		}
+
+		if len(metadata.ETags) > 0 {
+			req.Header.Set(headername.IfNoneMatch, metadata.ETags)
 		}
 	}
 

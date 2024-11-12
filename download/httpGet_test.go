@@ -50,11 +50,11 @@ func (c *stubClient) Do(req *http.Request) (resp *http.Response, err error) {
 		panic(fmt.Sprintf("url '%s' not found in test data", ur))
 	}
 
-	etags := c.eTags.Lookup(req.URL)
-	if len(etags) > 0 && r.StatusCode == http.StatusOK {
+	metadata := c.eTags.Lookup(req.URL)
+	if len(metadata.ETags) > 0 && r.StatusCode == http.StatusOK {
 		wanted := header.ETagsOf(req.Header.Get(headername.IfNoneMatch))
 		for _, w := range wanted {
-			if etags.WeaklyMatches(w.Hash) {
+			if header.ETagsOf(metadata.ETags).WeaklyMatches(w.Hash) {
 				r.StatusCode = http.StatusNotModified
 				r.Status = http.StatusText(http.StatusNotModified)
 				r.Body = io.NopCloser(&bytes.Buffer{})
@@ -104,7 +104,7 @@ func TestGet304UsingEtag(t *testing.T) {
 	defer stub.eTags.Close()
 
 	u := mustParse("http://example.org/")
-	stub.eTags.Store(u, header.ETags{{Hash: "hash"}})
+	stub.eTags.Store(u, db.Item{ETags: `"hash"`})
 
 	d := &Download{
 		Config: config.Config{

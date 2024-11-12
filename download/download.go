@@ -72,12 +72,15 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 
 	switch resp.StatusCode {
 	case http.StatusOK:
+		// write the response body to a file, possibly modifying its hyperlinks
 		return d.response200(item, resp)
 
 	case http.StatusNotModified:
+		discardData(resp.Body) // discard anything present
 		return d.response304(item, resp)
 
 	case http.StatusTooManyRequests:
+		discardData(resp.Body) // discard anything present
 		return d.response429(item, resp)
 
 	default:
@@ -90,7 +93,6 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 
 // response429 handles too-many-request responses.
 func (d *Download) response429(item work.Item, resp *http.Response) (*url.URL, *work.Result, error) {
-	discardData(resp.Body) // the body is normally empty, but we discard anything present
 	// put this URL back into the work queue to be re-tried later
 	repeat := &work.Result{Item: item, StatusCode: http.StatusTooManyRequests, References: []*url.URL{item.URL}}
 	repeat.Item.Depth-- // because it will get incremented and we need the retry depth to be unchanged
