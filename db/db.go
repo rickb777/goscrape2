@@ -1,14 +1,17 @@
 package db
 
 import (
-	"github.com/boltdb/bolt"
+	"bufio"
+	"fmt"
 	"github.com/cornelk/goscrape/logger"
 	"github.com/rickb777/acceptable/header"
+	"github.com/spf13/afero"
+	"io"
 	"log/slog"
-	"net/url"
+	urlpkg "net/url"
 	"os"
-	pathpkg "path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 )
@@ -16,10 +19,11 @@ import (
 // DB provides a persistent store for HTTP ETags to reduce network traffic when repeating
 // a download session. If the store is unavailable for some reason, its methods are no-ops.
 type DB struct {
-	db    *bolt.DB
-	file  string
-	count int
-	mu    sync.Mutex
+	file    string
+	records map[string]string
+	count   int
+	fs      afero.Fs
+	mu      sync.Mutex
 }
 
 func DeleteFile() {
@@ -27,30 +31,40 @@ func DeleteFile() {
 }
 
 func Open() *DB {
-	return OpenDB(configDir())
+	return OpenDB(configDir(), afero.NewOsFs())
 }
 
-const FileName = "goscrape.db"
+const FileName = "goscrape-etags.txt"
 
-func OpenDB(dir string) *DB {
+func OpenDB(dir string, fs afero.Fs) *DB {
+	if !fileExists(fs, dir) {
+		return nil
+	}
+
 	file := filepath.Join(dir, FileName)
-	store := open(file)
-	if store == nil {
-		return nil
+	store := &DB{file: file, fs: fs}
+
+	f, err := fs.Open(file)
+	if err == nil {
+		store.records, err = readFile(f)
+	} else {
+		store.records = make(map[string]string)
 	}
 
-	return &DB{db: store, file: file}
+	return store
 }
 
-func open(file string) *bolt.DB {
-	store, err := bolt.Open(file, 0644, nil)
-	if err != nil {
-		logger.Error("Cannot access ETag database", slog.String("file", "file"))
-		return nil
+func readFile(rdr io.Reader) (map[string]string, error) {
+	records := make(map[string]string)
+	s := bufio.NewScanner(rdr)
+	for s.Scan() {
+		line := s.Text()
+		before, after, found := strings.Cut(line, "\t")
+		if found && len(before) > 0 && len(after) > 0 {
+			records[before] = after
+		}
 	}
-
-	store.NoSync = true // cached data will be flushed explicitly
-	return store
+	return records, nil
 }
 
 func configDir() string {
@@ -72,121 +86,86 @@ func configDir() string {
 }
 
 func (store *DB) Close() error {
-	if store == nil || store.db == nil {
+	if store == nil {
 		return nil // no-op if absent
 	}
-	return store.db.Close()
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	store.flush()
+	return nil
 }
 
 // Lookup finds the ETags for a given URL.
-func (store *DB) Lookup(u *url.URL) (etags header.ETags) {
-	if store == nil || store.db == nil {
+func (store *DB) Lookup(u *urlpkg.URL) header.ETags {
+	if store == nil {
 		return nil // no-op if absent
 	}
 
-	err := store.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket(nonBlankKey(u.Host))
-		if b == nil {
-			return nil
-		}
+	v := *u
+	v.Fragment = ""
+	etags := store.records[v.String()]
+	return header.ETagsOf(etags)
+}
 
-		parts, filename := splitPath(u.Path)
-
-		for _, part := range parts {
-			b = b.Bucket(nonBlankKey(part))
-			if b == nil {
-				return nil
-			}
-		}
-
-		value := string(b.Get(nonBlankKey(filename)))
-		etags = header.ETagsOf(value)
-		return nil
-	})
-	if err != nil {
-		logger.Warn("Cannot view DB", slog.Any("err", err), slog.String("file", store.file))
-	}
-
-	return etags
+func write(w io.Writer, key, value string) error {
+	_, err := fmt.Fprintf(w, "%s\t%s\n", key, value)
+	return err
 }
 
 // Store stores the ETags for a given URL.
-func (store *DB) Store(u *url.URL, etags header.ETags) {
-	if store == nil || store.db == nil {
+func (store *DB) Store(u *urlpkg.URL, etags header.ETags) {
+	if store == nil {
 		return // no-op if absent
 	}
 
 	store.mu.Lock()
 	defer store.mu.Unlock()
 
-	err := store.db.Update(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists(nonBlankKey(u.Host))
-		if err != nil {
-			logger.Warn("Cannot create DB bucket", slog.Any("err", err), slog.Any("url", u), slog.String("name", u.Host))
-			return nil
-		}
+	v := *u
+	v.Fragment = ""
+	store.records[v.String()] = etags.String()
+	store.syncPeriodically()
+}
 
-		parts, filename := splitPath(u.Path)
-
-		for _, part := range parts {
-			b, err = b.CreateBucketIfNotExists(nonBlankKey(part))
-			if err != nil {
-				logger.Warn("Cannot create DB bucket", slog.Any("err", err), slog.Any("url", u), slog.String("name", part))
-				return nil
-			}
-		}
-
-		err = b.Put(nonBlankKey(filename), []byte(header.ETags(etags).String()))
-		if err != nil {
-			logger.Warn("Cannot put DB bucket value", slog.Any("err", err), slog.Any("url", u), slog.String("name", parts[len(parts)-1]))
-		}
-
-		return nil
-	})
-
+func (store *DB) flush() {
+	file, err := store.fs.Create(store.file)
 	if err != nil {
-		logger.Warn("Cannot update DB", slog.Any("err", err))
-	} else {
-		store.sync()
+		logger.Warn("Cannot create DB", slog.Any("err", err), slog.String("file", store.file))
+		return
 	}
+	defer file.Close()
+
+	keys := make([]string, 0, len(store.records))
+	for key := range store.records {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+
+	buf := bufio.NewWriter(file)
+	for _, key := range keys {
+		if err := write(buf, key, store.records[key]); err != nil {
+			logger.Warn("Cannot create DB", slog.Any("err", err), slog.String("file", store.file))
+			return
+		}
+	}
+	buf.Flush()
 }
 
 // numberOfStoresPerSync balances the cost of writing to disk against the lost stores that
 // could happen when the whole app is interrupted.
-const numberOfStoresPerSync = 100
+const numberOfStoresPerSync = 20
 
-// sync flushes changes to the disk but only after several store operations have happened.
+// syncPeriodically flushes changes to the disk but only after several store operations have happened.
 // The mutex must be already locked.
-func (store *DB) sync() {
+func (store *DB) syncPeriodically() {
 	store.count++
 	if store.count >= numberOfStoresPerSync {
 		store.count = 0
-		store.db.Sync() // a relatively expensive operation
-		store.db.Close()
-		store.db = open(store.file)
+		store.flush()
 	}
 }
 
-func splitPath(path string) ([]string, string) {
-	if strings.HasSuffix(path, "/") {
-		parts := strings.Split(pathpkg.Clean(path), "/")[1:]
-		return parts, ""
-	}
-	parts := strings.Split(pathpkg.Clean(path), "/")[1:]
-	switch {
-	case len(parts) == 0:
-		return nil, ""
-	case len(parts) == 1:
-		return nil, parts[0]
-	default:
-		j := strings.Join(parts[:len(parts)-1], "/")
-		return []string{j}, parts[len(parts)-1]
-	}
-}
-
-func nonBlankKey(s string) []byte {
-	if s == "" {
-		return []byte{'/'}
-	}
-	return []byte(s)
+func fileExists(fs afero.Fs, filePath string) bool {
+	_, err := fs.Stat(filePath)
+	return !os.IsNotExist(err)
 }

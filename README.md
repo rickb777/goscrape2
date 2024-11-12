@@ -121,6 +121,6 @@ the server somehow. Also, each file usually has a last-modified date.
 work needed if multiple sessions of downloading are run on the same start URL. Any file 
 that is not modified doesn't need to be downloaded more than once.
 
-A small database containing ETags is stored in ~/.config/goscrape.db, which can be manually
-deleted to purge this cache. It is automatically purged if the output directory doesn't
-exist when `goscrape` is started.
+A small database containing ETags is stored in `~/.config/goscrape-etags.txt`, which can
+be manually deleted to purge this cache. It is automatically purged if the output directory 
+doesn't exist when `goscrape` is started.

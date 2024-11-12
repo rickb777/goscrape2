@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/spf13/afero"
 	"io"
 	"net/http"
 	"net/url"
@@ -98,7 +99,7 @@ func TestGet304UsingEtag(t *testing.T) {
 	stub := &stubClient{}
 	stub.response(http.StatusOK, "http://example.org/", "text/html", `<html></html>`, header.ETag{Hash: "hash"})
 
-	stub.eTags = db.OpenDB(".")
+	stub.eTags = db.OpenDB(".", afero.NewMemMapFs())
 	defer os.Remove("./" + db.FileName)
 	defer stub.eTags.Close()
 
