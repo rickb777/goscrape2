@@ -40,11 +40,11 @@ func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Ti
 
 	if !lastModified.IsZero() {
 		req.Header.Set(headername.IfModifiedSince, lastModified.Format(header.RFC1123))
-	}
 
-	etags := d.ETagsDB.Lookup(u)
-	if len(etags) > 0 {
-		req.Header.Set(headername.IfNoneMatch, etags.String())
+		etags := d.ETagsDB.Lookup(u)
+		if len(etags) > 0 {
+			req.Header.Set(headername.IfNoneMatch, etags.String())
+		}
 	}
 
 	for key, values := range d.Config.Header {

@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
-	"os"
 	"time"
 
 	"github.com/cornelk/goscrape/config"
@@ -42,7 +41,7 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 
 	filePath := document.GetFilePath(item.URL, d.StartURL, d.Config.OutputDirectory, true)
 	if ioutil.FileExists(d.Fs, filePath) {
-		fileInfo, err := os.Stat(filePath)
+		fileInfo, err := d.Fs.Stat(filePath)
 		if err == nil && fileInfo != nil {
 			existingModified = fileInfo.ModTime()
 		}

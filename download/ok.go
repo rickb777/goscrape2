@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"os"
 	"time"
 
 	"github.com/cornelk/goscrape/document"
@@ -205,7 +204,7 @@ func (d *Download) storeDownload(u *url.URL, data io.Reader, lastModified time.T
 	}
 
 	if !lastModified.IsZero() {
-		if err := os.Chtimes(filePath, lastModified, lastModified); err != nil {
+		if err := d.Fs.Chtimes(filePath, lastModified, lastModified); err != nil {
 			logger.Error("Updating file timestamps failed",
 				slog.String("URL", u.String()),
 				slog.String("file", filePath),
