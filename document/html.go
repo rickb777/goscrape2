@@ -55,9 +55,6 @@ func (d *HTMLDocument) FixURLReferences() ([]byte, bool, error) {
 	if err := html.Render(&rendered, d.doc); err != nil {
 		return nil, false, fmt.Errorf("rendering html: %w", err)
 	}
-	if strings.Contains(rendered.String(), `html5media`) {
-		logger.Debug("FOUND")
-	}
 	return rendered.Bytes(), true, nil
 }
 
@@ -70,7 +67,7 @@ func fixHTMLNodeURLs(baseURL *url.URL, startURLHost string, relativeToRoot strin
 		urls := index.Nodes(tag)
 		for _, nodes := range urls {
 			for _, node := range nodes {
-				if fixNodeURL(baseURL, nodeInfo.Attributes, node, startURLHost, isHyperlink, relativeToRoot) {
+				if fixHTMLNodeURL(baseURL, nodeInfo.Attributes, node, startURLHost, isHyperlink, relativeToRoot) {
 					changed = true
 				}
 			}
@@ -80,9 +77,9 @@ func fixHTMLNodeURLs(baseURL *url.URL, startURLHost string, relativeToRoot strin
 	return changed
 }
 
-// fixNodeURL fixes the URL references of a HTML node to point to a relative file name.
+// fixHTMLNodeURL fixes the URL references of a HTML node to point to a relative file name.
 // It returns true if any attribute value bas been adjusted.
-func fixNodeURL(baseURL *url.URL, attributes []string, node *html.Node, startURLHost string, isHyperlink bool, relativeToRoot string) (changed bool) {
+func fixHTMLNodeURL(baseURL *url.URL, attributes []string, node *html.Node, startURLHost string, isHyperlink bool, relativeToRoot string) (changed bool) {
 	for i, attr := range node.Attr {
 		if !slices.Contains(attributes, attr.Key) {
 			continue

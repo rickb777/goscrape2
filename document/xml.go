@@ -1,43 +1,70 @@
 package document
 
 import (
-	"bufio"
-	"encoding/xml"
+	"bytes"
+	"fmt"
+	"github.com/beevik/etree"
+	"github.com/cornelk/goscrape/work"
 	"io"
 	"net/url"
 )
 
-// Node describes XML nodes in an easy-to-use way.
-// See https://stackoverflow.com/questions/30256729/how-to-traverse-through-xml-data-in-golang
-// and https://go.dev/play/p/d9BkGclp-1.
-type Node struct {
-	XMLName xml.Name
-	Attrs   []xml.Attr `xml:",any,attr"`
-	Content []byte     `xml:",innerxml"`
-	Nodes   []Node     `xml:",any"`
-}
-
-func (n *Node) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
-	n.Attrs = start.Attr
-	type node Node
-
-	return d.DecodeElement((*node)(n), &start)
-}
-
 type SVGDocument struct {
+	etree.Document
 	u        *url.URL
 	startURL *url.URL
-	doc      *Node
 }
 
 func ParseSVG(u, startURL *url.URL, rdr io.Reader) (*SVGDocument, error) {
-	dec := xml.NewDecoder(bufio.NewReader(rdr))
-
-	var n Node
-	err := dec.Decode(&n)
+	doc := etree.NewDocument()
+	_, err := doc.ReadFrom(rdr)
 	if err != nil {
 		return nil, err
 	}
 
-	return &SVGDocument{u: u, startURL: startURL, doc: &n}, nil
+	return &SVGDocument{Document: *doc, u: u, startURL: startURL}, nil
+}
+
+// FixURLReferences fixes URL references to point to relative file names.
+// It returns a bool that indicates that no reference needed to be fixed,
+// in this case the returned HTML string will be empty.
+func (d *SVGDocument) FixURLReferences() ([]byte, bool, work.Refs, error) {
+	relativeToRoot := urlRelativeToRoot(d.u)
+	//if !fixHTMLNodeURLs(d.u, d.startURL.Host, relativeToRoot, d.index) {
+	//	return nil, false, nil
+	//}
+
+	var links []string
+	walkXML(&d.Element, func(node *etree.Element) bool {
+		for i, a := range node.Attr {
+			if isLink(a) {
+				links = append(links, a.Value)
+				a.Value = relativeToRoot + a.Value
+				node.Attr[i] = a
+			}
+		}
+		return true
+	})
+
+	var result work.Refs
+
+	var rendered bytes.Buffer
+	_, err := d.WriteTo(&rendered)
+	if err != nil {
+		return nil, false, nil, fmt.Errorf("rendering SVG: %w", err)
+	}
+
+	return rendered.Bytes(), true, result, nil
+}
+
+func isLink(a etree.Attr) bool {
+	return (a.Space == "" || a.Space == "xlink") && a.Key == "href"
+}
+
+func walkXML(node *etree.Element, f func(*etree.Element) bool) {
+	if f(node) {
+		for _, c := range node.ChildElements() {
+			walkXML(c, f)
+		}
+	}
 }

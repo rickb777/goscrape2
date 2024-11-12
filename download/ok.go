@@ -120,7 +120,7 @@ func (d *Download) html200(item work.Item, resp *http.Response, lastModified tim
 //
 //	// use the URL that the website returned as new base url for the
 //	// scrape, in case a redirect changed it (only for the start page)
-//	return resp.Request.URL, &work.Result{Item: item, References: references}, nil
+//	return resp.Request.URL, &work.Result{Item: item, StatusCode: resp.StatusCode, ContentLength: contentLength, FileSize: fileSize, References: references}, nil
 //}
 
 //-------------------------------------------------------------------------------------------------
