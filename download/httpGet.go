@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/cornelk/goscrape/utc"
 	"io"
 	"log/slog"
 	"net/http"
@@ -42,16 +43,20 @@ func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Ti
 		req.Header.Set(headername.IfModifiedSince, lastModified.Format(header.RFC1123))
 
 		metadata := d.ETagsDB.Lookup(u)
-		if metadata.Expires.After(time.Now()) && d.Config.LaxAge >= 0 {
-			// not yet expired so no need for any HTTP traffic - report as 'teapot'
-			return &http.Response{
-				Request:       req,
-				Status:        http.StatusText(http.StatusTeapot),
-				StatusCode:    http.StatusTeapot, // treated like StatusNotModified
-				Header:        http.Header{},
-				Body:          io.NopCloser(&bytes.Buffer{}),
-				ContentLength: 0,
-			}, nil
+		if d.Config.LaxAge >= 0 {
+			now := utc.Now()
+			if now.Before(metadata.Expires.Add(d.Config.LaxAge)) ||
+				now.Before(lastModified.Add(d.Config.LaxAge)) {
+				// not yet expired so no need for any HTTP traffic - report as 'teapot'
+				return &http.Response{
+					Request:       req,
+					Status:        http.StatusText(http.StatusTeapot),
+					StatusCode:    http.StatusTeapot, // treated like StatusNotModified
+					Header:        http.Header{},
+					Body:          io.NopCloser(&bytes.Buffer{}),
+					ContentLength: 0,
+				}, nil
+			}
 		}
 
 		if len(metadata.ETags) > 0 {

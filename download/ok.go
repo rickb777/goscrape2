@@ -14,7 +14,6 @@ import (
 	"github.com/cornelk/goscrape/document"
 	"github.com/cornelk/goscrape/download/ioutil"
 	"github.com/cornelk/goscrape/logger"
-	"github.com/cornelk/goscrape/utc"
 	"github.com/cornelk/goscrape/work"
 	"github.com/rickb777/acceptable/header"
 	"github.com/rickb777/acceptable/headername"
@@ -28,9 +27,7 @@ func (d *Download) response200(item work.Item, resp *http.Response) (*url.URL, *
 	metadata := db.Item{ETags: resp.Header.Get(headername.ETag)}
 	if expires := resp.Header.Get(headername.Expires); expires != "" {
 		metadata.Expires, _ = header.ParseHTTPDateTime(expires)
-		metadata.Expires = metadata.Expires.Add(d.Config.GetLaxAge())
-	} else if d.Config.LaxAge > 0 {
-		metadata.Expires = utc.Now().Add(d.Config.LaxAge)
+		metadata.Expires = metadata.Expires
 	}
 
 	d.ETagsDB.Store(item.URL, metadata)
