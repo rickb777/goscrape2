@@ -58,7 +58,7 @@ func Open() *DB {
 const FileName = "goscrape-etags.txt"
 
 func OpenDB(dir string, fs afero.Fs) *DB {
-	if !fileExists(fs, dir) {
+	if err := fs.MkdirAll(dir, 0755); err != nil {
 		return nil
 	}
 
