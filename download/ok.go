@@ -54,12 +54,10 @@ func (d *Download) response200(item work.Item, resp *http.Response) (*url.URL, *
 func (d *Download) html200(item work.Item, resp *http.Response, lastModified time.Time, contentType header.ContentType, isGzip bool) (*url.URL, *work.Result, error) {
 	var references work.Refs
 
-	data, err := bufferEntireResponse(resp, isGzip)
+	contentLength, data, err := bufferEntireResponse(resp, isGzip)
 	if err != nil {
 		return nil, nil, fmt.Errorf("buffering %s: %w", contentType.String(), err)
 	}
-
-	contentLength := int64(len(data))
 
 	doc, err := document.ParseHTML(item.URL, d.StartURL, bytes.NewReader(data))
 	if err != nil {
@@ -134,12 +132,10 @@ func (d *Download) html200(item work.Item, resp *http.Response, lastModified tim
 func (d *Download) css200(item work.Item, resp *http.Response, lastModified time.Time, isGzip bool) (*url.URL, *work.Result, error) {
 	var references work.Refs
 
-	data, err := bufferEntireResponse(resp, isGzip)
+	contentLength, data, err := bufferEntireResponse(resp, isGzip)
 	if err != nil {
 		return nil, nil, fmt.Errorf("buffering text/css: %w", err)
 	}
-
-	contentLength := int64(len(data))
 
 	data, references = document.CheckCSSForUrls(item.URL, d.StartURL.Host, data)
 
@@ -151,12 +147,10 @@ func (d *Download) css200(item work.Item, resp *http.Response, lastModified time
 //-------------------------------------------------------------------------------------------------
 
 func (d *Download) image200(item work.Item, resp *http.Response, lastModified time.Time, contentType header.ContentType, isGzip bool) (*url.URL, *work.Result, error) {
-	data, err := bufferEntireResponse(resp, isGzip)
+	contentLength, data, err := bufferEntireResponse(resp, isGzip)
 	if err != nil {
 		return nil, nil, fmt.Errorf("buffering %s: %w", contentType.String(), err)
 	}
-
-	contentLength := int64(len(data))
 
 	data = d.Config.ImageQuality.CheckImageForRecode(item.URL, data)
 	if d.Config.ImageQuality != 0 {
@@ -171,23 +165,25 @@ func (d *Download) image200(item work.Item, resp *http.Response, lastModified ti
 //-------------------------------------------------------------------------------------------------
 
 func (d *Download) other200(item work.Item, resp *http.Response, lastModified time.Time, isGzip bool) (*url.URL, *work.Result, error) {
-	rdr := resp.Body
+	counter := &countingReader{r: resp.Body}
+	var rdr io.Reader = counter
+
 	if isGzip {
-		var err error
-		rdr, err = gzip.NewReader(rdr)
+		gr, err := gzip.NewReader(rdr)
 		if err != nil {
 			logger.Error("Decompressing gzip response failed",
 				slog.Any("url", resp.Request.URL),
 				slog.Any("error", err))
 			return nil, nil, err
 		}
-		defer rdr.Close() // this only closes the gzipper, not the response body
+		defer gr.Close() // this only closes the gzipper, not the response body
+		rdr = gr
 	}
 
 	// store without buffering entire file into memory
 	fileSize := d.storeDownload(item.URL, rdr, lastModified, false)
 
-	return nil, &work.Result{Item: item, StatusCode: resp.StatusCode, FileSize: fileSize, Gzip: isGzip}, nil
+	return nil, &work.Result{Item: item, StatusCode: resp.StatusCode, ContentLength: counter.n, FileSize: fileSize, Gzip: isGzip}, nil
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -224,26 +220,41 @@ func (d *Download) storeDownload(u *url.URL, data io.Reader, lastModified time.T
 
 //-------------------------------------------------------------------------------------------------
 
-func bufferEntireResponse(resp *http.Response, isGzip bool) ([]byte, error) {
-	buf := &bytes.Buffer{}
-	var err error
+func bufferEntireResponse(resp *http.Response, isGzip bool) (int64, []byte, error) {
+	counter := &countingReader{r: resp.Body}
+	var rdr io.Reader = counter
 
-	rdr := resp.Body
 	if isGzip {
-		rdr, err = gzip.NewReader(rdr)
+		gr, err := gzip.NewReader(rdr)
 		if err != nil {
 			logger.Error("Decompressing gzip response failed",
 				slog.Any("url", resp.Request.URL),
 				slog.Any("error", err))
-			return nil, err
+			return 0, nil, err
 		}
-		defer rdr.Close() // this only closes the gzipper, not the response body
+		defer gr.Close() // this only closes the gzipper, not the response body
+		rdr = gr
 	}
 
+	buf := &bytes.Buffer{}
 	if _, err := io.Copy(buf, rdr); err != nil {
-		return nil, fmt.Errorf("%s reading response body: %w", resp.Request.URL, err)
+		return 0, nil, fmt.Errorf("%s reading response body: %w", resp.Request.URL, err)
 	}
-	return buf.Bytes(), nil
+
+	return counter.n, buf.Bytes(), nil
+}
+
+//-------------------------------------------------------------------------------------------------
+
+type countingReader struct {
+	r io.Reader
+	n int64
+}
+
+func (r *countingReader) Read(p []byte) (n int, err error) {
+	n, err = r.r.Read(p)
+	r.n += int64(n)
+	return n, err
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -243,7 +243,7 @@ func logResult(result *work.Result) {
 		slog.Int("code", result.StatusCode),
 		slog.String("took", timeTaken(result.Item.StartTime)),
 	}
-	if result.ContentLength > 0 {
+	if result.ContentLength > 0 && result.ContentLength != result.FileSize {
 		args = append(args, slog.Int64("length", result.ContentLength))
 	}
 	if result.FileSize > 0 {
