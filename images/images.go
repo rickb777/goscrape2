@@ -23,22 +23,12 @@ func (q ImageQuality) CheckImageForRecode(url *url.URL, data []byte) []byte {
 		return data
 	}
 
-	logger.Debug("File type detected",
-		slog.String("type", kind.MIME.Type),
-		slog.String("sub_type", kind.MIME.Subtype))
-
 	if kind.MIME.Type == matchers.TypeJpeg.MIME.Type && kind.MIME.Subtype == matchers.TypeJpeg.MIME.Subtype {
-		if recoded := q.recodeJPEG(url, data); recoded != nil {
-			return recoded
-		}
-		return data
+		return q.recodeJPEG(url, data)
 	}
 
 	if kind.MIME.Type == matchers.TypePng.MIME.Type && kind.MIME.Subtype == matchers.TypePng.MIME.Subtype {
-		if recoded := q.recodePNG(url, data); recoded != nil {
-			return recoded
-		}
-		return data
+		return q.recodePNG(url, data)
 	}
 
 	return data
@@ -62,12 +52,12 @@ func (q ImageQuality) recodeJPEG(url fmt.Stringer, data []byte) []byte {
 	inBuf := bytes.NewBuffer(data)
 	img, err := jpeg.Decode(inBuf)
 	if err != nil {
-		return nil
+		return data
 	}
 
 	encoded := q.encodeJPEG(img)
 	if encoded == nil || len(encoded) > len(data) { // only use the new file if it is smaller
-		return nil
+		return data
 	}
 
 	logger.Debug("Recoded JPEG",
@@ -82,12 +72,12 @@ func (q ImageQuality) recodePNG(url fmt.Stringer, data []byte) []byte {
 	inBuf := bytes.NewBuffer(data)
 	img, err := png.Decode(inBuf)
 	if err != nil {
-		return nil
+		return data
 	}
 
 	encoded := q.encodeJPEG(img)
 	if encoded == nil || len(encoded) > len(data) { // only use the new file if it is smaller
-		return nil
+		return data
 	}
 
 	logger.Debug("Recoded PNG",

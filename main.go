@@ -37,13 +37,14 @@ type arguments struct {
 
 	URLs []string `arg:"positional"`
 
-	Concurrency     int64         `arg:"-c,--concurrency" help:"the number of concurrent downloads (ignored unless --throttle is zero)" default:"1"`
-	Depth           int64         `arg:"-d,--depth" help:"download depth limit, 0 for unlimited" default:"10"`
-	ImageQuality    int64         `arg:"-q,--imagequality" help:"image quality reduction, 0 to disable re-encoding"`
-	Timeout         time.Duration `arg:"-t,--timeout" help:"time limit (with units, e.g. 1s) for each HTTP request to connect and read the response" default:"30s"`
-	RetryDelay      time.Duration `arg:"--retrydelay" help:"initial delay used when retrying any download (with units, e.g. 1s)" default:"5s"`
-	MinimumThrottle time.Duration `arg:"--throttle" help:"minimum delay used between any two downloads (with units, e.g. 1s)" default:"0s"`
-	Tries           int64         `arg:"-n,--tries" help:"the number of tries to download each file if the server gives a 5xx error" default:"1"`
+	Concurrency  int64         `arg:"-c,--concurrency" help:"the number of concurrent downloads" default:"1"`
+	Depth        int64         `arg:"-d,--depth" help:"download depth limit, 0 for unlimited" default:"10"`
+	ImageQuality int64         `arg:"-q,--imagequality" help:"image quality reduction, 0 to disable re-encoding, maximum 99"`
+	Timeout      time.Duration `arg:"-t,--timeout" help:"time limit (with units, e.g. 1s) for each HTTP request to connect and read the response" default:"30s"`
+	LoopDelay    time.Duration `arg:"--loopdelay" help:"delay (with units, e.g. 1s) used between any two downloads" default:"0s"`
+	RetryDelay   time.Duration `arg:"--retrydelay" help:"initial delay (with units, e.g. 1s) used when retrying any download; this adds to the loop delay and grows exponentially when retrying" default:"10s"`
+	LaxAge       time.Duration `arg:"--laxage" help:"adds to the 'expires' timestamp specified by the origin server, or creates one if absent; if the origin is too conservative, this helps when doing successive runs" default:"0s"`
+	Tries        int64         `arg:"-n,--tries" help:"the number of tries to download each file if the server gives a 5xx error" default:"1"`
 
 	Serve      string `arg:"-s,--serve" help:"serve the website using a webserver"`
 	ServerPort int16  `arg:"-r,--serverport" help:"port to use for the webserver" default:"8080"`
@@ -146,11 +147,6 @@ func runScraper(ctx context.Context, args arguments) error {
 		return fmt.Errorf("reading cookie: %w", err)
 	}
 
-	if args.MinimumThrottle > 0 {
-		download.MinimumThrottle = args.MinimumThrottle
-		args.Concurrency = 1
-	}
-
 	cfg := config.Config{
 		Includes: args.Include,
 		Excludes: args.Exclude,
@@ -159,7 +155,9 @@ func runScraper(ctx context.Context, args arguments) error {
 		MaxDepth:     uint(args.Depth),
 		ImageQuality: images.ImageQuality(imageQuality),
 		Timeout:      args.Timeout,
+		LoopDelay:    args.LoopDelay,
 		RetryDelay:   args.RetryDelay,
+		LaxAge:       args.LaxAge,
 		Tries:        int(args.Tries),
 
 		OutputDirectory: args.Output,

@@ -19,7 +19,9 @@ type Config struct {
 	MaxDepth     uint                // download depth, 0 for unlimited
 	ImageQuality images.ImageQuality // image quality from 0 to 100%, 0 to disable reencoding
 	Timeout      time.Duration       // time limit to process each http request
+	LoopDelay    time.Duration       // fixed value sleep time per request
 	RetryDelay   time.Duration       // initial value; will increase exponentially
+	LaxAge       time.Duration       // added to origin server's expires timestamp
 	Tries        int                 // download attempts, 0 for unlimited
 
 	OutputDirectory string

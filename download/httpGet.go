@@ -74,7 +74,8 @@ func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Ti
 
 	// this loop provides retries if 5xx server errors arise
 	for i := 0; i < tries; i++ {
-		d.Throttle.Sleep() // throttle every URL
+		time.Sleep(d.Config.LoopDelay) // fixed rate limiter
+		d.Throttle.Sleep()             // variable throttle every URL
 
 		resp, err = d.Client.Do(req)
 		if err != nil {

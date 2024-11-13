@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
-	"github.com/cornelk/goscrape/db"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"time"
 
+	"github.com/cornelk/goscrape/db"
 	"github.com/cornelk/goscrape/document"
 	"github.com/cornelk/goscrape/download/ioutil"
 	"github.com/cornelk/goscrape/logger"
@@ -27,7 +27,11 @@ func (d *Download) response200(item work.Item, resp *http.Response) (*url.URL, *
 	metadata := db.Item{ETags: resp.Header.Get(headername.ETag)}
 	if expires := resp.Header.Get(headername.Expires); expires != "" {
 		metadata.Expires, _ = header.ParseHTTPDateTime(expires)
+		metadata.Expires = metadata.Expires.Add(d.Config.LaxAge)
+	} else if d.Config.LaxAge > 0 {
+		metadata.Expires = time.Now().UTC().Add(d.Config.LaxAge)
 	}
+
 	d.ETagsDB.Store(item.URL, metadata)
 
 	switch {

@@ -237,7 +237,8 @@ func (s *Scraper) Start(ctx context.Context) error {
 func logResult(result *work.Result) {
 	// using a func result so that it can be applied transparently to the major method call sites, above
 	var args = []any{
-		slog.String("url", result.Item.String()),
+		slog.String("url", result.Item.URL.String()),
+		slog.Int("depth", int(result.Item.Depth)),
 		slog.Int("code", result.StatusCode),
 		slog.String("took", timeTaken(result.Item.StartTime)),
 	}
