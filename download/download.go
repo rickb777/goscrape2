@@ -76,7 +76,7 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 		// write the response body to a file, possibly modifying its hyperlinks
 		return d.response200(item, resp)
 
-	case http.StatusNotModified:
+	case http.StatusNotModified, http.StatusTeapot:
 		discardData(resp.Body) // discard anything present
 		return d.response304(item, resp)
 

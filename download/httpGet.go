@@ -47,7 +47,7 @@ func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Ti
 			return &http.Response{
 				Request:       req,
 				Status:        http.StatusText(http.StatusTeapot),
-				StatusCode:    http.StatusTeapot,
+				StatusCode:    http.StatusTeapot, // treated like StatusNotModified
 				Header:        http.Header{},
 				Body:          io.NopCloser(&bytes.Buffer{}),
 				ContentLength: 0,
