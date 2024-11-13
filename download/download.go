@@ -85,6 +85,10 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 		d.ETagsDB.Store(item.URL, db.Item{Expires: utc.Now().Add(d.Config.GetLaxAge())})
 		return item.URL, &work.Result{Item: item, StatusCode: resp.StatusCode}, nil
 
+	case http.StatusForbidden, http.StatusGone, http.StatusUnavailableForLegalReasons:
+		discardData(resp.Body) // discard anything present
+		return d.responseGone(item, resp)
+
 	case http.StatusTooManyRequests:
 		discardData(resp.Body) // discard anything present
 		return d.response429(item, resp)
@@ -93,6 +97,15 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 		discardData(resp.Body) // didn't want it
 		return item.URL, &work.Result{Item: item, StatusCode: resp.StatusCode}, nil
 	}
+}
+
+//-------------------------------------------------------------------------------------------------
+
+// responseGone deletes obsolete/inaccessible files
+func (d *Download) responseGone(item work.Item, resp *http.Response) (*url.URL, *work.Result, error) {
+	filePath := document.GetFilePath(item.URL, d.StartURL, d.Config.OutputDirectory, true)
+	_ = d.Fs.Remove(filePath)
+	return item.URL, &work.Result{Item: item, StatusCode: resp.StatusCode}, nil
 }
 
 //-------------------------------------------------------------------------------------------------
