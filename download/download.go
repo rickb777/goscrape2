@@ -80,6 +80,11 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 		discardData(resp.Body) // discard anything present
 		return d.response304(item, resp)
 
+	case http.StatusNotFound:
+		discardData(resp.Body) // discard anything present
+		d.ETagsDB.Store(item.URL, db.Item{Expires: utc.Now().Add(d.Config.LaxAge)})
+		return item.URL, &work.Result{Item: item, StatusCode: resp.StatusCode}, nil
+
 	case http.StatusTooManyRequests:
 		discardData(resp.Body) // discard anything present
 		return d.response429(item, resp)

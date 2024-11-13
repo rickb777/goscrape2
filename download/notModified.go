@@ -3,6 +3,7 @@ package download
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"path"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/cornelk/goscrape/document"
 	"github.com/cornelk/goscrape/download/ioutil"
+	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/goscrape/work"
 )
 
@@ -21,7 +23,7 @@ func (d *Download) response304(item work.Item, resp *http.Response) (*url.URL, *
 		return d.html304(item, resp)
 
 	case ".css":
-		return d.css304(item)
+		return d.css304(item, resp.StatusCode)
 
 	default:
 		if strings.HasSuffix(item.URL.Path, "/") {
@@ -31,7 +33,7 @@ func (d *Download) response304(item work.Item, resp *http.Response) (*url.URL, *
 
 	// use the URL that the website returned as new base url for the
 	// scrape, in case a redirect changed it (only for the start page)
-	return resp.Request.URL, &work.Result{Item: item, StatusCode: http.StatusNotModified}, nil
+	return resp.Request.URL, &work.Result{Item: item, StatusCode: resp.StatusCode}, nil
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -42,7 +44,8 @@ func (d *Download) html304(item work.Item, resp *http.Response) (*url.URL, *work
 	filePath := document.GetFilePath(item.URL, d.StartURL, d.Config.OutputDirectory, true)
 	data, err := ioutil.ReadFile(d.Fs, d.StartURL, filePath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("existing HTML file: %w", err)
+		logger.Debug("absent HTML file", slog.Any("error", err))
+		return nil, &work.Result{Item: item, StatusCode: resp.StatusCode}, nil
 	}
 
 	doc, err := document.ParseHTML(item.URL, d.StartURL, bytes.NewReader(data))
@@ -57,20 +60,21 @@ func (d *Download) html304(item work.Item, resp *http.Response) (*url.URL, *work
 
 	// use the URL that the website returned as new base url for the
 	// scrape, in case a redirect changed it (only for the start page)
-	return resp.Request.URL, &work.Result{Item: item, StatusCode: http.StatusNotModified, References: references}, nil
+	return resp.Request.URL, &work.Result{Item: item, StatusCode: resp.StatusCode, References: references}, nil
 }
 
 //-------------------------------------------------------------------------------------------------
 
-func (d *Download) css304(item work.Item) (*url.URL, *work.Result, error) {
+func (d *Download) css304(item work.Item, statusCode int) (*url.URL, *work.Result, error) {
 	var references work.Refs
 	filePath := document.GetFilePath(item.URL, d.StartURL, d.Config.OutputDirectory, false)
 	data, err := ioutil.ReadFile(d.Fs, d.StartURL, filePath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("existing CSS file: %w", err)
+		logger.Debug("absent CSS file", slog.Any("error", err))
+		return nil, &work.Result{Item: item, StatusCode: statusCode}, nil
 	}
 
 	_, references = document.CheckCSSForUrls(item.URL, d.StartURL.Host, data)
 
-	return nil, &work.Result{Item: item, StatusCode: http.StatusNotModified, References: references}, nil
+	return nil, &work.Result{Item: item, StatusCode: statusCode, References: references}, nil
 }
