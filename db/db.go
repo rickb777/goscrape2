@@ -48,11 +48,11 @@ type DB struct {
 }
 
 func DeleteFile() {
-	_ = os.Remove(filepath.Join(configDir(), FileName))
+	_ = os.Remove(filepath.Join(localStateDir(), FileName))
 }
 
 func Open() *DB {
-	return OpenDB(configDir(), afero.NewOsFs())
+	return OpenDB(localStateDir(), afero.NewOsFs())
 }
 
 const FileName = "goscrape-etags.txt"
@@ -116,8 +116,10 @@ func readFile(rdr io.Reader) (map[string]Item, error) {
 	return records, nil
 }
 
-func configDir() string {
-	dir := os.Getenv("XDG_CONFIG_HOME")
+// localStateDir gets the XDG state directory, a place for storage of volatile
+// application state. See https://specifications.freedesktop.org/basedir-spec/
+func localStateDir() string {
+	dir := os.Getenv("XDG_STATE_HOME")
 	if dir != "" {
 		return dir
 	}
@@ -128,7 +130,7 @@ func configDir() string {
 	}
 
 	if home != "" {
-		return filepath.Join(home, ".config")
+		return filepath.Join(home, ".local/state")
 	}
 
 	return ""
