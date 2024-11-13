@@ -46,6 +46,7 @@ func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Ti
 		if metadata.Expires.After(time.Now()) {
 			// not yet expired so no need for any HTTP traffic - report as 'teapot'
 			return &http.Response{
+				Request:       req,
 				Status:        http.StatusText(http.StatusTeapot),
 				StatusCode:    http.StatusTeapot,
 				Header:        http.Header{},
