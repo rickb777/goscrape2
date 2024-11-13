@@ -249,6 +249,9 @@ func logResult(result *work.Result) {
 	if result.FileSize > 0 {
 		args = append(args, slog.Int64("fileSize", result.FileSize))
 	}
+	if result.Gzip {
+		args = append(args, slog.String("enc", "gzip"))
+	}
 	logger.Log(chooseLevel(result.StatusCode), statusText(result.StatusCode), args...)
 }
 

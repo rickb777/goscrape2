@@ -88,7 +88,7 @@ func (d *Download) html200(item work.Item, resp *http.Response, lastModified tim
 
 	// use the URL that the website returned as new base url for the
 	// scrape, in case a redirect changed it (only for the start page)
-	return resp.Request.URL, &work.Result{Item: item, StatusCode: resp.StatusCode, ContentLength: contentLength, FileSize: fileSize, References: references}, nil
+	return resp.Request.URL, &work.Result{Item: item, StatusCode: resp.StatusCode, ContentLength: contentLength, FileSize: fileSize, Gzip: isGzip, References: references}, nil
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -146,7 +146,7 @@ func (d *Download) css200(item work.Item, resp *http.Response, lastModified time
 
 	fileSize := d.storeDownload(item.URL, bytes.NewReader(data), lastModified, false)
 
-	return nil, &work.Result{Item: item, StatusCode: resp.StatusCode, ContentLength: contentLength, FileSize: fileSize, References: references}, nil
+	return nil, &work.Result{Item: item, StatusCode: resp.StatusCode, ContentLength: contentLength, FileSize: fileSize, Gzip: isGzip, References: references}, nil
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -166,7 +166,7 @@ func (d *Download) image200(item work.Item, resp *http.Response, lastModified ti
 
 	fileSize := d.storeDownload(item.URL, bytes.NewReader(data), lastModified, false)
 
-	return nil, &work.Result{Item: item, StatusCode: resp.StatusCode, ContentLength: contentLength, FileSize: fileSize}, nil
+	return nil, &work.Result{Item: item, StatusCode: resp.StatusCode, ContentLength: contentLength, Gzip: isGzip, FileSize: fileSize}, nil
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -188,7 +188,7 @@ func (d *Download) other200(item work.Item, resp *http.Response, lastModified ti
 	// store without buffering entire file into memory
 	fileSize := d.storeDownload(item.URL, rdr, lastModified, false)
 
-	return nil, &work.Result{Item: item, StatusCode: resp.StatusCode, FileSize: fileSize}, nil
+	return nil, &work.Result{Item: item, StatusCode: resp.StatusCode, FileSize: fileSize, Gzip: isGzip}, nil
 }
 
 //-------------------------------------------------------------------------------------------------

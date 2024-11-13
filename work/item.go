@@ -28,6 +28,7 @@ type Result struct {
 	Excluded      Refs
 	ContentLength int64
 	FileSize      int64
+	Gzip          bool
 }
 
 func (refs Refs) String() string {
