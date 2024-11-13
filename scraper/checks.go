@@ -7,7 +7,7 @@ import (
 
 // shouldURLBeDownloaded checks whether a page should be downloaded.
 // nolint: cyclop
-func (s *Scraper) shouldURLBeDownloaded(item *url.URL, depth uint) bool {
+func (s *Scraper) shouldURLBeDownloaded(item *url.URL, depth int) bool {
 	if item.Scheme != "http" && item.Scheme != "https" {
 		return false
 	}
@@ -43,7 +43,7 @@ func (s *Scraper) shouldURLBeDownloaded(item *url.URL, depth uint) bool {
 	return true
 }
 
-func (s *Scraper) partitionResult(result *work.Result, depth uint) {
+func (s *Scraper) partitionResult(result *work.Result, depth int) {
 	var included []*url.URL
 	for _, ref := range result.References {
 		if s.shouldURLBeDownloaded(ref, depth) {

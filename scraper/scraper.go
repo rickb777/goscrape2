@@ -17,6 +17,7 @@ import (
 	"github.com/cornelk/goscrape/download/ioutil"
 	"github.com/cornelk/goscrape/filter"
 	"github.com/cornelk/goscrape/logger"
+	"github.com/cornelk/goscrape/utc"
 	"github.com/cornelk/goscrape/work"
 	"github.com/rickb777/process/v2"
 	"github.com/spf13/afero"
@@ -238,7 +239,7 @@ func logResult(result *work.Result) {
 	// using a func result so that it can be applied transparently to the major method call sites, above
 	var args = []any{
 		slog.String("url", result.Item.URL.String()),
-		slog.Int("depth", int(result.Item.Depth)),
+		slog.Int("depth", result.Item.Depth),
 		slog.Int("code", result.StatusCode),
 		slog.String("took", timeTaken(result.Item.StartTime)),
 	}
@@ -252,7 +253,7 @@ func logResult(result *work.Result) {
 }
 
 func timeTaken(before time.Time) string {
-	return time.Now().Sub(before).Round(time.Millisecond).String()
+	return utc.Now().Sub(before).Round(time.Millisecond).String()
 }
 
 func chooseLevel(statusCode int) slog.Level {

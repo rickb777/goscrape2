@@ -14,6 +14,7 @@ import (
 	"github.com/cornelk/goscrape/document"
 	"github.com/cornelk/goscrape/download/ioutil"
 	"github.com/cornelk/goscrape/logger"
+	"github.com/cornelk/goscrape/utc"
 	"github.com/cornelk/goscrape/work"
 	"github.com/spf13/afero"
 )
@@ -47,7 +48,7 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 		}
 	}
 
-	item.StartTime = time.Now()
+	item.StartTime = utc.Now()
 
 	resp, err := d.httpGet(ctx, item.URL, existingModified)
 	if err != nil {

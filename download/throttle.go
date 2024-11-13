@@ -8,14 +8,19 @@ import (
 type Throttle int64
 
 const (
-	twoSeconds    = 2 * time.Second
-	thirtySeconds = 30 * time.Second
+	twoSeconds = 2 * time.Second
+	tenSeconds = 10 * time.Second
+)
+
+var (
+	smallStep = twoSeconds
+	bigStep   = tenSeconds
 )
 
 func (t *Throttle) SlowDown() {
 	a := (*int64)(t)
-	if !atomic.CompareAndSwapInt64(a, 0, int64(thirtySeconds)) {
-		atomic.AddInt64(a, int64(twoSeconds))
+	if !atomic.CompareAndSwapInt64(a, 0, int64(bigStep)) {
+		atomic.AddInt64(a, int64(smallStep))
 	}
 }
 

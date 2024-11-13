@@ -57,7 +57,7 @@ goscrape --serve website.com
 ```
 Scrape a website and create an offline browsable version on the disk.
 
-Usage: goscrape [--include INCLUDE] [--exclude EXCLUDE] [--output OUTPUT] [--concurrency CONCURRENCY] [--depth DEPTH] [--imagequality IMAGEQUALITY] [--timeout TIMEOUT] [--loopdelay LOOPDELAY] [--retrydelay RETRYDELAY] [--laxage LAXAGE] [--tries TRIES] [--serve SERVE] [--serverport SERVERPORT] [--cookiefile COOKIEFILE] [--savecookiefile SAVECOOKIEFILE] [--header HEADER] [--proxy PROXY] [--user USER] [--useragent USERAGENT] [--verbose] [--debug] [URLS [URLS ...]]
+Usage: goscrape [--include INCLUDE] [--exclude EXCLUDE] [--output OUTPUT] [--concurrency CONCURRENCY] [--depth DEPTH] [--imagequality IMAGEQUALITY] [--timeout TIMEOUT] [--loopdelay LOOPDELAY] [--laxage LAXAGE] [--tries TRIES] [--serve SERVE] [--serverport SERVERPORT] [--cookiefile COOKIEFILE] [--savecookiefile SAVECOOKIEFILE] [--header HEADER] [--proxy PROXY] [--user USER] [--useragent USERAGENT] [--verbose] [--debug] [URLS [URLS ...]]
 
 Positional arguments:
   URLS
@@ -79,8 +79,6 @@ Options:
                          time limit (with units, e.g. 1s) for each HTTP request to connect and read the response [default: 30s]
   --loopdelay LOOPDELAY
                          delay (with units, e.g. 1s) used between any two downloads [default: 0s]
-  --retrydelay RETRYDELAY
-                         initial delay (with units, e.g. 1s) used when retrying any download; this adds to the loop delay and grows exponentially when retrying [default: 10s]
   --laxage LAXAGE        adds to the 'expires' timestamp specified by the origin server, or creates one if absent; if the origin is too conservative, this helps when doing successive runs [default: 0s]
   --tries TRIES, -n TRIES
                          the number of tries to download each file if the server gives a 5xx error [default: 1]

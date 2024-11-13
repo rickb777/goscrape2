@@ -2,7 +2,6 @@ package download
 
 import (
 	"bytes"
-	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
@@ -43,7 +42,7 @@ func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Ti
 		req.Header.Set(headername.IfModifiedSince, lastModified.Format(header.RFC1123))
 
 		metadata := d.ETagsDB.Lookup(u)
-		if metadata.Expires.After(time.Now()) {
+		if metadata.Expires.After(time.Now()) && d.Config.LaxAge >= 0 {
 			// not yet expired so no need for any HTTP traffic - report as 'teapot'
 			return &http.Response{
 				Request:       req,
@@ -66,7 +65,6 @@ func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Ti
 		}
 	}
 
-	retryDelay := d.Config.RetryDelay // used every retry for this URL only
 	tries := d.Config.Tries
 	if tries < 1 {
 		tries = 1
@@ -98,8 +96,7 @@ func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Ti
 
 		// 5xx status code = server error - retry the specified number of times
 		case resp.StatusCode >= 500:
-			d.Throttle.Reset()
-			retryDelay = backoff(retryDelay)
+			d.Throttle.SlowDown() // throttle every URL
 			// retry logic continues below
 
 		case resp.StatusCode == http.StatusTooManyRequests:
@@ -130,21 +127,11 @@ func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Ti
 		if i+1 < tries {
 			logger.Warn(http.StatusText(resp.StatusCode),
 				slog.String("url", req.URL.String()),
-				slog.Int("code", resp.StatusCode),
-				slog.String("sleep", retryDelay.String()))
-
-			time.Sleep(retryDelay) // delay before retrying (this URL only)
+				slog.Int("code", resp.StatusCode))
 		}
 	}
 
 	return resp, nil // allow this URL to be abandoned
-}
-
-func backoff(t time.Duration) time.Duration {
-	const factor = 7
-	const divisor = 4 // must be less than factor
-
-	return time.Duration(t*factor) / divisor
 }
 
 func closeResponseBody(c io.Closer, u *url.URL) {
@@ -153,28 +140,6 @@ func closeResponseBody(c io.Closer, u *url.URL) {
 			slog.Any("url", u),
 			slog.Any("error", err))
 	}
-}
-
-func bufferEntireResponse(resp *http.Response, isGzip bool) ([]byte, error) {
-	buf := &bytes.Buffer{}
-	var err error
-
-	rdr := resp.Body
-	if isGzip {
-		rdr, err = gzip.NewReader(rdr)
-		if err != nil {
-			logger.Error("Decompressing gzip response failed",
-				slog.Any("url", resp.Request.URL),
-				slog.Any("error", err))
-			return nil, err
-		}
-		defer rdr.Close() // this only closes the gzipper, not the response body
-	}
-
-	if _, err := io.Copy(buf, rdr); err != nil {
-		return nil, fmt.Errorf("%s reading response body: %w", resp.Request.URL, err)
-	}
-	return buf.Bytes(), nil
 }
 
 func addHeaderValue(args []any, header http.Header, name string) []any {

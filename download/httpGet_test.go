@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/cornelk/goscrape/utc"
 	"github.com/spf13/afero"
 	"io"
 	"net/http"
@@ -75,7 +76,6 @@ func TestGet200(t *testing.T) {
 
 	d := &Download{
 		Config: config.Config{
-			Tries:     1,
 			UserAgent: "Foo/Bar",
 			Header:    http.Header{"X-Extra": []string{"Hello"}},
 		},
@@ -86,6 +86,110 @@ func TestGet200(t *testing.T) {
 	lastModified := time.Date(2000, 1, 1, 1, 1, 1, 0, time.UTC)
 
 	resp, err := d.httpGet(context.Background(), mustParse("http://example.org/"), lastModified)
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "gzip", resp.Request.Header.Get(headername.AcceptEncoding))
+	assert.Equal(t, "Foo/Bar", resp.Request.Header.Get(headername.UserAgent))
+	assert.Equal(t, "Sat, 01 Jan 2000 01:01:01 UTC", resp.Request.Header.Get(headername.IfModifiedSince))
+	assert.Equal(t, "Hello", resp.Request.Header.Get("X-Extra"))
+}
+
+func TestGet404(t *testing.T) {
+	stub := &stubClient{}
+	stub.response(http.StatusNotFound, "http://example.org/", "text/html", `<html></html>`)
+
+	d := &Download{
+		Config: config.Config{
+			UserAgent: "Foo/Bar",
+		},
+		Client: stub,
+		Auth:   "credentials",
+	}
+
+	lastModified := time.Date(2000, 1, 1, 1, 1, 1, 0, time.UTC)
+
+	resp, err := d.httpGet(context.Background(), mustParse("http://example.org/"), lastModified)
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+	assert.Equal(t, "gzip", resp.Request.Header.Get(headername.AcceptEncoding))
+	assert.Equal(t, "Foo/Bar", resp.Request.Header.Get(headername.UserAgent))
+	assert.Equal(t, "Sat, 01 Jan 2000 01:01:01 UTC", resp.Request.Header.Get(headername.IfModifiedSince))
+}
+
+func TestGet429(t *testing.T) {
+	stub := &stubClient{}
+	stub.response(http.StatusTooManyRequests, "http://example.org/", "text/html", `<html></html>`)
+
+	d := &Download{
+		Config: config.Config{
+			UserAgent: "Foo/Bar",
+		},
+		Client: stub,
+		Auth:   "credentials",
+	}
+
+	lastModified := time.Date(2000, 1, 1, 1, 1, 1, 0, time.UTC)
+
+	resp, err := d.httpGet(context.Background(), mustParse("http://example.org/"), lastModified)
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusTooManyRequests, resp.StatusCode)
+	assert.Equal(t, "gzip", resp.Request.Header.Get(headername.AcceptEncoding))
+	assert.Equal(t, "Foo/Bar", resp.Request.Header.Get(headername.UserAgent))
+	assert.Equal(t, "Sat, 01 Jan 2000 01:01:01 UTC", resp.Request.Header.Get(headername.IfModifiedSince))
+	assert.False(t, d.Throttle.IsNormal())
+}
+
+func TestGet200RevalidateWhenExpired(t *testing.T) {
+	stub := &stubClient{}
+	stub.response(http.StatusOK, "http://example.org/", "text/html", `<html></html>`)
+
+	u := mustParse("http://example.org/")
+	stub.eTags.Store(u, db.Item{ETags: `"hash"`, Expires: utc.Now().Add(-time.Hour)}) // expired
+
+	d := &Download{
+		Config: config.Config{
+			UserAgent: "Foo/Bar",
+			Header:    http.Header{"X-Extra": []string{"Hello"}},
+		},
+		Client: stub,
+		Auth:   "credentials",
+	}
+
+	lastModified := time.Date(2000, 1, 1, 1, 1, 1, 0, time.UTC)
+
+	resp, err := d.httpGet(context.Background(), u, lastModified)
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "gzip", resp.Request.Header.Get(headername.AcceptEncoding))
+	assert.Equal(t, "Foo/Bar", resp.Request.Header.Get(headername.UserAgent))
+	assert.Equal(t, "Sat, 01 Jan 2000 01:01:01 UTC", resp.Request.Header.Get(headername.IfModifiedSince))
+	assert.Equal(t, "Hello", resp.Request.Header.Get("X-Extra"))
+}
+
+func TestGet200RevalidateWhenLaxIsNegative(t *testing.T) {
+	stub := &stubClient{}
+	stub.response(http.StatusOK, "http://example.org/", "text/html", `<html></html>`)
+
+	u := mustParse("http://example.org/")
+	stub.eTags.Store(u, db.Item{ETags: `"hash"`, Expires: utc.Now().Add(time.Hour)}) // not expired
+
+	d := &Download{
+		Config: config.Config{
+			UserAgent: "Foo/Bar",
+			Header:    http.Header{"X-Extra": []string{"Hello"}},
+			LaxAge:    -1,
+		},
+		Client: stub,
+		Auth:   "credentials",
+	}
+
+	lastModified := time.Date(2000, 1, 1, 1, 1, 1, 0, time.UTC)
+
+	resp, err := d.httpGet(context.Background(), u, lastModified)
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -108,7 +212,6 @@ func TestGet304UsingEtag(t *testing.T) {
 
 	d := &Download{
 		Config: config.Config{
-			Tries:     1,
 			UserAgent: "Foo/Bar",
 			Header:    http.Header{"X-Extra": []string{"Hello"}},
 		},
@@ -125,7 +228,43 @@ func TestGet304UsingEtag(t *testing.T) {
 	assert.Equal(t, http.StatusNotModified, resp.StatusCode)
 }
 
+func TestNotYetExpired(t *testing.T) {
+	stub := &stubClient{}
+
+	stub.eTags = db.OpenDB(".", afero.NewMemMapFs())
+	defer os.Remove("./" + db.FileName)
+	defer stub.eTags.Close()
+
+	u := mustParse("http://example.org/")
+	stub.eTags.Store(u, db.Item{ETags: `"hash"`, Expires: utc.Now().Add(time.Hour)}) // not expired
+
+	d := &Download{
+		Config: config.Config{
+			UserAgent: "Foo/Bar",
+			Header:    http.Header{"X-Extra": []string{"Hello"}},
+		},
+		Client:  stub,
+		Auth:    "credentials",
+		ETagsDB: stub.eTags,
+	}
+
+	lastModified := time.Date(2000, 1, 1, 1, 1, 1, 0, time.UTC)
+
+	resp, err := d.httpGet(context.Background(), u, lastModified)
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusTeapot, resp.StatusCode)
+}
+
 func TestGet500(t *testing.T) {
+	smallStep = 100 * time.Millisecond
+	bigStep = 500 * time.Millisecond
+
+	defer func() {
+		smallStep = twoSeconds
+		bigStep = tenSeconds
+	}()
+
 	stub := &stubClient{}
 	stub.response(http.StatusInternalServerError, "http://example.org/", "text/html", `<html></html>`)
 

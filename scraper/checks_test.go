@@ -35,7 +35,7 @@ func TestShouldURLBeDownloaded(t *testing.T) {
 
 	cases := []struct {
 		item     *url.URL
-		depth    uint
+		depth    int
 		expected bool
 	}{
 		{item: MustParseURL("http://example.org/ok/wanted"), expected: true},

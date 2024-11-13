@@ -14,6 +14,7 @@ import (
 	"github.com/cornelk/goscrape/document"
 	"github.com/cornelk/goscrape/download/ioutil"
 	"github.com/cornelk/goscrape/logger"
+	"github.com/cornelk/goscrape/utc"
 	"github.com/cornelk/goscrape/work"
 	"github.com/rickb777/acceptable/header"
 	"github.com/rickb777/acceptable/headername"
@@ -29,7 +30,7 @@ func (d *Download) response200(item work.Item, resp *http.Response) (*url.URL, *
 		metadata.Expires, _ = header.ParseHTTPDateTime(expires)
 		metadata.Expires = metadata.Expires.Add(d.Config.LaxAge)
 	} else if d.Config.LaxAge > 0 {
-		metadata.Expires = time.Now().UTC().Add(d.Config.LaxAge)
+		metadata.Expires = utc.Now().Add(d.Config.LaxAge)
 	}
 
 	d.ETagsDB.Store(item.URL, metadata)
@@ -223,6 +224,30 @@ func (d *Download) storeDownload(u *url.URL, data io.Reader, lastModified time.T
 	}
 
 	return fileSize
+}
+
+//-------------------------------------------------------------------------------------------------
+
+func bufferEntireResponse(resp *http.Response, isGzip bool) ([]byte, error) {
+	buf := &bytes.Buffer{}
+	var err error
+
+	rdr := resp.Body
+	if isGzip {
+		rdr, err = gzip.NewReader(rdr)
+		if err != nil {
+			logger.Error("Decompressing gzip response failed",
+				slog.Any("url", resp.Request.URL),
+				slog.Any("error", err))
+			return nil, err
+		}
+		defer rdr.Close() // this only closes the gzipper, not the response body
+	}
+
+	if _, err := io.Copy(buf, rdr); err != nil {
+		return nil, fmt.Errorf("%s reading response body: %w", resp.Request.URL, err)
+	}
+	return buf.Bytes(), nil
 }
 
 //-------------------------------------------------------------------------------------------------

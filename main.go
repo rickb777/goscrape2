@@ -42,8 +42,7 @@ type arguments struct {
 	ImageQuality int64         `arg:"-q,--imagequality" help:"image quality reduction, 0 to disable re-encoding, maximum 99"`
 	Timeout      time.Duration `arg:"-t,--timeout" help:"time limit (with units, e.g. 1s) for each HTTP request to connect and read the response" default:"30s"`
 	LoopDelay    time.Duration `arg:"--loopdelay" help:"delay (with units, e.g. 1s) used between any two downloads" default:"0s"`
-	RetryDelay   time.Duration `arg:"--retrydelay" help:"initial delay (with units, e.g. 1s) used when retrying any download; this adds to the loop delay and grows exponentially when retrying" default:"10s"`
-	LaxAge       time.Duration `arg:"--laxage" help:"adds to the 'expires' timestamp specified by the origin server, or creates one if absent; if the origin is too conservative, this helps when doing successive runs" default:"0s"`
+	LaxAge       time.Duration `arg:"--laxage" help:"adds to the 'expires' timestamp specified by the origin server, or creates one if absent; if the origin is too conservative, this helps when doing successive runs; a negative value causes revalidation" default:"0s"`
 	Tries        int64         `arg:"-n,--tries" help:"the number of tries to download each file if the server gives a 5xx error" default:"1"`
 
 	Serve      string `arg:"-s,--serve" help:"serve the website using a webserver"`
@@ -152,11 +151,10 @@ func runScraper(ctx context.Context, args arguments) error {
 		Excludes: args.Exclude,
 
 		Concurrency:  int(args.Concurrency),
-		MaxDepth:     uint(args.Depth),
+		MaxDepth:     int(args.Depth),
 		ImageQuality: images.ImageQuality(imageQuality),
 		Timeout:      args.Timeout,
 		LoopDelay:    args.LoopDelay,
-		RetryDelay:   args.RetryDelay,
 		LaxAge:       args.LaxAge,
 		Tries:        int(args.Tries),
 
