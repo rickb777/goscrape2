@@ -28,7 +28,7 @@ func (d *Download) response200(item work.Item, resp *http.Response) (*url.URL, *
 	metadata := db.Item{ETags: resp.Header.Get(headername.ETag)}
 	if expires := resp.Header.Get(headername.Expires); expires != "" {
 		metadata.Expires, _ = header.ParseHTTPDateTime(expires)
-		metadata.Expires = metadata.Expires.Add(d.Config.LaxAge)
+		metadata.Expires = metadata.Expires.Add(d.Config.GetLaxAge())
 	} else if d.Config.LaxAge > 0 {
 		metadata.Expires = utc.Now().Add(d.Config.LaxAge)
 	}

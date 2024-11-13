@@ -249,7 +249,7 @@ func logResult(result *work.Result) {
 	if result.FileSize > 0 {
 		args = append(args, slog.Int64("fileSize", result.FileSize))
 	}
-	logger.Log(chooseLevel(result.StatusCode), http.StatusText(result.StatusCode), args...)
+	logger.Log(chooseLevel(result.StatusCode), statusText(result.StatusCode), args...)
 }
 
 func timeTaken(before time.Time) string {
@@ -261,4 +261,11 @@ func chooseLevel(statusCode int) slog.Level {
 		return slog.LevelWarn
 	}
 	return slog.LevelInfo
+}
+
+func statusText(statusCode int) string {
+	if statusCode == http.StatusTeapot {
+		return "Skipped"
+	}
+	return http.StatusText(statusCode)
 }

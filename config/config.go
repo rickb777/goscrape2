@@ -33,6 +33,13 @@ type Config struct {
 	UserAgent string
 }
 
+func (c *Config) GetLaxAge() time.Duration {
+	if c.LaxAge > 0 {
+		return c.LaxAge
+	}
+	return 0
+}
+
 func (c *Config) SensibleDefaults() {
 	if c.Concurrency < 1 {
 		c.Concurrency = 1
@@ -52,10 +59,6 @@ func (c *Config) SensibleDefaults() {
 
 	if c.LoopDelay < 0 {
 		c.LoopDelay = 0
-	}
-
-	if c.LaxAge < 0 {
-		c.LaxAge = 0
 	}
 }
 
