@@ -18,13 +18,18 @@ type Throttle struct {
 }
 
 // New returns a new Throttle with the minimum, initial and extra values specified.
-// This panics if minimum is less than zero or if initialStep is less than minimum.
+//   - If minimum is less than zero it is set to zero.
+//   - If initialStep is less than or equal to minimum, it will be set to minimum+1.
+//   - If extraStep is less than zero, with will be set to zero.
 func New(minimum, initialStep, extraStep time.Duration) *Throttle {
 	if minimum < 0 {
-		panic("negative minimum delay")
+		minimum = 0
 	}
-	if initialStep < minimum {
-		panic("initialStep must be greater than the minimum delay")
+	if initialStep <= minimum {
+		initialStep = minimum + 1
+	}
+	if extraStep < 0 {
+		extraStep = 0
 	}
 
 	t := &Throttle{
