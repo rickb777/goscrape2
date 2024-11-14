@@ -2,6 +2,7 @@ package download
 
 import (
 	"context"
+	"github.com/cornelk/goscrape/download/throttle"
 	"io"
 	"log/slog"
 	"net/http"
@@ -32,9 +33,10 @@ type Download struct {
 
 	Auth   string
 	Client HttpClient
+	Fs     afero.Fs // filesystem can be replaced with in-memory filesystem for testing
 
-	Fs       afero.Fs // filesystem can be replaced with in-memory filesystem for testing
-	Throttle Throttle // increases when server gives 429 (Too Many Requests) responses
+	Lockdown  *throttle.Throttle // increases sharply when server gives 429 (Too Many Requests) responses, then resets
+	LoopDelay *throttle.Throttle // increases only slightly when server gives 429; never decreases
 }
 
 func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *work.Result, error) {

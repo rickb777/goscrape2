@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/cornelk/goscrape/download/throttle"
 	"log/slog"
 	"net/http"
 	"net/http/cookiejar"
@@ -146,16 +147,16 @@ func (s *Scraper) Start(ctx context.Context) error {
 	}
 
 	d := &download.Download{
-		Config:   s.config,
-		Cookies:  s.cookies,
-		ETagsDB:  s.ETagsDB,
-		StartURL: s.URL,
-		Auth:     s.auth,
-		Client:   s.client,
-		Fs:       s.fs,
+		Config:    s.config,
+		Cookies:   s.cookies,
+		ETagsDB:   s.ETagsDB,
+		StartURL:  s.URL,
+		Auth:      s.auth,
+		Client:    s.client,
+		Fs:        s.fs,
+		Lockdown:  throttle.New(0, 10*time.Second, 2*time.Second),
+		LoopDelay: throttle.New(s.config.LoopDelay, time.Millisecond, time.Millisecond/2),
 	}
-
-	d.Throttle.Reset()
 
 	redirect, firstResult, err := d.ProcessURL(ctx, firstItem)
 	if err != nil {
@@ -175,7 +176,7 @@ func (s *Scraper) Start(ctx context.Context) error {
 	// Pool of processes to concurrently handle URL downloading.
 	pool.GoNE(s.config.Concurrency, func(pid int) error {
 		for {
-			if pid == 0 || d.Throttle.IsNormal() {
+			if pid == 0 || d.Lockdown.IsNormal() {
 				select {
 				case <-ctx.Done():
 					return nil

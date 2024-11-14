@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/cornelk/goscrape/download/throttle"
 	"github.com/cornelk/goscrape/utc"
 	"github.com/spf13/afero"
 	"io"
@@ -126,8 +127,9 @@ func TestGet429(t *testing.T) {
 		Config: config.Config{
 			UserAgent: "Foo/Bar",
 		},
-		Client: stub,
-		Auth:   "credentials",
+		Client:   stub,
+		Auth:     "credentials",
+		Lockdown: throttle.New(0, 10, 10),
 	}
 
 	lastModified := time.Date(2000, 1, 1, 1, 1, 1, 0, time.UTC)
@@ -139,7 +141,7 @@ func TestGet429(t *testing.T) {
 	assert.Equal(t, "gzip", resp.Request.Header.Get(headername.AcceptEncoding))
 	assert.Equal(t, "Foo/Bar", resp.Request.Header.Get(headername.UserAgent))
 	assert.Equal(t, "Sat, 01 Jan 2000 01:01:01 UTC", resp.Request.Header.Get(headername.IfModifiedSince))
-	assert.False(t, d.Throttle.IsNormal())
+	assert.False(t, d.Lockdown.IsNormal())
 }
 
 func TestGet200RevalidateWhenExpired(t *testing.T) {
@@ -257,14 +259,6 @@ func TestNotYetExpired(t *testing.T) {
 }
 
 func TestGet500(t *testing.T) {
-	smallStep = 100 * time.Millisecond
-	bigStep = 500 * time.Millisecond
-
-	defer func() {
-		smallStep = twoSeconds
-		bigStep = tenSeconds
-	}()
-
 	stub := &stubClient{}
 	stub.response(http.StatusInternalServerError, "http://example.org/", "text/html", `<html></html>`)
 
