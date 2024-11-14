@@ -223,8 +223,3 @@ func (store *DB) syncPeriodically() {
 		store.flush()
 	}
 }
-
-func fileExists(fs afero.Fs, filePath string) bool {
-	_, err := fs.Stat(filePath)
-	return !os.IsNotExist(err)
-}

@@ -2,6 +2,7 @@ package scraper
 
 import (
 	"github.com/cornelk/goscrape/filter"
+	"github.com/cornelk/goscrape/stubclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"net/http"
@@ -20,11 +21,11 @@ func MustParseURL(s string) *url.URL {
 func TestShouldURLBeDownloaded(t *testing.T) {
 	startURL := "https://example.org/#fragment"
 
-	stub := &stubClient{}
-	stub.response(http.StatusOK, "https://example.org/", "text/html", "")
-	stub.response(http.StatusOK, "https://example.org/page2", "text/html", "")
-	stub.response(http.StatusOK, "https://example.org/sub/", "text/html", "")
-	stub.response(http.StatusOK, "https://example.org/style.css", "text/css", "")
+	stub := &stubclient.Client{}
+	stub.GivenResponse(http.StatusOK, "https://example.org/", "text/html", "")
+	stub.GivenResponse(http.StatusOK, "https://example.org/page2", "text/html", "")
+	stub.GivenResponse(http.StatusOK, "https://example.org/sub/", "text/html", "")
+	stub.GivenResponse(http.StatusOK, "https://example.org/style.css", "text/css", "")
 
 	scraper := newTestScraper(t, startURL, stub)
 	require.NotNil(t, scraper)

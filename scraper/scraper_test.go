@@ -1,9 +1,8 @@
 package scraper
 
 import (
-	"bytes"
 	"context"
-	"fmt"
+	"github.com/cornelk/goscrape/stubclient"
 	"io"
 	"log/slog"
 	"net/http"
@@ -12,44 +11,12 @@ import (
 
 	"github.com/cornelk/goscrape/config"
 	"github.com/cornelk/goscrape/logger"
-	"github.com/rickb777/acceptable/headername"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-type stubClient struct {
-	responses map[string]*http.Response // more configurable responses
-}
-
-func (c *stubClient) response(statusCode int, url, contentType, body string) {
-	req, _ := http.NewRequest(http.MethodGet, url, nil)
-	rdr := bytes.NewReader([]byte(body))
-	resp := &http.Response{
-		Request:    req,
-		Header:     http.Header{headername.ContentType: []string{contentType}},
-		Body:       io.NopCloser(rdr),
-		StatusCode: statusCode,
-	}
-	if c.responses == nil {
-		c.responses = make(map[string]*http.Response)
-	}
-	c.responses[url] = resp
-}
-
-func (c *stubClient) Do(req *http.Request) (resp *http.Response, err error) {
-	ur := req.URL.String()
-	resp, ok := c.responses[ur]
-	if ok {
-		resp.Request = req
-		return resp, nil
-	}
-	panic(fmt.Sprintf("url '%s' not found in test data", ur))
-}
-
-//-------------------------------------------------------------------------------------------------
-
-func newTestScraper(t *testing.T, startURL string, stub *stubClient) *Scraper {
+func newTestScraper(t *testing.T, startURL string, stub *stubclient.Client) *Scraper {
 	t.Helper()
 
 	logger.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -95,11 +62,11 @@ func TestScraperLinks(t *testing.T) {
 
 	startURL := "https://example.org/#fragment" // start page with fragment
 
-	stub := &stubClient{}
-	stub.response(http.StatusOK, "https://example.org/", "text/html", indexPage)
-	stub.response(http.StatusOK, "https://example.org/page2", "text/html", page2)
-	stub.response(http.StatusOK, "https://example.org/sub/", "text/html", indexPage)
-	stub.response(http.StatusOK, "https://example.org/style.css", "text/css", "")
+	stub := &stubclient.Client{}
+	stub.GivenResponse(http.StatusOK, "https://example.org/", "text/html", indexPage)
+	stub.GivenResponse(http.StatusOK, "https://example.org/page2", "text/html", page2)
+	stub.GivenResponse(http.StatusOK, "https://example.org/sub/", "text/html", indexPage)
+	stub.GivenResponse(http.StatusOK, "https://example.org/style.css", "text/css", "")
 
 	scraper := newTestScraper(t, startURL, stub)
 	require.NotNil(t, scraper)
@@ -136,9 +103,9 @@ func TestScraperAttributes(t *testing.T) {
 
 	startURL := "https://example.org/"
 
-	stub := &stubClient{}
-	stub.response(http.StatusOK, "https://example.org/", "text/html", indexPage)
-	stub.response(http.StatusOK, "https://example.org/bg.gif", "image/gif", "")
+	stub := &stubclient.Client{}
+	stub.GivenResponse(http.StatusOK, "https://example.org/", "text/html", indexPage)
+	stub.GivenResponse(http.StatusOK, "https://example.org/bg.gif", "image/gif", "")
 
 	scraper := newTestScraper(t, startURL, stub)
 	require.NotNil(t, scraper)

@@ -1,13 +1,11 @@
 package download
 
 import (
-	"bytes"
 	"context"
-	"fmt"
 	"github.com/cornelk/goscrape/download/throttle"
+	"github.com/cornelk/goscrape/stubclient"
 	"github.com/cornelk/goscrape/utc"
 	"github.com/spf13/afero"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -22,58 +20,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type stubClient struct {
-	responses map[string]http.Response // more configurable responses
-	eTags     *db.DB
-}
-
-func (c *stubClient) response(statusCode int, url, contentType, body string, etags ...header.ETag) {
-	req, _ := http.NewRequest(http.MethodGet, url, nil)
-	rdr := bytes.NewReader([]byte(body))
-	resp := http.Response{
-		Request:    req,
-		Header:     http.Header{headername.ContentType: []string{contentType}},
-		Body:       io.NopCloser(rdr),
-		StatusCode: statusCode,
-	}
-	if len(etags) > 0 {
-		resp.Header.Set("ETag", header.ETags(etags).String())
-	}
-	if c.responses == nil {
-		c.responses = make(map[string]http.Response)
-	}
-	c.responses[url] = resp
-}
-
-func (c *stubClient) Do(req *http.Request) (resp *http.Response, err error) {
-	ur := req.URL.String()
-	r, ok := c.responses[ur]
-	if !ok {
-		panic(fmt.Sprintf("url '%s' not found in test data", ur))
-	}
-
-	metadata := c.eTags.Lookup(req.URL)
-	if len(metadata.ETags) > 0 && r.StatusCode == http.StatusOK {
-		wanted := header.ETagsOf(req.Header.Get(headername.IfNoneMatch))
-		for _, w := range wanted {
-			if header.ETagsOf(metadata.ETags).WeaklyMatches(w.Hash) {
-				r.StatusCode = http.StatusNotModified
-				r.Status = http.StatusText(http.StatusNotModified)
-				r.Body = io.NopCloser(&bytes.Buffer{})
-				break
-			}
-		}
-	}
-
-	r.Request = req
-	return &r, nil
-}
-
-//-------------------------------------------------------------------------------------------------
-
 func TestGet200(t *testing.T) {
-	stub := &stubClient{}
-	stub.response(http.StatusOK, "http://example.org/", "text/html", `<html></html>`)
+	stub := &stubclient.Client{}
+	stub.GivenResponse(http.StatusOK, "http://example.org/", "text/html", `<html></html>`)
 
 	d := &Download{
 		Config: config.Config{
@@ -97,8 +46,8 @@ func TestGet200(t *testing.T) {
 }
 
 func TestGet404(t *testing.T) {
-	stub := &stubClient{}
-	stub.response(http.StatusNotFound, "http://example.org/", "text/html", `<html></html>`)
+	stub := &stubclient.Client{}
+	stub.GivenResponse(http.StatusNotFound, "http://example.org/", "text/html", `<html></html>`)
 
 	d := &Download{
 		Config: config.Config{
@@ -120,8 +69,8 @@ func TestGet404(t *testing.T) {
 }
 
 func TestGet429(t *testing.T) {
-	stub := &stubClient{}
-	stub.response(http.StatusTooManyRequests, "http://example.org/", "text/html", `<html></html>`)
+	stub := &stubclient.Client{}
+	stub.GivenResponse(http.StatusTooManyRequests, "http://example.org/", "text/html", `<html></html>`)
 
 	d := &Download{
 		Config: config.Config{
@@ -145,11 +94,11 @@ func TestGet429(t *testing.T) {
 }
 
 func TestGet200RevalidateWhenExpired(t *testing.T) {
-	stub := &stubClient{}
-	stub.response(http.StatusOK, "http://example.org/", "text/html", `<html></html>`)
+	stub := &stubclient.Client{}
+	stub.GivenResponse(http.StatusOK, "http://example.org/", "text/html", `<html></html>`)
 
 	u := mustParse("http://example.org/")
-	stub.eTags.Store(u, db.Item{ETags: `"hash"`, Expires: utc.Now().Add(-time.Hour)}) // expired
+	stub.Metadata.Store(u, db.Item{ETags: `"hash"`, Expires: utc.Now().Add(-time.Hour)}) // expired
 
 	d := &Download{
 		Config: config.Config{
@@ -173,11 +122,11 @@ func TestGet200RevalidateWhenExpired(t *testing.T) {
 }
 
 func TestGet200RevalidateWhenLaxIsNegative(t *testing.T) {
-	stub := &stubClient{}
-	stub.response(http.StatusOK, "http://example.org/", "text/html", `<html></html>`)
+	stub := &stubclient.Client{}
+	stub.GivenResponse(http.StatusOK, "http://example.org/", "text/html", `<html></html>`)
 
 	u := mustParse("http://example.org/")
-	stub.eTags.Store(u, db.Item{ETags: `"hash"`, Expires: utc.Now().Add(time.Hour)}) // not expired
+	stub.Metadata.Store(u, db.Item{ETags: `"hash"`, Expires: utc.Now().Add(time.Hour)}) // not expired
 
 	d := &Download{
 		Config: config.Config{
@@ -202,15 +151,15 @@ func TestGet200RevalidateWhenLaxIsNegative(t *testing.T) {
 }
 
 func TestGet304UsingEtag(t *testing.T) {
-	stub := &stubClient{}
-	stub.response(http.StatusOK, "http://example.org/", "text/html", `<html></html>`, header.ETag{Hash: "hash"})
+	stub := &stubclient.Client{}
+	stub.GivenResponse(http.StatusOK, "http://example.org/", "text/html", `<html></html>`, header.ETag{Hash: "hash"})
 
-	stub.eTags = db.OpenDB(".", afero.NewMemMapFs())
+	stub.Metadata = db.OpenDB(".", afero.NewMemMapFs())
 	defer os.Remove("./" + db.FileName)
-	defer stub.eTags.Close()
+	defer stub.Metadata.Close()
 
 	u := mustParse("http://example.org/")
-	stub.eTags.Store(u, db.Item{ETags: `"hash"`})
+	stub.Metadata.Store(u, db.Item{ETags: `"hash"`})
 
 	d := &Download{
 		Config: config.Config{
@@ -219,7 +168,7 @@ func TestGet304UsingEtag(t *testing.T) {
 		},
 		Client:  stub,
 		Auth:    "credentials",
-		ETagsDB: stub.eTags,
+		ETagsDB: stub.Metadata,
 	}
 
 	lastModified := time.Date(2000, 1, 1, 1, 1, 1, 0, time.UTC)
@@ -231,14 +180,14 @@ func TestGet304UsingEtag(t *testing.T) {
 }
 
 func TestNotYetExpired(t *testing.T) {
-	stub := &stubClient{}
+	stub := &stubclient.Client{}
 
-	stub.eTags = db.OpenDB(".", afero.NewMemMapFs())
+	stub.Metadata = db.OpenDB(".", afero.NewMemMapFs())
 	defer os.Remove("./" + db.FileName)
-	defer stub.eTags.Close()
+	defer stub.Metadata.Close()
 
 	u := mustParse("http://example.org/")
-	stub.eTags.Store(u, db.Item{ETags: `"hash"`, Expires: utc.Now().Add(time.Hour)}) // not expired
+	stub.Metadata.Store(u, db.Item{ETags: `"hash"`, Expires: utc.Now().Add(time.Hour)}) // not expired
 
 	d := &Download{
 		Config: config.Config{
@@ -247,7 +196,7 @@ func TestNotYetExpired(t *testing.T) {
 		},
 		Client:  stub,
 		Auth:    "credentials",
-		ETagsDB: stub.eTags,
+		ETagsDB: stub.Metadata,
 	}
 
 	lastModified := time.Date(2000, 1, 1, 1, 1, 1, 0, time.UTC)
@@ -259,8 +208,8 @@ func TestNotYetExpired(t *testing.T) {
 }
 
 func TestGet500(t *testing.T) {
-	stub := &stubClient{}
-	stub.response(http.StatusInternalServerError, "http://example.org/", "text/html", `<html></html>`)
+	stub := &stubclient.Client{}
+	stub.GivenResponse(http.StatusInternalServerError, "http://example.org/", "text/html", `<html></html>`)
 
 	d := &Download{
 		Config: config.Config{
