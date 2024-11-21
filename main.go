@@ -45,7 +45,7 @@ type arguments struct {
 	LaxAge       time.Duration `arg:"--laxage" help:"adds to the 'expires' timestamp specified by the origin server, or creates one if absent; if the origin is too conservative, this helps when doing successive runs; a negative value causes revalidation" default:"0s"`
 	Tries        int64         `arg:"-n,--tries" help:"the number of tries to download each file if the server gives a 5xx error" default:"1"`
 
-	Serve      string `arg:"-s,--serve" help:"serve the website using a webserver"`
+	Serve      string `arg:"-s,--serve" help:"serve the website using a webserver rooted at the specified path"`
 	ServerPort int16  `arg:"-r,--serverport" help:"port to use for the webserver" default:"8080"`
 
 	CookieFile     string `arg:"--cookiefile" help:"file containing the cookie content"`
@@ -173,7 +173,8 @@ func runScraper(ctx context.Context, args arguments) error {
 
 func scrapeURLs(ctx context.Context, cfg config.Config, args arguments) error {
 
-	if !ioutil.FileExists(afero.NewOsFs(), cfg.OutputDirectory) {
+	fs := afero.NewOsFs()
+	if !ioutil.FileExists(fs, cfg.OutputDirectory) {
 		db.DeleteFile() // get rid of stale cache
 	}
 
@@ -182,7 +183,7 @@ func scrapeURLs(ctx context.Context, cfg config.Config, args arguments) error {
 
 	for _, url := range args.URLs {
 		cfg.URL = url
-		sc, err := scraper.New(cfg)
+		sc, err := scraper.New(cfg, fs)
 		if err != nil {
 			return fmt.Errorf("initializing scraper: %w", err)
 		}

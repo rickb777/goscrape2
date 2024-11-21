@@ -6,8 +6,10 @@ import (
 	"log/slog"
 	"mime"
 	"net/http"
+	"os"
 
 	"github.com/cornelk/goscrape/logger"
+	"github.com/rickb777/servefiles/v3"
 )
 
 // set more mime types in the browser, this for example fixes .asp files not being
@@ -17,7 +19,8 @@ var mimeTypes = map[string]string{
 }
 
 func ServeDirectory(ctx context.Context, path string, port int16) error {
-	fs := http.FileServer(http.Dir(path))
+	fs := servefiles.NewAssetHandlerIoFS(os.DirFS(path))
+	//servefiles.Debugf = func(format string, v ...interface{}) { fmt.Printf(format, v...) }
 	mux := http.NewServeMux()
 	mux.Handle("/", fs) // server root by file system
 

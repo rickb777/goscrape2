@@ -24,11 +24,9 @@ func newTestScraper(t *testing.T, startURL string, stub *stubclient.Client) *Scr
 		URL:      startURL,
 		MaxDepth: 10,
 	}
-	scraper, err := New(cfg)
+	scraper, err := New(cfg, afero.NewMemMapFs())
 	require.NoError(t, err)
 	require.NotNil(t, scraper)
-
-	scraper.fs = afero.NewMemMapFs()
 
 	scraper.client = stub
 

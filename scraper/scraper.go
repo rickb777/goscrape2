@@ -50,7 +50,7 @@ type Scraper struct {
 
 // New creates a new Scraper instance.
 // nolint: funlen
-func New(cfg config.Config) (*Scraper, error) {
+func New(cfg config.Config, fs afero.Fs) (*Scraper, error) {
 	var errs []error
 
 	u, err := url.Parse(cfg.URL)
@@ -114,7 +114,7 @@ func New(cfg config.Config) (*Scraper, error) {
 		URL:     u,
 
 		client: client,
-		fs:     afero.NewOsFs(), // filesystem can be replaced with in-memory filesystem for testing
+		fs:     fs, // filesystem can be replaced with in-memory filesystem for testing
 
 		includes: includes,
 		excludes: excludes,
