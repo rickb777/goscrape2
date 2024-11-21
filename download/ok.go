@@ -14,6 +14,7 @@ import (
 	"github.com/cornelk/goscrape/document"
 	"github.com/cornelk/goscrape/download/ioutil"
 	"github.com/cornelk/goscrape/logger"
+	"github.com/cornelk/goscrape/mapping"
 	"github.com/cornelk/goscrape/work"
 	"github.com/rickb777/acceptable/header"
 	"github.com/rickb777/acceptable/headername"
@@ -191,7 +192,7 @@ func (d *Download) other200(item work.Item, resp *http.Response, lastModified ti
 // storeDownload writes the download to a file, if a known binary file is detected,
 // processing of the file as page to look for links is skipped.
 func (d *Download) storeDownload(u *url.URL, data io.Reader, lastModified time.Time, isAPage bool) (fileSize int64) {
-	filePath := document.GetFilePath(u, d.StartURL, d.Config.OutputDirectory, isAPage)
+	filePath := mapping.GetFilePath(u, d.StartURL, d.Config.OutputDirectory, isAPage)
 
 	if !isAPage && ioutil.FileExists(d.Fs, filePath) {
 		return 0

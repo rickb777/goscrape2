@@ -131,31 +131,37 @@ func New(cfg config.Config, url string, fs afero.Fs) (*Scraper, error) {
 
 //-------------------------------------------------------------------------------------------------
 
+func (sc *Scraper) Downloader() *download.Download {
+	sc.config.SensibleDefaults()
+
+	return &download.Download{
+		Config:    sc.config,
+		Cookies:   sc.cookies,
+		ETagsDB:   sc.ETagsDB,
+		StartURL:  sc.URL,
+		Auth:      sc.auth,
+		Client:    sc.client,
+		Fs:        sc.fs,
+		Lockdown:  throttle.New(0, 10*time.Second, 2*time.Second),
+		LoopDelay: throttle.New(sc.config.LoopDelay, time.Millisecond, time.Millisecond/2),
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+
 // Start starts the scraping.
-func (s *Scraper) Start(ctx context.Context) error {
-	err := ioutil.CreateDirectory(s.fs, s.config.OutputDirectory)
+func (sc *Scraper) Start(ctx context.Context) error {
+	err := ioutil.CreateDirectory(sc.fs, sc.config.OutputDirectory)
 	if err != nil {
 		return err
 	}
 
-	s.config.SensibleDefaults()
+	d := sc.Downloader()
 
-	firstItem := work.Item{URL: s.URL}
+	firstItem := work.Item{URL: sc.URL}
 
-	if !s.shouldURLBeDownloaded(firstItem.URL, 0) {
+	if !sc.shouldURLBeDownloaded(firstItem.URL, 0) {
 		return errors.New("start page is excluded from downloading")
-	}
-
-	d := &download.Download{
-		Config:    s.config,
-		Cookies:   s.cookies,
-		ETagsDB:   s.ETagsDB,
-		StartURL:  s.URL,
-		Auth:      s.auth,
-		Client:    s.client,
-		Fs:        s.fs,
-		Lockdown:  throttle.New(0, 10*time.Second, 2*time.Second),
-		LoopDelay: throttle.New(s.config.LoopDelay, time.Millisecond, time.Millisecond/2),
 	}
 
 	redirect, firstResult, err := d.ProcessURL(ctx, firstItem)
@@ -164,17 +170,17 @@ func (s *Scraper) Start(ctx context.Context) error {
 	}
 
 	if redirect != nil {
-		s.URL = redirect // s.URL is not altered subsequently
+		sc.URL = redirect // sc.URL is not altered subsequently
 	}
 
 	// WorkQueue has unlimited buffering and so prevents deadlock
 	workQueueIn, workQueueOut := process.WorkQueue[work.Item](32)
-	results := make(chan work.Result, s.config.Concurrency)
+	results := make(chan work.Result, sc.config.Concurrency)
 
 	pool := process.NewGroup()
 
 	// Pool of processes to concurrently handle URL downloading.
-	pool.GoNE(s.config.Concurrency, func(pid int) error {
+	pool.GoNE(sc.config.Concurrency, func(pid int) error {
 		for {
 			if pid == 0 || d.Lockdown.IsNormal() {
 				select {
@@ -213,7 +219,7 @@ func (s *Scraper) Start(ctx context.Context) error {
 		for result := range results {
 			todo--
 			newDepth := result.Item.Depth + 1
-			s.partitionResult(&result, newDepth)
+			sc.partitionResult(&result, newDepth)
 			logger.Debug("Partitioned", slog.Any("item", result.Item), slog.Any("include", result.References), slog.Any("exclude", result.Excluded))
 			for _, ref := range result.References {
 				workQueueIn <- work.Item{URL: ref, Referrer: result.Item.URL, Depth: newDepth}

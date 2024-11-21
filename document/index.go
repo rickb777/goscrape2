@@ -7,13 +7,6 @@ import (
 	"log/slog"
 )
 
-const (
-	// PageExtension is the file extension that downloaded pages get.
-	PageExtension = ".html"
-	// PageDirIndex is the file name of the index file for every dir.
-	PageDirIndex = "index" + PageExtension
-)
-
 func (d *HTMLDocument) FindReferences() (work.Refs, error) {
 	var result work.Refs
 	for tag := range htmlindex.Nodes {

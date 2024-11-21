@@ -2,7 +2,6 @@ package download
 
 import (
 	"context"
-	"github.com/cornelk/goscrape/download/throttle"
 	"io"
 	"log/slog"
 	"net/http"
@@ -12,9 +11,10 @@ import (
 
 	"github.com/cornelk/goscrape/config"
 	"github.com/cornelk/goscrape/db"
-	"github.com/cornelk/goscrape/document"
 	"github.com/cornelk/goscrape/download/ioutil"
+	"github.com/cornelk/goscrape/download/throttle"
 	"github.com/cornelk/goscrape/logger"
+	"github.com/cornelk/goscrape/mapping"
 	"github.com/cornelk/goscrape/utc"
 	"github.com/cornelk/goscrape/work"
 	"github.com/spf13/afero"
@@ -42,7 +42,7 @@ type Download struct {
 func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *work.Result, error) {
 	var existingModified time.Time
 
-	filePath := document.GetFilePath(item.URL, d.StartURL, d.Config.OutputDirectory, true)
+	filePath := mapping.GetFilePath(item.URL, d.StartURL, d.Config.OutputDirectory, true)
 	if ioutil.FileExists(d.Fs, filePath) {
 		fileInfo, err := d.Fs.Stat(filePath)
 		if err == nil && fileInfo != nil {
@@ -105,7 +105,7 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 
 // responseGone deletes obsolete/inaccessible files
 func (d *Download) responseGone(item work.Item, resp *http.Response) (*url.URL, *work.Result, error) {
-	filePath := document.GetFilePath(item.URL, d.StartURL, d.Config.OutputDirectory, true)
+	filePath := mapping.GetFilePath(item.URL, d.StartURL, d.Config.OutputDirectory, true)
 	_ = d.Fs.Remove(filePath)
 	return item.URL, &work.Result{Item: item, StatusCode: resp.StatusCode}, nil
 }

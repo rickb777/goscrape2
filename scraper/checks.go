@@ -7,46 +7,46 @@ import (
 
 // shouldURLBeDownloaded checks whether a page should be downloaded.
 // nolint: cyclop
-func (s *Scraper) shouldURLBeDownloaded(item *url.URL, depth int) bool {
+func (sc *Scraper) shouldURLBeDownloaded(item *url.URL, depth int) bool {
 	if item.Scheme != "http" && item.Scheme != "https" {
 		return false
 	}
 
 	p := item.String()
-	if item.Host == s.URL.Host {
+	if item.Host == sc.URL.Host {
 		p = item.Path
 	}
 	if p == "" {
 		p = "/"
 	}
 
-	if !s.processed.AddIfAbsent(p) { // was already downloaded or checked?
+	if !sc.processed.AddIfAbsent(p) { // was already downloaded or checked?
 		return false
 	}
 
-	if item.Host != s.URL.Host {
+	if item.Host != sc.URL.Host {
 		return false
 	}
 
-	if depth >= s.config.MaxDepth {
+	if depth >= sc.config.MaxDepth {
 		return false
 	}
 
-	if s.includes != nil && !s.includes.Matches(item, "Including URL") {
+	if sc.includes != nil && !sc.includes.Matches(item, "Including URL") {
 		return false
 	}
 
-	if s.excludes != nil && s.excludes.Matches(item, "Skipping URL") {
+	if sc.excludes != nil && sc.excludes.Matches(item, "Skipping URL") {
 		return false
 	}
 
 	return true
 }
 
-func (s *Scraper) partitionResult(result *work.Result, depth int) {
+func (sc *Scraper) partitionResult(result *work.Result, depth int) {
 	var included []*url.URL
 	for _, ref := range result.References {
-		if s.shouldURLBeDownloaded(ref, depth) {
+		if sc.shouldURLBeDownloaded(ref, depth) {
 			included = append(included, ref)
 		} else {
 			result.Excluded = append(result.Excluded, ref)

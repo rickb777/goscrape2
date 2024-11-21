@@ -1,11 +1,20 @@
-package document
+package mapping
 
 import (
 	"net/url"
 	"path/filepath"
 )
 
-const externalDomainPrefix = "_" // _ is a prefix for external domains on the filesystem
+const (
+	// PageExtension is the file extension that downloaded pages get.
+	PageExtension = ".html"
+
+	// PageDirIndex is the file name of the index file for every dir.
+	PageDirIndex = "index" + PageExtension
+
+	// externalDomainPrefix _ is a prefix for external domains on the filesystem
+	externalDomainPrefix = "_"
+)
 
 // GetFilePath returns a file path for a URL to store the URL content in.
 func GetFilePath(url, startURL *url.URL, outputDirectory string, isAPage bool) string {

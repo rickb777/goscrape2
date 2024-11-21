@@ -9,8 +9,8 @@ import (
 )
 
 // Cookies returns the current cookies.
-func (s *Scraper) Cookies() []config.Cookie {
-	httpCookies := s.cookies.Cookies(s.URL)
+func (sc *Scraper) Cookies() []config.Cookie {
+	httpCookies := sc.cookies.Cookies(sc.URL)
 	cookies := make([]config.Cookie, 0, len(httpCookies))
 
 	for _, c := range httpCookies {

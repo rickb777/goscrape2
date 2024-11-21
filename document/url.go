@@ -1,6 +1,7 @@
 package document
 
 import (
+	"github.com/cornelk/goscrape/mapping"
 	"net/url"
 	"path"
 	"strings"
@@ -38,11 +39,11 @@ func resolveURL(base *url.URL, reference, startURLHost, relativeToRoot string) s
 	}
 
 	if resolved[len(resolved)-1] == '/' {
-		resolved += PageDirIndex // link dir index to index.html
+		resolved += mapping.PageDirIndex // link dir index to index.html
 	} else {
 		l := strings.LastIndexByte(resolved, '/')
 		if 0 <= l && l < len(resolved)-1 && resolved[l+1] == '#' {
-			resolved = resolved[:l+1] + PageDirIndex + resolved[l+1:] // link fragment correct
+			resolved = resolved[:l+1] + mapping.PageDirIndex + resolved[l+1:] // link fragment correct
 		}
 	}
 
@@ -63,7 +64,7 @@ func urlRelativeToRoot(u *url.URL) string {
 
 func urlRelativeToOther(src, base *url.URL) string {
 	srcSplits := strings.Split(src.Path, "/")
-	baseSplits := strings.Split(GetPageFilePath(base), "/")
+	baseSplits := strings.Split(mapping.GetPageFilePath(base), "/")
 
 	for {
 		if len(srcSplits) == 0 || len(baseSplits) == 0 {

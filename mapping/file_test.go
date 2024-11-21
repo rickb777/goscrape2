@@ -1,4 +1,4 @@
-package document
+package mapping
 
 import (
 	"io"

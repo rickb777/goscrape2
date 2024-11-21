@@ -45,7 +45,8 @@ type arguments struct {
 	LaxAge       time.Duration `arg:"--laxage" help:"adds to the 'expires' timestamp specified by the origin server, or creates one if absent; if the origin is too conservative, this helps when doing successive runs; a negative value causes revalidation" default:"0s"`
 	Tries        int64         `arg:"-n,--tries" help:"the number of tries to download each file if the server gives a 5xx error" default:"1"`
 
-	Serve      string `arg:"-s,--serve" help:"serve the website using a webserver rooted at the specified path"`
+	Serve      string `arg:"-s,--serve" help:"serve the website using a webserver rooted at the specified path; this disables scraping"`
+	Origin     string `arg:"--origin" help:"set the origin server used when serving the website (optional)"`
 	ServerPort int16  `arg:"-r,--serverport" help:"port to use for the webserver" default:"8080"`
 
 	CookieFile     string `arg:"--cookiefile" help:"file containing the cookie content"`
@@ -85,12 +86,11 @@ func main() {
 			fmt.Printf("Server execution error: %s\n", err)
 			os.Exit(1)
 		}
-		return
-	}
-
-	if err := runScraper(ctx, args); err != nil {
-		fmt.Printf("Scraping execution error: %s\n", err)
-		os.Exit(1)
+	} else {
+		if err := runScraper(ctx, args); err != nil {
+			fmt.Printf("Scraping execution error: %s\n", err)
+			os.Exit(1)
+		}
 	}
 }
 
@@ -122,9 +122,9 @@ func readArguments() (arguments, error) {
 	return args, nil
 }
 
-func runScraper(ctx context.Context, args arguments) error {
+func buildConfig(args arguments) (*config.Config, error) {
 	if len(args.URLs) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	var username, password string
@@ -143,7 +143,7 @@ func runScraper(ctx context.Context, args arguments) error {
 
 	cookies, err := readCookieFile(args.CookieFile)
 	if err != nil {
-		return fmt.Errorf("reading cookie: %w", err)
+		return nil, fmt.Errorf("reading cookie: %w", err)
 	}
 
 	cfg := config.Config{
@@ -168,20 +168,30 @@ func runScraper(ctx context.Context, args arguments) error {
 		UserAgent: args.UserAgent,
 	}
 
-	if !ioutil.FileExists(afero.NewOsFs(), cfg.OutputDirectory) {
-		db.DeleteFile() // get rid of stale cache
-	}
-
-	return scrapeURLs(ctx, cfg, args)
+	return &cfg, nil
 }
 
-func scrapeURLs(ctx context.Context, cfg config.Config, args arguments) error {
+func runScraper(ctx context.Context, args arguments) error {
+	cfg, err := buildConfig(args)
+	if cfg == nil || err != nil {
+		return err
+	}
 
+	fs := afero.NewOsFs()
+
+	if !ioutil.FileExists(fs, cfg.OutputDirectory) {
+		db.DeleteFile(fs) // get rid of stale cache
+	}
+
+	return scrapeURLs(ctx, fs, *cfg, args.SaveCookieFile, args.URLs)
+}
+
+func scrapeURLs(ctx context.Context, fs afero.Fs, cfg config.Config, saveCookieFile string, urls []string) error {
 	etagStore := db.Open()
 	defer etagStore.Close()
 
-	for _, url := range args.URLs {
-		sc, err := scraper.New(cfg, url, afero.NewOsFs())
+	for _, url := range urls {
+		sc, err := scraper.New(cfg, url, fs)
 		if err != nil {
 			return fmt.Errorf("initializing scraper: %w", err)
 		}
@@ -197,8 +207,8 @@ func scrapeURLs(ctx context.Context, cfg config.Config, args arguments) error {
 			return fmt.Errorf("scraping '%s': %w", sc.URL, err)
 		}
 
-		if args.SaveCookieFile != "" {
-			if err := saveCookies(args.SaveCookieFile, sc.Cookies()); err != nil {
+		if saveCookieFile != "" {
+			if err := saveCookies(saveCookieFile, sc.Cookies()); err != nil {
 				return fmt.Errorf("saving cookies: %w", err)
 			}
 		}
@@ -218,7 +228,22 @@ func reportHistogram() {
 }
 
 func runServer(ctx context.Context, args arguments) error {
-	if err := scraper.ServeDirectory(ctx, args.Serve, args.ServerPort); err != nil {
+	var sc *scraper.Scraper
+
+	if args.Origin != "" {
+		cfg, err := buildConfig(args)
+		if cfg == nil || err != nil {
+			return err
+		}
+
+		fs := afero.NewOsFs()
+		sc, err = scraper.New(*cfg, args.Origin, fs)
+		if err == nil {
+			return fmt.Errorf("serving directory for %s: %w", args.Origin, err)
+		}
+	}
+
+	if err := scraper.ServeDirectory(ctx, args.Serve, args.ServerPort, sc); err != nil {
 		return fmt.Errorf("serving directory: %w", err)
 	}
 	return nil

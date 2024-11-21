@@ -47,8 +47,8 @@ type DB struct {
 	mu      sync.Mutex
 }
 
-func DeleteFile() {
-	_ = os.Remove(filepath.Join(localStateDir(), FileName))
+func DeleteFile(fs afero.Fs) {
+	_ = fs.Remove(filepath.Join(localStateDir(), FileName))
 }
 
 func Open() *DB {
