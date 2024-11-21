@@ -9,7 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/cookiejar"
-	"net/url"
+	urlpkg "net/url"
 	"time"
 
 	"github.com/cornelk/goscrape/config"
@@ -30,7 +30,7 @@ import (
 type Scraper struct {
 	config  config.Config
 	cookies *cookiejar.Jar
-	URL     *url.URL // contains the main URL to parse, will be modified in case of a redirect
+	URL     *urlpkg.URL // contains the main URL to parse, will be modified in case of a redirect
 
 	auth   string
 	client download.HttpClient
@@ -50,10 +50,10 @@ type Scraper struct {
 
 // New creates a new Scraper instance.
 // nolint: funlen
-func New(cfg config.Config, fs afero.Fs) (*Scraper, error) {
+func New(cfg config.Config, url string, fs afero.Fs) (*Scraper, error) {
 	var errs []error
 
-	u, err := url.Parse(cfg.URL)
+	u, err := urlpkg.Parse(url)
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -69,7 +69,7 @@ func New(cfg config.Config, fs afero.Fs) (*Scraper, error) {
 		errs = append(errs, err)
 	}
 
-	proxyURL, err := url.Parse(cfg.Proxy)
+	proxyURL, err := urlpkg.Parse(cfg.Proxy)
 	if err != nil {
 		errs = append(errs, err)
 	}

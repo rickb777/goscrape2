@@ -11,7 +11,6 @@ import (
 
 // Config contains the scraper configuration.
 type Config struct {
-	URL      string
 	Includes []string
 	Excludes []string
 

@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/cornelk/goscrape/config"
 	"github.com/cornelk/goscrape/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,10 +14,7 @@ import (
 
 func TestFixURLReferences(t *testing.T) {
 	logger.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
-	cfg := config.Config{
-		URL: "http://domain.com",
-	}
-	u, _ := url.Parse(cfg.URL)
+	u, _ := url.Parse("http://domain.com")
 
 	b := []byte(`<html lang="es"><head></head>
 <body>

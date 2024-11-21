@@ -168,22 +168,20 @@ func runScraper(ctx context.Context, args arguments) error {
 		UserAgent: args.UserAgent,
 	}
 
+	if !ioutil.FileExists(afero.NewOsFs(), cfg.OutputDirectory) {
+		db.DeleteFile() // get rid of stale cache
+	}
+
 	return scrapeURLs(ctx, cfg, args)
 }
 
 func scrapeURLs(ctx context.Context, cfg config.Config, args arguments) error {
 
-	fs := afero.NewOsFs()
-	if !ioutil.FileExists(fs, cfg.OutputDirectory) {
-		db.DeleteFile() // get rid of stale cache
-	}
-
 	etagStore := db.Open()
 	defer etagStore.Close()
 
 	for _, url := range args.URLs {
-		cfg.URL = url
-		sc, err := scraper.New(cfg, fs)
+		sc, err := scraper.New(cfg, url, afero.NewOsFs())
 		if err != nil {
 			return fmt.Errorf("initializing scraper: %w", err)
 		}

@@ -7,7 +7,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cornelk/goscrape/config"
 	"github.com/cornelk/goscrape/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,12 +31,9 @@ func TestGetFilePath(t *testing.T) {
 		{baseURL: "https://google.com/", downloadURL: "https://google.com/settings", expectedFilePath: expectedBasePath + "settings.html"},
 	}
 
-	var cfg config.Config
 	logger.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	for _, c := range cases {
-		cfg.URL = c.baseURL
-
 		URL, err := url.Parse(c.downloadURL)
 		require.NoError(t, err)
 

@@ -20,11 +20,8 @@ func newTestScraper(t *testing.T, startURL string, stub *stubclient.Client) *Scr
 	t.Helper()
 
 	logger.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
-	cfg := config.Config{
-		URL:      startURL,
-		MaxDepth: 10,
-	}
-	scraper, err := New(cfg, afero.NewMemMapFs())
+	cfg := config.Config{MaxDepth: 10}
+	scraper, err := New(cfg, startURL, afero.NewMemMapFs())
 	require.NoError(t, err)
 	require.NotNil(t, scraper)
 
