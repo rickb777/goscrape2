@@ -8,7 +8,7 @@ require (
 	github.com/gorilla/css v1.0.1
 	github.com/h2non/filetype v1.1.4-0.20231228185113-6469358c2bcb
 	github.com/rickb777/acceptable v0.41.0
-	github.com/rickb777/process/v2 v2.0.4
+	github.com/rickb777/process/v2 v2.1.0
 	github.com/rickb777/servefiles/v3 v3.9.0
 	github.com/spf13/afero v1.11.0
 	github.com/stretchr/testify v1.10.0
