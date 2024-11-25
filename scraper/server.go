@@ -3,13 +3,13 @@ package scraper
 import (
 	"context"
 	"fmt"
+	"github.com/cornelk/goscrape/logger"
+	"github.com/cornelk/goscrape/work"
+	"github.com/rickb777/servefiles/v3"
+	"github.com/spf13/afero"
 	"log/slog"
 	"mime"
 	"net/http"
-	"os"
-
-	"github.com/cornelk/goscrape/logger"
-	"github.com/rickb777/servefiles/v3"
 )
 
 // set more mime types in the browser, this for example fixes .asp files not being
@@ -20,39 +20,31 @@ var mimeTypes = map[string]string{
 
 type onDemand struct {
 	sc *Scraper
+	fs afero.Fs
 }
 
 func (h *onDemand) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	//h.sc.Downloader()
-	http.Error(w, "not implemented", 404)
+	url := h.sc.URL.ResolveReference(r.URL)
+	d := h.sc.Downloader()
+	_, result, err := d.ProcessURL(r.Context(), work.Item{URL: url})
+	if err != nil {
+		http.Error(w, "Bad gateway: "+err.Error(), http.StatusBadGateway)
+	} else if result.StatusCode >= 300 {
+		http.Error(w, fmt.Sprintf("Internal server error: upstream %d", result.StatusCode), http.StatusInternalServerError)
+	}
 }
 
 func ServeDirectory(ctx context.Context, path string, port int16, sc *Scraper) error {
-	fileServer := servefiles.NewAssetHandlerIoFS(os.DirFS(path))
-
-	//if sc != nil {
-	//	fileServer.NotFound = &onDemand{sc: sc}
-	//}
-
-	//servefiles.Debugf = func(format string, v ...interface{}) { fmt.Printf(format, v...) }
-	mux := http.NewServeMux()
-	mux.Handle("/", fileServer)
-
-	// update mime types
-	for ext, mt := range mimeTypes {
-		if err := mime.AddExtensionType(ext, mt); err != nil {
-			return fmt.Errorf("adding mime type '%s': %w", ext, err)
-		}
-	}
+	fs := afero.NewBasePathFs(afero.NewOsFs(), path)
 
 	fullAddr := fmt.Sprintf("http://127.0.0.1:%d", port)
 	logger.Info("Serving directory...",
 		slog.String("path", path),
 		slog.String("address", fullAddr))
 
-	server := &http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
-		Handler: mux,
+	server, err := newWebserver(fs, port, sc)
+	if err != nil {
+		return err
 	}
 
 	serverErr := make(chan error, 1)
@@ -69,6 +61,31 @@ func ServeDirectory(ctx context.Context, path string, port int16, sc *Scraper) e
 		return nil
 
 	case err := <-serverErr:
-		return fmt.Errorf("starting webserver: %w", err)
+		return fmt.Errorf("webserver: %w", err)
 	}
 }
+
+func newWebserver(fs afero.Fs, port int16, sc *Scraper) (*http.Server, error) {
+	//servefiles.Debugf = func(format string, v ...interface{}) { fmt.Printf(format, v...) }
+	fileServer := servefiles.NewAssetHandlerFS(fs)
+
+	if sc != nil {
+		fileServer.NotFound = &onDemand{sc: sc, fs: fs}
+	}
+
+	mux := http.NewServeMux()
+	mux.Handle("/", fileServer)
+
+	addr := fmt.Sprintf(":%d", port)
+	return &http.Server{Addr: addr, Handler: mux}, nil
+}
+
+func addMoreMIMETypes() {
+	for ext, mt := range mimeTypes {
+		if err := mime.AddExtensionType(ext, mt); err != nil {
+			panic(fmt.Errorf("adding mime type '%s': %w", ext, err))
+		}
+	}
+}
+
+func init() { addMoreMIMETypes() }

@@ -2,7 +2,6 @@ package scraper
 
 import (
 	"context"
-	"github.com/cornelk/goscrape/stubclient"
 	"io"
 	"log/slog"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/cornelk/goscrape/config"
 	"github.com/cornelk/goscrape/logger"
+	"github.com/cornelk/goscrape/stubclient"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
