@@ -4,10 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
-	"github.com/cornelk/goscrape/db"
-	"github.com/cornelk/goscrape/download/ioutil"
-	"github.com/spf13/afero"
 	"log/slog"
 	"maps"
 	"os"
@@ -16,12 +14,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexflint/go-arg"
 	"github.com/cornelk/goscrape/config"
+	"github.com/cornelk/goscrape/db"
 	"github.com/cornelk/goscrape/download"
+	"github.com/cornelk/goscrape/download/ioutil"
 	"github.com/cornelk/goscrape/images"
 	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/goscrape/scraper"
+	"github.com/spf13/afero"
 )
 
 var (
@@ -30,51 +30,94 @@ var (
 	date    = ""
 )
 
-type arguments struct {
-	Include []string `arg:"-i,--include" help:"only include URLs that match a regular expression"`
-	Exclude []string `arg:"-x,--exclude" help:"exclude URLs that match a regular expression"`
-	Output  string   `arg:"-o,--output" help:"output directory to write files to"`
+type Strings []string
 
-	URLs []string `arg:"positional"`
-
-	Concurrency  int64         `arg:"-c,--concurrency" help:"the number of concurrent downloads" default:"1"`
-	Depth        int64         `arg:"-d,--depth" help:"download depth limit, 0 for unlimited" default:"10"`
-	ImageQuality int64         `arg:"-q,--imagequality" help:"image quality reduction, 0 to disable re-encoding, maximum 99"`
-	Timeout      time.Duration `arg:"-t,--timeout" help:"time limit (with units, e.g. 1s) for each HTTP request to connect and read the response" default:"30s"`
-	LoopDelay    time.Duration `arg:"--loopdelay" help:"delay (with units, e.g. 1s) used between any two downloads" default:"0s"`
-	LaxAge       time.Duration `arg:"--laxage" help:"adds to the 'expires' timestamp specified by the origin server, or creates one if absent; if the origin is too conservative, this helps when doing successive runs; a negative value causes revalidation" default:"0s"`
-	Tries        int64         `arg:"-n,--tries" help:"the number of tries to download each file if the server gives a 5xx error" default:"1"`
-
-	Serve      string `arg:"-s,--serve" help:"serve the website using a webserver rooted at the specified path; this disables scraping"`
-	Origin     string `arg:"--origin" help:"set the origin server used when serving the website (optional)"`
-	ServerPort int16  `arg:"-r,--serverport" help:"port to use for the webserver" default:"8080"`
-
-	CookieFile     string `arg:"--cookiefile" help:"file containing the cookie content"`
-	SaveCookieFile string `arg:"--savecookiefile" help:"file to save the cookie content"`
-
-	Headers   []string `arg:"-h,--header" help:"HTTP header to use for scraping"`
-	Proxy     string   `arg:"-p,--proxy" help:"HTTP proxy to use for scraping"`
-	User      string   `arg:"-u,--user" help:"user[:password] to use for HTTP authentication"`
-	UserAgent string   `arg:"-a,--useragent" help:"user agent to use for scraping"`
-
-	Verbose bool `arg:"-v,--verbose" help:"verbose output"`
-	Debug   bool `arg:"-z,--debug" help:"debug output"`
+// String is an implementation of the flag.Value interface
+func (i *Strings) String() string {
+	return fmt.Sprintf("%v", *i)
 }
 
-func (arguments) Description() string {
-	return "Scrape a website and create an offline browsable version on the disk.\n"
+// Set is an implementation of the flag.Value interface
+func (i *Strings) Set(value string) error {
+	*i = append(*i, value)
+	return nil
 }
 
-func (arguments) Version() string {
-	return fmt.Sprintf("formatVersion: %s\n", formatVersion(version, commit, date))
+type Arguments struct {
+	URLs []string
+
+	Include Strings
+	Exclude Strings
+	Output  string
+
+	Concurrency  int
+	Depth        int
+	ImageQuality int
+	Timeout      time.Duration
+	LoopDelay    time.Duration
+	LaxAge       time.Duration
+	Tries        int
+
+	Serve      string
+	Origin     string
+	ServerPort int
+
+	CookieFile     string
+	SaveCookieFile string
+
+	Headers   Strings
+	Proxy     string
+	User      string
+	UserAgent string
+
+	Verbose bool
+	Debug   bool
+}
+
+func declareFlags() Arguments {
+	var arguments Arguments
+
+	flag.Var(&arguments.Include, "i", "only include URLs that match a regular expression (can be repeated)")
+	flag.Var(&arguments.Exclude, "x", "exclude URLs that match a regular expression (can be repeated)")
+	flag.StringVar(&arguments.Output, "o", "", "output `directory` to write files to")
+
+	flag.IntVar(&arguments.Concurrency, "concurrency", 1, "the number of concurrent downloads")
+	flag.IntVar(&arguments.Depth, "depth", 0, "download depth limit, 0 for unlimited")
+	flag.IntVar(&arguments.ImageQuality, "imagequality", 0, "image quality reduction, 0 to disable re-encoding, maximum 99")
+	flag.DurationVar(&arguments.Timeout, "timeout", 0, "time limit (with units, e.g. 1s) for each HTTP request to connect and read the response")
+	flag.DurationVar(&arguments.LoopDelay, "loopdelay", 0, "delay (with units, e.g. 1s) used between any two downloads")
+	flag.DurationVar(&arguments.LaxAge, "laxage", 0, "adds to the 'expires' timestamp specified by the origin server, or creates one if absent; if the origin is too conservative, this helps when doing successive runs; a negative value causes revalidation")
+	flag.IntVar(&arguments.Tries, "tries", 1, "the number of tries to download each file if the server gives a 5xx error")
+
+	flag.StringVar(&arguments.Serve, "serve", "", "serve the website using a webserver rooted at the specified path; this disables scraping")
+	flag.StringVar(&arguments.Origin, "origin", "", "set the origin server used when serving the website (optional)")
+	flag.IntVar(&arguments.ServerPort, "port", 8080, "port to use for the webserver")
+
+	flag.StringVar(&arguments.CookieFile, "cookies", "", "file containing the cookie content")
+	flag.StringVar(&arguments.SaveCookieFile, "savecookiefile", "", "file to save the cookie content")
+
+	flag.Var(&arguments.Headers, "header", "HTTP header to use for scraping (can be repeated)")
+	flag.StringVar(&arguments.Proxy, "proxy", "", "HTTP proxy to use for scraping")
+	flag.StringVar(&arguments.User, "user", "", "user[:password] to use for HTTP authentication")
+	flag.StringVar(&arguments.UserAgent, "useragent", "", "user agent to use for scraping")
+
+	flag.BoolVar(&arguments.Verbose, "v", false, "verbose output")
+	flag.BoolVar(&arguments.Debug, "z", false, "debug output")
+
+	flag.Parse()
+	arguments.URLs = flag.Args()
+
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "Scrape a website and create an offline browsable version on the disk.\n\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0])
+		flag.PrintDefaults()
+		fmt.Fprintf(flag.CommandLine.Output(), "\nVersion %s\n", formatVersion(version, commit, date))
+	}
+	return arguments
 }
 
 func main() {
-	args, err := readArguments()
-	if err != nil {
-		fmt.Printf("Reading arguments failed: %s\n", err)
-		os.Exit(1)
-	}
+	args := declareFlags()
 
 	ctx := context.Background()
 	//ctx := app.Context() // provides signal handler cancellation
@@ -86,47 +129,17 @@ func main() {
 			fmt.Printf("Server execution error: %s\n", err)
 			os.Exit(1)
 		}
-	} else {
+	} else if len(args.URLs) > 0 {
 		if err := runScraper(ctx, args); err != nil {
 			fmt.Printf("Scraping execution error: %s\n", err)
 			os.Exit(1)
 		}
+	} else {
+		flag.Usage()
 	}
 }
 
-func readArguments() (arguments, error) {
-	var args arguments
-	parser, err := arg.NewParser(arg.Config{}, &args)
-	if err != nil {
-		return arguments{}, fmt.Errorf("creating argument parser: %w", err)
-	}
-
-	if err = parser.Parse(os.Args[1:]); err != nil {
-		switch {
-		case errors.Is(err, arg.ErrHelp):
-			parser.WriteHelp(os.Stdout)
-			os.Exit(0)
-		case errors.Is(err, arg.ErrVersion):
-			fmt.Println(args.Version())
-			os.Exit(0)
-		}
-
-		return arguments{}, fmt.Errorf("parsing arguments: %w", err)
-	}
-
-	if len(args.URLs) == 0 && args.Serve == "" {
-		parser.WriteHelp(os.Stdout)
-		os.Exit(0)
-	}
-
-	return args, nil
-}
-
-func buildConfig(args arguments) (*config.Config, error) {
-	if len(args.URLs) == 0 {
-		return nil, nil
-	}
-
+func buildConfig(args Arguments) (*config.Config, error) {
 	var username, password string
 	if args.User != "" {
 		sl := strings.Split(args.User, ":")
@@ -171,7 +184,11 @@ func buildConfig(args arguments) (*config.Config, error) {
 	return &cfg, nil
 }
 
-func runScraper(ctx context.Context, args arguments) error {
+func runScraper(ctx context.Context, args Arguments) error {
+	//if len(args.URLs) == 0 {
+	//	return nil
+	//}
+
 	cfg, err := buildConfig(args)
 	if cfg == nil || err != nil {
 		return err
@@ -227,7 +244,7 @@ func reportHistogram() {
 	}
 }
 
-func runServer(ctx context.Context, args arguments) error {
+func runServer(ctx context.Context, args Arguments) error {
 	var sc *scraper.Scraper
 
 	if args.Origin != "" {
@@ -243,13 +260,13 @@ func runServer(ctx context.Context, args arguments) error {
 		}
 	}
 
-	if err := scraper.ServeDirectory(ctx, args.Serve, args.ServerPort, sc); err != nil {
+	if err := scraper.ServeDirectory(ctx, args.Serve, int16(args.ServerPort), sc); err != nil {
 		return fmt.Errorf("serving directory: %w", err)
 	}
 	return nil
 }
 
-func createLogger(args arguments) *slog.Logger {
+func createLogger(args Arguments) *slog.Logger {
 	opts := &slog.HandlerOptions{}
 
 	if args.Debug {

@@ -3,7 +3,6 @@ module github.com/cornelk/goscrape
 go 1.23
 
 require (
-	github.com/alexflint/go-arg v1.5.1
 	github.com/beevik/etree v1.4.1
 	github.com/gorilla/css v1.0.1
 	github.com/h2non/filetype v1.1.4-0.20231228185113-6469358c2bcb
@@ -16,7 +15,6 @@ require (
 )
 
 require (
-	github.com/alexflint/go-scalar v1.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gammazero/deque v1.0.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect

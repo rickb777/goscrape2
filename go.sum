@@ -1,7 +1,3 @@
-github.com/alexflint/go-arg v1.5.1 h1:nBuWUCpuRy0snAG+uIJ6N0UvYxpxA0/ghA/AaHxlT8Y=
-github.com/alexflint/go-arg v1.5.1/go.mod h1:A7vTJzvjoaSTypg4biM5uYNTkJ27SkNTArtYXnlqVO8=
-github.com/alexflint/go-scalar v1.2.0 h1:WR7JPKkeNpnYIOfHRa7ivM21aWAdHD0gEWHCx+WQBRw=
-github.com/alexflint/go-scalar v1.2.0/go.mod h1:LoFvNMqS1CPrMVltza4LvnGKhaSpc3oyLEBUZVhhS2o=
 github.com/beevik/etree v1.4.1 h1:PmQJDDYahBGNKDcpdX8uPy1xRCwoCGVUiW669MEirVI=
 github.com/beevik/etree v1.4.1/go.mod h1:gPNJNaBGVZ9AwsidazFZyygnd+0pAU38N4D+WemwKNs=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
@@ -26,8 +22,6 @@ github.com/rickb777/acceptable v0.41.0 h1:CoR+jBvA3jo+zneNri5yjNWhNaPPipUSZ8cK4m
 github.com/rickb777/acceptable v0.41.0/go.mod h1:/KkBflODTuQkUC75UUYWWw8tQCU1vvfi7svIqpdZwjM=
 github.com/rickb777/path v1.3.1 h1:U+Ot5Uh6A+1Xf+i7Do5+xbbdIanI3n4HG1uecsYx4RU=
 github.com/rickb777/path v1.3.1/go.mod h1:cxsBIOXR+rZ9vgQQQh/j3vYuNLG/G9gMZIUeNDAM5+k=
-github.com/rickb777/process/v2 v2.0.4 h1:P1844Sbhw0NfJZp0NS7iv4IMRWan8zBG6xKHVKFi/6M=
-github.com/rickb777/process/v2 v2.0.4/go.mod h1:ud+KWheTWt2SdGsDEVRrjJLYdBvr6Y2qRO1yU9SUYLs=
 github.com/rickb777/process/v2 v2.1.0 h1:oKoe9HLKLiJEFhGSg/63oUkVYlbRHRdbtaSj6HF5+QQ=
 github.com/rickb777/process/v2 v2.1.0/go.mod h1:YXs8ktWuMUi5M6X3RxOmAa7VISlrgt1UvUY7ABNAs7w=
 github.com/rickb777/servefiles/v3 v3.9.0 h1:/9qXJQJQmz5Hst7D4tUCevI8kpjk1lCHP597hfD6/tA=
@@ -36,7 +30,6 @@ github.com/rogpeppe/go-internal v1.13.1 h1:KvO1DLK/DRN07sQ1LQKScxyZJuNnedQ5/wKSR
 github.com/rogpeppe/go-internal v1.13.1/go.mod h1:uMEvuHeurkdAXX61udpOXGD/AzZDWNMNyH2VO9fmH0o=
 github.com/spf13/afero v1.11.0 h1:WJQKhtpdm3v2IzqG8VMqrr6Rf3UYpEF239Jy9wNepM8=
 github.com/spf13/afero v1.11.0/go.mod h1:GH9Y3pIexgf1MTIWtNGyogA5MwRIDXGUr+hbWNoBjkY=
-github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
 github.com/stretchr/testify v1.10.0 h1:Xv5erBjTwe/5IxqUQTdXv5kgmIvbHo3QQyRwhJsOfJA=
 github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
 golang.org/x/net v0.31.0 h1:68CPQngjLL0r2AlUKiSxtQFKvzRVbnzLwMUn5SzcLHo=
