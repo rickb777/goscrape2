@@ -19,6 +19,7 @@ func MustParseURL(s string) *url.URL {
 }
 
 func TestShouldURLBeDownloaded(t *testing.T) {
+	setup()
 	startURL := "https://example.org/#fragment"
 
 	stub := &stubclient.Client{}
@@ -40,8 +41,8 @@ func TestShouldURLBeDownloaded(t *testing.T) {
 		expected bool
 	}{
 		{item: MustParseURL("http://example.org/ok/wanted"), expected: true},
-		{item: MustParseURL("http://example.org/ok/toodeep"), depth: 10, expected: false},
-		{item: MustParseURL("http://example.org/oktoodeep"), depth: 11, expected: false},
+		{item: MustParseURL("http://example.org/ok/toodeep"), depth: 11, expected: false},
+		{item: MustParseURL("http://example.org/oktoodeep"), depth: 12, expected: false},
 		{item: MustParseURL("ftp://example.org/ok"), expected: false},
 		{item: MustParseURL("https://example.org/ok/done"), expected: false},
 		{item: MustParseURL("https://other.org/ok"), expected: false},

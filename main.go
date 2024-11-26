@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	urlpkg "net/url"
 	"os"
 	"runtime"
 	"slices"
@@ -21,6 +22,7 @@ import (
 	"github.com/cornelk/goscrape/images"
 	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/goscrape/scraper"
+	"github.com/rickb777/servefiles/v3"
 	"github.com/spf13/afero"
 )
 
@@ -46,7 +48,7 @@ func (i *Strings) Set(value string) error {
 //-------------------------------------------------------------------------------------------------
 
 type Arguments struct {
-	URLs []string
+	URLs []*urlpkg.URL
 
 	Include   Strings
 	Exclude   Strings
@@ -83,11 +85,11 @@ func declareFlags() Arguments {
 	flag.StringVar(&arguments.Directory, "d", "", "`directory` to write files to and to serve files from")
 
 	flag.IntVar(&arguments.Concurrency, "concurrency", 1, "the number of concurrent downloads")
-	flag.IntVar(&arguments.Depth, "depth", 0, "download depth limit, 0 for unlimited")
-	flag.IntVar(&arguments.ImageQuality, "imagequality", 0, "image quality reduction, 0 to disable re-encoding, maximum 99")
+	flag.IntVar(&arguments.Depth, "depth", 0, "download depth limit (default unlimited)")
+	flag.IntVar(&arguments.ImageQuality, "imagequality", 0, "image quality reduction, minimum 1 to maximum 99 (re-encoding disabled by default)")
 	flag.DurationVar(&arguments.Timeout, "timeout", 0, "time limit (with units, e.g. 1s) for each HTTP request to connect and read the response")
 	flag.DurationVar(&arguments.LoopDelay, "loopdelay", 0, "delay (with units, e.g. 1s) used between any two downloads")
-	flag.DurationVar(&arguments.LaxAge, "laxage", 0, "adds to the 'expires' timestamp specified by the origin server, or creates one if absent; if the origin is too conservative, this helps when doing successive runs; a negative value causes revalidation")
+	flag.DurationVar(&arguments.LaxAge, "laxage", 0, "adds to the 'expires' timestamp specified by the origin server, or creates one if absent; if the origin is too conservative, this helps when doing successive runs; a negative value causes revalidation instead")
 	flag.IntVar(&arguments.Tries, "tries", 1, "the number of tries to download each file if the server gives a 5xx error")
 
 	flag.BoolVar(&arguments.Serve, "serve", false, "serve the website using a webserver; scraping will only happen on demand")
@@ -105,7 +107,6 @@ func declareFlags() Arguments {
 	flag.BoolVar(&arguments.Debug, "z", false, "debug output")
 
 	flag.Parse()
-	arguments.URLs = flag.Args()
 
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Scrape a website and create an offline browsable version on the disk.\n\n")
@@ -121,6 +122,13 @@ func declareFlags() Arguments {
 
 func main() {
 	args := declareFlags()
+
+	var err error
+	args.URLs, err = parseAll(flag.Args())
+	if err != nil {
+		fmt.Printf("Invalid URL: %s\n", err)
+		os.Exit(1)
+	}
 
 	ctx := context.Background()
 	//ctx := app.Context() // provides signal handler cancellation
@@ -154,6 +162,17 @@ func main() {
 	} else {
 		flag.Usage()
 	}
+}
+
+func parseAll(urls []string) (list []*urlpkg.URL, err error) {
+	list = make([]*urlpkg.URL, len(urls))
+	for i, url := range urls {
+		list[i], err = urlpkg.Parse(url)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return list, nil
 }
 
 func buildConfig(args Arguments) (*config.Config, error) {
@@ -201,12 +220,12 @@ func buildConfig(args Arguments) (*config.Config, error) {
 	return &cfg, nil
 }
 
-func scrapeURLs(ctx context.Context, fs afero.Fs, cfg config.Config, saveCookieFile string, urls []string) error {
+func scrapeURLs(ctx context.Context, fs afero.Fs, cfg config.Config, saveCookieFile string, urls []*urlpkg.URL) error {
 	etagStore := db.Open()
 	defer etagStore.Close()
 
 	for _, url := range urls {
-		sc, err := scraper.New(cfg, url, fs)
+		sc, err := scraper.New(cfg, url, afero.NewBasePathFs(fs, cfg.Directory))
 		if err != nil {
 			return fmt.Errorf("initializing scraper: %w", err)
 		}
@@ -246,24 +265,26 @@ func runServer(ctx context.Context, fs afero.Fs, cfg config.Config, args Argumen
 	var sc *scraper.Scraper
 
 	if len(args.URLs) > 0 {
+		url := args.URLs[0]
 		var err error
-		sc, err = scraper.New(cfg, args.URLs[0], fs)
+		sc, err = scraper.New(cfg, url, afero.NewBasePathFs(fs, cfg.Directory))
 		if err != nil {
-			return fmt.Errorf("serving directory for %s: %w", args.URLs[0], err)
+			return fmt.Errorf("serving directory for %s: %w", url, err)
 		}
 	}
 
-	if err := scraper.ServeDirectory(ctx, args.Directory, int16(args.ServerPort), sc); err != nil {
+	if err := scraper.ServeDirectory(ctx, cfg.Directory, int16(args.ServerPort), sc); err != nil {
 		return fmt.Errorf("serving directory: %w", err)
 	}
 	return nil
 }
 
 func createLogger(args Arguments) *slog.Logger {
-	opts := &slog.HandlerOptions{}
+	opts := &slog.HandlerOptions{Level: slog.LevelWarn}
 
 	if args.Debug {
 		opts.Level = slog.LevelDebug
+		servefiles.Debugf = func(format string, v ...interface{}) { logger.Debug(fmt.Sprintf(format, v...)) }
 	} else if args.Verbose {
 		opts.Level = slog.LevelInfo
 	} else {

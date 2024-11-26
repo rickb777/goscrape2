@@ -192,14 +192,14 @@ func (d *Download) other200(item work.Item, resp *http.Response, lastModified ti
 // storeDownload writes the download to a file, if a known binary file is detected,
 // processing of the file as page to look for links is skipped.
 func (d *Download) storeDownload(u *url.URL, data io.Reader, lastModified time.Time, isAPage bool) (fileSize int64) {
-	filePath := mapping.GetFilePath(u, d.StartURL, d.Config.Directory, isAPage)
+	filePath := mapping.GetFilePath(u, isAPage)
 
 	if !isAPage && ioutil.FileExists(d.Fs, filePath) {
 		return 0
 	}
 
 	var err error
-	if fileSize, err = ioutil.WriteFileAtomically(d.Fs, d.StartURL, filePath, data); err != nil {
+	if fileSize, err = ioutil.WriteFileAtomically(d.Fs, filePath, data); err != nil {
 		logger.Error("Writing to file failed",
 			slog.String("URL", u.String()),
 			slog.String("file", filePath),

@@ -28,7 +28,7 @@ func (sc *Scraper) shouldURLBeDownloaded(item *url.URL, depth int) bool {
 		return false
 	}
 
-	if depth >= sc.config.MaxDepth {
+	if depth > sc.config.MaxDepth {
 		return false
 	}
 

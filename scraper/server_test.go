@@ -2,16 +2,34 @@ package scraper
 
 import (
 	"context"
+	"fmt"
+	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/goscrape/stubclient"
+	"github.com/rickb777/servefiles/v3"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"log/slog"
 	"net/http"
+	"os"
+	"sync"
 	"testing"
 	"time"
 )
 
+func setup() {
+	if testing.Verbose() {
+		sync.OnceFunc(func() {
+			opts := &slog.HandlerOptions{Level: slog.LevelWarn}
+			opts.Level = slog.LevelDebug
+			servefiles.Debugf = func(format string, v ...interface{}) { logger.Debug(fmt.Sprintf(format, v...)) }
+			logger.Logger = slog.New(slog.NewTextHandler(os.Stdout, opts))
+		})
+	}
+}
+
 func TestServeDirectory(t *testing.T) {
+	setup()
 	startURL := "https://example.org/"
 
 	stub := &stubclient.Client{}
@@ -29,6 +47,7 @@ func TestServeDirectory(t *testing.T) {
 }
 
 func TestWebserver(t *testing.T) {
+	setup()
 	indexPage := `
 <html>
 <head>
@@ -73,22 +92,18 @@ It's here!
 	startURL := "https://example.org/"
 
 	originStub := &stubclient.Client{}
-	//originStub.GivenResponse(http.StatusOK, "https://example.org/", "text/html", indexPage)
-	//originStub.GivenResponse(http.StatusOK, "https://example.org/page2/", "text/html", page2)
-	//originStub.GivenResponse(http.StatusOK, "https://example.org/sub/", "text/html", subPage)
-	//originStub.GivenResponse(http.StatusOK, "https://example.org/style.css", "text/css", "")
 	originStub.GivenResponse(http.StatusOK, "https://example.org/missing.html", "text/html", missing)
 
 	scraper := newTestScraper(t, startURL, originStub)
 	require.NotNil(t, scraper)
 
-	fs := afero.NewMemMapFs()
-	writeFile(fs, "index.html", indexPage)
-	writeFile(fs, "page2/index.html", page2)
-	writeFile(fs, "sub/index.html", subPage)
-	writeFile(fs, "style.css", "{}")
+	scraper.fs = afero.NewMemMapFs()
+	writeFile(scraper.fs, "example.org/index.html", indexPage)
+	writeFile(scraper.fs, "example.org/page2/index.html", page2)
+	writeFile(scraper.fs, "example.org/sub/index.html", subPage)
+	writeFile(scraper.fs, "example.org/style.css", "{}")
 
-	server, err := newWebserver(fs, 14141, scraper)
+	server, err := newWebserver(14141, nil, scraper)
 	require.NoError(t, err)
 	require.NotNil(t, server)
 
@@ -103,15 +118,15 @@ It's here!
 
 	resp, err := c.Get("http://localhost:14141/")
 	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, http.StatusOK, resp.StatusCode, "/")
 
-	//resp, err = c.Get("http://localhost:14141/page2/")
-	//require.NoError(t, err)
-	//assert.Equal(t, http.StatusOK, resp.StatusCode)
+	resp, err = c.Get("http://localhost:14141/page2/")
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode, "/page2/")
 
 	resp, err = c.Get("http://localhost:14141/missing.html")
 	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, http.StatusOK, resp.StatusCode, "/missing.html")
 
 	err = server.Shutdown(context.Background())
 	require.NoError(t, err)

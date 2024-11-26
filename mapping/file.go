@@ -6,29 +6,21 @@ import (
 )
 
 const (
-	// PageExtension is the file extension that downloaded pages get.
-	PageExtension = ".html"
+	// HTMLExtension is the file extension that downloaded pages get.
+	HTMLExtension = ".html"
 
 	// PageDirIndex is the file name of the index file for every dir.
-	PageDirIndex = "index" + PageExtension
-
-	// externalDomainPrefix _ is a prefix for external domains on the filesystem
-	externalDomainPrefix = "_"
+	PageDirIndex = "index" + HTMLExtension
 )
 
 // GetFilePath returns a file path for a URL to store the URL content in.
-func GetFilePath(url, startURL *url.URL, outputDirectory string, isAPage bool) string {
-	fileName := url.Path
+func GetFilePath(url *url.URL, isAPage bool) string {
 	if isAPage {
-		fileName = GetPageFilePath(url)
+		fileName := GetPageFilePath(url)
+		return "." + fileName
+	} else {
+		return "." + url.Path
 	}
-
-	var externalHost string
-	if url.Host != startURL.Host {
-		externalHost = externalDomainPrefix + url.Host
-	}
-
-	return filepath.Join(outputDirectory, startURL.Host, externalHost, fileName)
 }
 
 // GetPageFilePath returns a filename for a URL that represents a page.
@@ -38,7 +30,7 @@ func GetPageFilePath(url *url.URL) string {
 	// root of domain will be index.html
 	switch {
 	case fileName == "" || fileName == "/":
-		fileName = PageDirIndex
+		fileName = "/" + PageDirIndex
 		// directory index will be index.html in the directory
 
 	case fileName[len(fileName)-1] == '/':
@@ -48,7 +40,7 @@ func GetPageFilePath(url *url.URL) string {
 		ext := filepath.Ext(fileName)
 		// if file extension is missing add .html, otherwise keep the existing file extension
 		if ext == "" {
-			fileName += PageExtension
+			fileName += HTMLExtension
 		}
 	}
 

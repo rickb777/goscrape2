@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/cornelk/goscrape/download/throttle"
 	"log/slog"
 	"net/http"
 	"net/http/cookiejar"
@@ -15,7 +14,7 @@ import (
 	"github.com/cornelk/goscrape/config"
 	"github.com/cornelk/goscrape/db"
 	"github.com/cornelk/goscrape/download"
-	"github.com/cornelk/goscrape/download/ioutil"
+	"github.com/cornelk/goscrape/download/throttle"
 	"github.com/cornelk/goscrape/filter"
 	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/goscrape/utc"
@@ -50,14 +49,10 @@ type Scraper struct {
 
 // New creates a new Scraper instance.
 // nolint: funlen
-func New(cfg config.Config, url string, fs afero.Fs) (*Scraper, error) {
+func New(cfg config.Config, url *urlpkg.URL, fs afero.Fs) (*Scraper, error) {
 	var errs []error
 
-	u, err := urlpkg.Parse(url)
-	if err != nil {
-		errs = append(errs, err)
-	}
-	u.Fragment = ""
+	url.Fragment = ""
 
 	includes, err := filter.New(cfg.Includes)
 	if err != nil {
@@ -78,11 +73,11 @@ func New(cfg config.Config, url string, fs afero.Fs) (*Scraper, error) {
 		return nil, errors.Join(errs...)
 	}
 
-	if u.Scheme == "" {
-		u.Scheme = "http" // if no URL scheme was given default to http
+	if url.Scheme == "" {
+		url.Scheme = "http" // if no URL scheme was given default to http
 	}
 
-	cookies, err := createCookieJar(u, cfg.Cookies)
+	cookies, err := createCookieJar(url, cfg.Cookies)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +106,7 @@ func New(cfg config.Config, url string, fs afero.Fs) (*Scraper, error) {
 	s := &Scraper{
 		config:  cfg,
 		cookies: cookies,
-		URL:     u,
+		URL:     url,
 
 		client: client,
 		fs:     fs, // filesystem can be replaced with in-memory filesystem for testing
@@ -141,7 +136,7 @@ func (sc *Scraper) Downloader() *download.Download {
 		StartURL:  sc.URL,
 		Auth:      sc.auth,
 		Client:    sc.client,
-		Fs:        sc.fs,
+		Fs:        afero.NewBasePathFs(sc.fs, sc.URL.Host),
 		Lockdown:  throttle.New(0, 10*time.Second, 2*time.Second),
 		LoopDelay: throttle.New(sc.config.LoopDelay, time.Millisecond, time.Millisecond/2),
 	}
@@ -151,11 +146,6 @@ func (sc *Scraper) Downloader() *download.Download {
 
 // Start starts the scraping.
 func (sc *Scraper) Start(ctx context.Context) error {
-	err := ioutil.CreateDirectory(sc.fs, sc.config.Directory)
-	if err != nil {
-		return err
-	}
-
 	d := sc.Downloader()
 
 	firstItem := work.Item{URL: sc.URL}

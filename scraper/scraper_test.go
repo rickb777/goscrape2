@@ -17,11 +17,12 @@ import (
 )
 
 func newTestScraper(t *testing.T, startURL string, stub *stubclient.Client) *Scraper {
+	setup()
 	t.Helper()
 
 	logger.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	cfg := config.Config{MaxDepth: 10}
-	scraper, err := New(cfg, startURL, afero.NewMemMapFs())
+	scraper, err := New(cfg, MustParseURL(startURL), afero.NewMemMapFs())
 	require.NoError(t, err)
 	require.NotNil(t, scraper)
 

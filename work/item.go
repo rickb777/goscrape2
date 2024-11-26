@@ -13,6 +13,7 @@ type Item struct {
 	StartTime time.Time
 	Referrer  *url.URL
 	Depth     int
+	FilePath  string // returned when the item is processed
 }
 
 func (it Item) String() string {

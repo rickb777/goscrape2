@@ -6,7 +6,6 @@ import (
 	"io"
 	"log/slog"
 	"math/rand/v2"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -35,11 +34,8 @@ func CreateDirectory(fs afero.Fs, path string) error {
 	return nil
 }
 
-func WriteFileAtomically(fs afero.Fs, startURL *url.URL, filePath string, data io.Reader) (int64, error) {
+func WriteFileAtomically(fs afero.Fs, filePath string, data io.Reader) (int64, error) {
 	dir := filepath.Dir(filePath)
-	if len(dir) < len(startURL.Host) { // nothing to append if it is the root dir
-		dir = filepath.Join(".", startURL.Host, dir)
-	}
 
 	if err := CreateDirectory(fs, dir); err != nil {
 		return 0, err
@@ -71,33 +67,7 @@ func WriteFileAtomically(fs afero.Fs, startURL *url.URL, filePath string, data i
 	return length, nil
 }
 
-//func OpenFile(fs afero.Fs, startURL *url.URL, filePath string) (io.ReadCloser, error) {
-//	dir := filepath.Dir(filePath)
-//	if len(dir) < len(startURL.Host) { // nothing to append if it is the root dir
-//		dir = filepath.Join(".", startURL.Host, dir)
-//	}
-//
-//	f, err := fs.Open(filePath)
-//	if err != nil {
-//		return nil, fmt.Errorf("reading file '%s': %w", filePath, err)
-//	}
-//
-//	data := &bytes.Buffer{}
-//	if _, err = io.Copy(data, f); err != nil {
-//		// nolint: wrapcheck
-//		_ = f.Close() // try to close and remove file but return the first error
-//		return nil, fmt.Errorf("reading from  file: %w", err)
-//	}
-//
-//	return f, nil
-//}
-
-func ReadFile(fs afero.Fs, startURL *url.URL, filePath string) ([]byte, error) {
-	dir := filepath.Dir(filePath)
-	if len(dir) < len(startURL.Host) { // nothing to append if it is the root dir
-		dir = filepath.Join(".", startURL.Host, dir)
-	}
-
+func ReadFile(fs afero.Fs, filePath string) ([]byte, error) {
 	f, err := fs.Open(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("reading file '%s': %w", filePath, err)
