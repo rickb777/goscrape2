@@ -42,7 +42,7 @@ func (d *Download) response304(item work.Item, resp *http.Response) (*url.URL, *
 func (d *Download) html304(item work.Item, resp *http.Response) (*url.URL, *work.Result, error) {
 	var references work.Refs
 
-	filePath := mapping.GetFilePath(item.URL, d.StartURL, d.Config.OutputDirectory, true)
+	filePath := mapping.GetFilePath(item.URL, d.StartURL, d.Config.Directory, true)
 	data, err := ioutil.ReadFile(d.Fs, d.StartURL, filePath)
 	if err != nil {
 		logger.Debug("absent HTML file", slog.Any("error", err))
@@ -68,7 +68,7 @@ func (d *Download) html304(item work.Item, resp *http.Response) (*url.URL, *work
 
 func (d *Download) css304(item work.Item, statusCode int) (*url.URL, *work.Result, error) {
 	var references work.Refs
-	filePath := mapping.GetFilePath(item.URL, d.StartURL, d.Config.OutputDirectory, false)
+	filePath := mapping.GetFilePath(item.URL, d.StartURL, d.Config.Directory, false)
 	data, err := ioutil.ReadFile(d.Fs, d.StartURL, filePath)
 	if err != nil {
 		logger.Debug("absent CSS file", slog.Any("error", err))

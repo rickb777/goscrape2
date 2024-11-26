@@ -22,9 +22,9 @@ type Config struct {
 	LaxAge       time.Duration       // added to origin server's expires timestamp
 	Tries        int                 // download attempts, 0 for unlimited
 
-	OutputDirectory string
-	Username        string
-	Password        string
+	Directory string
+	Username  string
+	Password  string
 
 	Cookies   []Cookie
 	Header    http.Header

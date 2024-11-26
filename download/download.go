@@ -42,7 +42,7 @@ type Download struct {
 func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *work.Result, error) {
 	var existingModified time.Time
 
-	filePath := mapping.GetFilePath(item.URL, d.StartURL, d.Config.OutputDirectory, true)
+	filePath := mapping.GetFilePath(item.URL, d.StartURL, d.Config.Directory, true)
 	if ioutil.FileExists(d.Fs, filePath) {
 		fileInfo, err := d.Fs.Stat(filePath)
 		if err == nil && fileInfo != nil {
@@ -105,7 +105,7 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 
 // responseGone deletes obsolete/inaccessible files
 func (d *Download) responseGone(item work.Item, resp *http.Response) (*url.URL, *work.Result, error) {
-	filePath := mapping.GetFilePath(item.URL, d.StartURL, d.Config.OutputDirectory, true)
+	filePath := mapping.GetFilePath(item.URL, d.StartURL, d.Config.Directory, true)
 	_ = d.Fs.Remove(filePath)
 	return item.URL, &work.Result{Item: item, StatusCode: resp.StatusCode}, nil
 }

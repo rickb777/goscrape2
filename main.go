@@ -43,12 +43,14 @@ func (i *Strings) Set(value string) error {
 	return nil
 }
 
+//-------------------------------------------------------------------------------------------------
+
 type Arguments struct {
 	URLs []string
 
-	Include Strings
-	Exclude Strings
-	Output  string
+	Include   Strings
+	Exclude   Strings
+	Directory string
 
 	Concurrency  int
 	Depth        int
@@ -58,8 +60,7 @@ type Arguments struct {
 	LaxAge       time.Duration
 	Tries        int
 
-	Serve      string
-	Origin     string
+	Serve      bool
 	ServerPort int
 
 	CookieFile     string
@@ -77,9 +78,9 @@ type Arguments struct {
 func declareFlags() Arguments {
 	var arguments Arguments
 
-	flag.Var(&arguments.Include, "i", "only include URLs that match a regular expression (can be repeated)")
-	flag.Var(&arguments.Exclude, "x", "exclude URLs that match a regular expression (can be repeated)")
-	flag.StringVar(&arguments.Output, "o", "", "output `directory` to write files to")
+	flag.Var(&arguments.Include, "i", "only include URLs that match a `regular expression` (can be repeated)")
+	flag.Var(&arguments.Exclude, "x", "exclude URLs that match a `regular expression` (can be repeated)")
+	flag.StringVar(&arguments.Directory, "d", "", "`directory` to write files to and to serve files from")
 
 	flag.IntVar(&arguments.Concurrency, "concurrency", 1, "the number of concurrent downloads")
 	flag.IntVar(&arguments.Depth, "depth", 0, "download depth limit, 0 for unlimited")
@@ -89,14 +90,13 @@ func declareFlags() Arguments {
 	flag.DurationVar(&arguments.LaxAge, "laxage", 0, "adds to the 'expires' timestamp specified by the origin server, or creates one if absent; if the origin is too conservative, this helps when doing successive runs; a negative value causes revalidation")
 	flag.IntVar(&arguments.Tries, "tries", 1, "the number of tries to download each file if the server gives a 5xx error")
 
-	flag.StringVar(&arguments.Serve, "serve", "", "serve the website using a webserver rooted at the specified path; this disables scraping")
-	flag.StringVar(&arguments.Origin, "origin", "", "set the origin server used when serving the website (optional)")
+	flag.BoolVar(&arguments.Serve, "serve", false, "serve the website using a webserver; scraping will only happen on demand")
 	flag.IntVar(&arguments.ServerPort, "port", 8080, "port to use for the webserver")
 
 	flag.StringVar(&arguments.CookieFile, "cookies", "", "file containing the cookie content")
 	flag.StringVar(&arguments.SaveCookieFile, "savecookiefile", "", "file to save the cookie content")
 
-	flag.Var(&arguments.Headers, "header", "HTTP header to use for scraping (can be repeated)")
+	flag.Var(&arguments.Headers, "H", "\"name:value\" HTTP header to use for scraping (can be repeated)")
 	flag.StringVar(&arguments.Proxy, "proxy", "", "HTTP proxy to use for scraping")
 	flag.StringVar(&arguments.User, "user", "", "user[:password] to use for HTTP authentication")
 	flag.StringVar(&arguments.UserAgent, "useragent", "", "user agent to use for scraping")
@@ -109,12 +109,15 @@ func declareFlags() Arguments {
 
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Scrape a website and create an offline browsable version on the disk.\n\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0])
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage:\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "  %s [options] <url> ...\n\n", os.Args[0])
 		flag.PrintDefaults()
-		fmt.Fprintf(flag.CommandLine.Output(), "\nVersion %s\n", formatVersion(version, commit, date))
+		fmt.Fprintf(flag.CommandLine.Output(), "\nOptions also accept '--'.\nVersion %s\n", formatVersion(version, commit, date))
 	}
 	return arguments
 }
+
+//-------------------------------------------------------------------------------------------------
 
 func main() {
 	args := declareFlags()
@@ -124,16 +127,30 @@ func main() {
 
 	logger.Logger = createLogger(args)
 
-	if args.Serve != "" {
-		if err := runServer(ctx, args); err != nil {
+	cfg, err := buildConfig(args)
+	if err != nil {
+		fmt.Printf("Config error: %s\n", err)
+		os.Exit(1)
+	}
+
+	fs := afero.NewOsFs()
+
+	if !ioutil.FileExists(fs, cfg.Directory) {
+		db.DeleteFile(fs) // get rid of stale cache
+	}
+
+	if args.Serve {
+		if err := runServer(ctx, fs, *cfg, args); err != nil {
 			fmt.Printf("Server execution error: %s\n", err)
 			os.Exit(1)
 		}
+
 	} else if len(args.URLs) > 0 {
-		if err := runScraper(ctx, args); err != nil {
+		if err := scrapeURLs(ctx, fs, *cfg, args.SaveCookieFile, args.URLs); err != nil {
 			fmt.Printf("Scraping execution error: %s\n", err)
 			os.Exit(1)
 		}
+
 	} else {
 		flag.Usage()
 	}
@@ -163,17 +180,17 @@ func buildConfig(args Arguments) (*config.Config, error) {
 		Includes: args.Include,
 		Excludes: args.Exclude,
 
-		Concurrency:  int(args.Concurrency),
-		MaxDepth:     int(args.Depth),
+		Concurrency:  args.Concurrency,
+		MaxDepth:     args.Depth,
 		ImageQuality: images.ImageQuality(imageQuality),
 		Timeout:      args.Timeout,
 		LoopDelay:    args.LoopDelay,
 		LaxAge:       args.LaxAge,
-		Tries:        int(args.Tries),
+		Tries:        args.Tries,
 
-		OutputDirectory: args.Output,
-		Username:        username,
-		Password:        password,
+		Directory: args.Directory,
+		Username:  username,
+		Password:  password,
 
 		Cookies:   cookies,
 		Header:    config.MakeHeaders(args.Headers),
@@ -182,25 +199,6 @@ func buildConfig(args Arguments) (*config.Config, error) {
 	}
 
 	return &cfg, nil
-}
-
-func runScraper(ctx context.Context, args Arguments) error {
-	//if len(args.URLs) == 0 {
-	//	return nil
-	//}
-
-	cfg, err := buildConfig(args)
-	if cfg == nil || err != nil {
-		return err
-	}
-
-	fs := afero.NewOsFs()
-
-	if !ioutil.FileExists(fs, cfg.OutputDirectory) {
-		db.DeleteFile(fs) // get rid of stale cache
-	}
-
-	return scrapeURLs(ctx, fs, *cfg, args.SaveCookieFile, args.URLs)
 }
 
 func scrapeURLs(ctx context.Context, fs afero.Fs, cfg config.Config, saveCookieFile string, urls []string) error {
@@ -244,23 +242,18 @@ func reportHistogram() {
 	}
 }
 
-func runServer(ctx context.Context, args Arguments) error {
+func runServer(ctx context.Context, fs afero.Fs, cfg config.Config, args Arguments) error {
 	var sc *scraper.Scraper
 
-	if args.Origin != "" {
-		cfg, err := buildConfig(args)
-		if cfg == nil || err != nil {
-			return err
-		}
-
-		fs := afero.NewOsFs()
-		sc, err = scraper.New(*cfg, args.Origin, fs)
-		if err == nil {
-			return fmt.Errorf("serving directory for %s: %w", args.Origin, err)
+	if len(args.URLs) > 0 {
+		var err error
+		sc, err = scraper.New(cfg, args.URLs[0], fs)
+		if err != nil {
+			return fmt.Errorf("serving directory for %s: %w", args.URLs[0], err)
 		}
 	}
 
-	if err := scraper.ServeDirectory(ctx, args.Serve, int16(args.ServerPort), sc); err != nil {
+	if err := scraper.ServeDirectory(ctx, args.Directory, int16(args.ServerPort), sc); err != nil {
 		return fmt.Errorf("serving directory: %w", err)
 	}
 	return nil

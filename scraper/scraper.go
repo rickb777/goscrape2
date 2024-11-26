@@ -151,7 +151,7 @@ func (sc *Scraper) Downloader() *download.Download {
 
 // Start starts the scraping.
 func (sc *Scraper) Start(ctx context.Context) error {
-	err := ioutil.CreateDirectory(sc.fs, sc.config.OutputDirectory)
+	err := ioutil.CreateDirectory(sc.fs, sc.config.Directory)
 	if err != nil {
 		return err
 	}
