@@ -41,8 +41,10 @@ func TestShouldURLBeDownloaded(t *testing.T) {
 		expected bool
 	}{
 		{item: MustParseURL("http://example.org/ok/wanted"), expected: true},
+		{item: MustParseURL("http://example.org/ok/nottoodeep"), depth: 10, expected: true},
 		{item: MustParseURL("http://example.org/ok/toodeep"), depth: 11, expected: false},
 		{item: MustParseURL("http://example.org/oktoodeep"), depth: 12, expected: false},
+		{item: MustParseURL("http://example.org/other"), depth: 1, expected: false},
 		{item: MustParseURL("ftp://example.org/ok"), expected: false},
 		{item: MustParseURL("https://example.org/ok/done"), expected: false},
 		{item: MustParseURL("https://other.org/ok"), expected: false},

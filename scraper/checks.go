@@ -32,11 +32,11 @@ func (sc *Scraper) shouldURLBeDownloaded(item *url.URL, depth int) bool {
 		return false
 	}
 
-	if sc.includes != nil && !sc.includes.Matches(item, "Including URL") {
+	if sc.includes.Present() && !sc.includes.Matches(item, "Including URL") {
 		return false
 	}
 
-	if sc.excludes != nil && sc.excludes.Matches(item, "Skipping URL") {
+	if sc.excludes.Present() && sc.excludes.Matches(item, "Skipping URL") {
 		return false
 	}
 
@@ -44,7 +44,8 @@ func (sc *Scraper) shouldURLBeDownloaded(item *url.URL, depth int) bool {
 }
 
 func (sc *Scraper) partitionResult(result *work.Result, depth int) {
-	var included []*url.URL
+	included := make([]*url.URL, 0, len(result.References))
+
 	for _, ref := range result.References {
 		if sc.shouldURLBeDownloaded(ref, depth) {
 			included = append(included, ref)
@@ -52,5 +53,6 @@ func (sc *Scraper) partitionResult(result *work.Result, depth int) {
 			result.Excluded = append(result.Excluded, ref)
 		}
 	}
+
 	result.References = included
 }

@@ -30,6 +30,10 @@ func New(regexps []string) ([]*regexp.Regexp, error) {
 	return compiled, nil
 }
 
+func (filter Filter) Present() bool {
+	return len(filter) > 0
+}
+
 func (filter Filter) Matches(url *url.URL, intent string) bool {
 	for _, re := range filter {
 		if re.MatchString(url.Path) {
@@ -39,5 +43,6 @@ func (filter Filter) Matches(url *url.URL, intent string) bool {
 			return true
 		}
 	}
+
 	return false
 }

@@ -133,6 +133,11 @@ func main() {
 	ctx := context.Background()
 	//ctx := app.Context() // provides signal handler cancellation
 
+	if !args.Serve || len(args.URLs) == 0 {
+		flag.Usage()
+		os.Exit(0)
+	}
+
 	logger.Logger = createLogger(args)
 
 	cfg, err := buildConfig(args)
@@ -147,20 +152,18 @@ func main() {
 		db.DeleteFile(fs) // get rid of stale cache
 	}
 
-	if args.Serve {
-		if err := runServer(ctx, fs, *cfg, args); err != nil {
-			fmt.Printf("Server execution error: %s\n", err)
-			os.Exit(1)
-		}
-
-	} else if len(args.URLs) > 0 {
+	if len(args.URLs) > 0 {
 		if err := scrapeURLs(ctx, fs, *cfg, args.SaveCookieFile, args.URLs); err != nil {
 			fmt.Printf("Scraping execution error: %s\n", err)
 			os.Exit(1)
 		}
+	}
 
-	} else {
-		flag.Usage()
+	if args.Serve {
+		if err := runServer(ctx, fs, *cfg, args.ServerPort, args.URLs); err != nil {
+			fmt.Printf("Server execution error: %s\n", err)
+			os.Exit(1)
+		}
 	}
 }
 
@@ -261,11 +264,11 @@ func reportHistogram() {
 	}
 }
 
-func runServer(ctx context.Context, fs afero.Fs, cfg config.Config, args Arguments) error {
+func runServer(ctx context.Context, fs afero.Fs, cfg config.Config, serverPort int, urls []*urlpkg.URL) error {
 	var sc *scraper.Scraper
 
-	if len(args.URLs) > 0 {
-		url := args.URLs[0]
+	if len(urls) > 0 {
+		url := urls[0]
 		var err error
 		sc, err = scraper.New(cfg, url, afero.NewBasePathFs(fs, cfg.Directory))
 		if err != nil {
@@ -273,7 +276,7 @@ func runServer(ctx context.Context, fs afero.Fs, cfg config.Config, args Argumen
 		}
 	}
 
-	if err := scraper.ServeDirectory(ctx, cfg.Directory, int16(args.ServerPort), sc); err != nil {
+	if err := scraper.ServeDirectory(ctx, cfg.Directory, int16(serverPort), sc); err != nil {
 		return fmt.Errorf("serving directory: %w", err)
 	}
 	return nil

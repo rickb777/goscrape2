@@ -39,6 +39,8 @@ func (h *onDemand) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+//-------------------------------------------------------------------------------------------------
+
 func ServeDirectory(ctx context.Context, path string, port int16, sc *Scraper) error {
 	var fs afero.Fs
 	if sc == nil {
