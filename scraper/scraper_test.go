@@ -2,14 +2,11 @@ package scraper
 
 import (
 	"context"
-	"io"
-	"log/slog"
 	"net/http"
 	"slices"
 	"testing"
 
 	"github.com/cornelk/goscrape/config"
-	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/goscrape/stubclient"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -20,15 +17,13 @@ func newTestScraper(t *testing.T, startURL string, stub *stubclient.Client) *Scr
 	setup()
 	t.Helper()
 
-	logger.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	cfg := config.Config{MaxDepth: 10}
-	scraper, err := New(cfg, MustParseURL(startURL), afero.NewMemMapFs())
+	sc, err := New(cfg, mustParseURL(startURL), afero.NewMemMapFs())
 	require.NoError(t, err)
-	require.NotNil(t, scraper)
+	require.NotNil(t, sc)
 
-	scraper.client = stub
-
-	return scraper
+	sc.Client = stub
+	return sc
 }
 
 func TestScraperLinks(t *testing.T) {
@@ -56,15 +51,13 @@ func TestScraperLinks(t *testing.T) {
 </html>
 `
 
-	startURL := "https://example.org/#fragment" // start page with fragment
-
 	stub := &stubclient.Client{}
 	stub.GivenResponse(http.StatusOK, "https://example.org/", "text/html", indexPage)
 	stub.GivenResponse(http.StatusOK, "https://example.org/page2", "text/html", page2)
 	stub.GivenResponse(http.StatusOK, "https://example.org/sub/", "text/html", indexPage)
 	stub.GivenResponse(http.StatusOK, "https://example.org/style.css", "text/css", "")
 
-	scraper := newTestScraper(t, startURL, stub)
+	scraper := newTestScraper(t, "https://example.org/#fragment", stub)
 	require.NotNil(t, scraper)
 
 	ctx := context.Background()

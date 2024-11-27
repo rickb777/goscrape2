@@ -1,21 +1,41 @@
 package scraper
 
 import (
+	"fmt"
 	"github.com/cornelk/goscrape/filter"
+	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/goscrape/stubclient"
+	"github.com/rickb777/servefiles/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
+	"sync"
 	"testing"
 )
 
-func MustParseURL(s string) *url.URL {
+func mustParseURL(s string) *url.URL {
 	u, e := url.Parse(s)
 	if e != nil {
 		panic(e)
 	}
 	return u
+}
+
+func setup() {
+	sync.OnceFunc(func() {
+		if testing.Verbose() {
+			opts := &slog.HandlerOptions{Level: slog.LevelWarn}
+			opts.Level = slog.LevelDebug
+			servefiles.Debugf = func(format string, v ...interface{}) { logger.Debug(fmt.Sprintf(format, v...)) }
+			logger.Logger = slog.New(slog.NewTextHandler(os.Stdout, opts))
+		} else {
+			logger.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+		}
+	})
 }
 
 func TestShouldURLBeDownloaded(t *testing.T) {
@@ -40,15 +60,15 @@ func TestShouldURLBeDownloaded(t *testing.T) {
 		depth    int
 		expected bool
 	}{
-		{item: MustParseURL("http://example.org/ok/wanted"), expected: true},
-		{item: MustParseURL("http://example.org/ok/nottoodeep"), depth: 10, expected: true},
-		{item: MustParseURL("http://example.org/ok/toodeep"), depth: 11, expected: false},
-		{item: MustParseURL("http://example.org/oktoodeep"), depth: 12, expected: false},
-		{item: MustParseURL("http://example.org/other"), depth: 1, expected: false},
-		{item: MustParseURL("ftp://example.org/ok"), expected: false},
-		{item: MustParseURL("https://example.org/ok/done"), expected: false},
-		{item: MustParseURL("https://other.org/ok"), expected: false},
-		{item: MustParseURL("https://example.org/ok/bad"), expected: false},
+		{item: mustParseURL("http://example.org/ok/wanted"), expected: true},
+		{item: mustParseURL("http://example.org/ok/nottoodeep"), depth: 10, expected: true},
+		{item: mustParseURL("http://example.org/ok/toodeep"), depth: 11, expected: false},
+		{item: mustParseURL("http://example.org/oktoodeep"), depth: 12, expected: false},
+		{item: mustParseURL("http://example.org/other"), depth: 1, expected: false},
+		{item: mustParseURL("ftp://example.org/ok"), expected: false},
+		{item: mustParseURL("https://example.org/ok/done"), expected: false},
+		{item: mustParseURL("https://other.org/ok"), expected: false},
+		{item: mustParseURL("https://example.org/ok/bad"), expected: false},
 	}
 
 	for _, c := range cases {

@@ -32,8 +32,8 @@ type Scraper struct {
 	URL     *urlpkg.URL // contains the main URL to parse, will be modified in case of a redirect
 
 	auth   string
-	client download.HttpClient
-	fs     afero.Fs // filesystem
+	Client download.HttpClient
+	Fs     afero.Fs // filesystem
 
 	includes filter.Filter
 	excludes filter.Filter
@@ -108,8 +108,8 @@ func New(cfg config.Config, url *urlpkg.URL, fs afero.Fs) (*Scraper, error) {
 		cookies: cookies,
 		URL:     url,
 
-		client: client,
-		fs:     fs, // filesystem can be replaced with in-memory filesystem for testing
+		Client: client,
+		Fs:     fs, // filesystem can be replaced with in-memory filesystem for testing
 
 		includes: includes,
 		excludes: excludes,
@@ -135,8 +135,8 @@ func (sc *Scraper) Downloader() *download.Download {
 		ETagsDB:   sc.ETagsDB,
 		StartURL:  sc.URL,
 		Auth:      sc.auth,
-		Client:    sc.client,
-		Fs:        afero.NewBasePathFs(sc.fs, sc.URL.Host),
+		Client:    sc.Client,
+		Fs:        afero.NewBasePathFs(sc.Fs, sc.URL.Host),
 		Lockdown:  throttle.New(0, 10*time.Second, 2*time.Second),
 		LoopDelay: throttle.New(sc.config.LoopDelay, time.Millisecond, time.Millisecond/2),
 	}

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"net/http"
 	urlpkg "net/url"
 	"os"
 	"runtime"
@@ -22,6 +23,7 @@ import (
 	"github.com/cornelk/goscrape/images"
 	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/goscrape/scraper"
+	"github.com/cornelk/goscrape/server"
 	"github.com/rickb777/servefiles/v3"
 	"github.com/spf13/afero"
 )
@@ -153,14 +155,13 @@ func main() {
 	}
 
 	if len(args.URLs) > 0 {
-		if err := scrapeURLs(ctx, fs, *cfg, args.SaveCookieFile, args.URLs); err != nil {
+		if err := scrapeURLs(ctx, fs, *cfg, args.SaveCookieFile, args.Serve, int16(args.ServerPort), args.URLs); err != nil {
 			fmt.Printf("Scraping execution error: %s\n", err)
 			os.Exit(1)
 		}
-	}
 
-	if args.Serve {
-		if err := runServer(ctx, fs, *cfg, args.ServerPort, args.URLs); err != nil {
+	} else if args.Serve {
+		if err := server.ServeDirectory(ctx, cfg.Directory, int16(args.ServerPort), nil); err != nil {
 			fmt.Printf("Server execution error: %s\n", err)
 			os.Exit(1)
 		}
@@ -198,7 +199,7 @@ func buildConfig(args Arguments) (*config.Config, error) {
 		return nil, fmt.Errorf("reading cookie: %w", err)
 	}
 
-	cfg := config.Config{
+	return &config.Config{
 		Includes: args.Include,
 		Excludes: args.Exclude,
 
@@ -218,22 +219,30 @@ func buildConfig(args Arguments) (*config.Config, error) {
 		Header:    config.MakeHeaders(args.Headers),
 		Proxy:     args.Proxy,
 		UserAgent: args.UserAgent,
-	}
-
-	return &cfg, nil
+	}, nil
 }
 
-func scrapeURLs(ctx context.Context, fs afero.Fs, cfg config.Config, saveCookieFile string, urls []*urlpkg.URL) error {
+func scrapeURLs(ctx context.Context, fs afero.Fs, cfg config.Config, saveCookieFile string, serve bool, serverPort int16, urls []*urlpkg.URL) error {
 	etagStore := db.Open()
 	defer etagStore.Close()
 
-	for _, url := range urls {
+	var webServer *http.Server
+	var errChan chan error
+
+	for i, url := range urls {
 		sc, err := scraper.New(cfg, url, afero.NewBasePathFs(fs, cfg.Directory))
 		if err != nil {
 			return fmt.Errorf("initializing scraper: %w", err)
 		}
 
 		sc.ETagsDB = etagStore
+
+		if serve && i == 0 {
+			webServer, errChan, err = server.LaunchWebserver(sc, cfg.Directory, serverPort)
+			if err != nil {
+				return fmt.Errorf("launching webserver: %w", err)
+			}
+		}
 
 		logger.Info("Scraping", slog.String("url", sc.URL.String()))
 		if err = sc.Start(ctx); err != nil {
@@ -252,34 +261,18 @@ func scrapeURLs(ctx context.Context, fs afero.Fs, cfg config.Config, saveCookieF
 	}
 
 	reportHistogram()
-	return nil
+
+	return server.AwaitWebserver(ctx, webServer, errChan)
 }
 
 func reportHistogram() {
 	m := download.Counters.Map()
 	keys := slices.Collect(maps.Keys(m))
 	slices.Sort(keys)
+	logger.Warn("Scraping finished", slog.Int("response-codes", len(keys)))
 	for _, key := range keys {
 		logger.Warn(fmt.Sprintf("%3d: %d", key, m[key]))
 	}
-}
-
-func runServer(ctx context.Context, fs afero.Fs, cfg config.Config, serverPort int, urls []*urlpkg.URL) error {
-	var sc *scraper.Scraper
-
-	if len(urls) > 0 {
-		url := urls[0]
-		var err error
-		sc, err = scraper.New(cfg, url, afero.NewBasePathFs(fs, cfg.Directory))
-		if err != nil {
-			return fmt.Errorf("serving directory for %s: %w", url, err)
-		}
-	}
-
-	if err := scraper.ServeDirectory(ctx, cfg.Directory, int16(serverPort), sc); err != nil {
-		return fmt.Errorf("serving directory: %w", err)
-	}
-	return nil
 }
 
 func createLogger(args Arguments) *slog.Logger {
