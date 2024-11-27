@@ -82,7 +82,7 @@ func declareFlags() Arguments {
 
 	flag.Var(&arguments.Include, "i", "only include URLs that match a `regular expression` (can be repeated)")
 	flag.Var(&arguments.Exclude, "x", "exclude URLs that match a `regular expression` (can be repeated)")
-	flag.StringVar(&arguments.Directory, "d", "", "`directory` to write files to and to serve files from")
+	flag.StringVar(&arguments.Directory, "dir", "", "`directory` to write files to and to serve files from")
 
 	flag.IntVar(&arguments.Concurrency, "concurrency", 1, "the number of concurrent downloads")
 	flag.IntVar(&arguments.Depth, "depth", 0, "download depth limit (default unlimited)")
