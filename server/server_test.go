@@ -63,7 +63,7 @@ func TestServeDirectory(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
-	err := ServeDirectory(ctx, "", 14141, sc)
+	err := ServeDirectory(ctx, sc, "", 14141)
 	require.NoError(t, err)
 }
 

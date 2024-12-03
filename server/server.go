@@ -11,7 +11,9 @@ import (
 	"github.com/cornelk/goscrape/logger"
 	"github.com/cornelk/goscrape/scraper"
 	"github.com/cornelk/goscrape/work"
+	"github.com/gorilla/handlers"
 	"github.com/rickb777/servefiles/v3"
+	sloghttp "github.com/samber/slog-http"
 	"github.com/spf13/afero"
 )
 
@@ -44,7 +46,7 @@ func (h *onDemand) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 //-------------------------------------------------------------------------------------------------
 
-func ServeDirectory(ctx context.Context, path string, port int16, sc *scraper.Scraper) error {
+func ServeDirectory(ctx context.Context, sc *scraper.Scraper, path string, port int16) error {
 	server, errChan, err := LaunchWebserver(sc, path, port)
 	if err != nil {
 		return err
@@ -58,8 +60,10 @@ func LaunchWebserver(sc *scraper.Scraper, path string, port int16) (*http.Server
 		slog.String("path", path),
 		slog.String("address", fmt.Sprintf("http://%s:%d", hostname(), port)))
 
-	fileServer := selectAssetServer(sc, path)
-	server := newWebserver(port, fileServer)
+	handler := selectAssetServer(sc, path)
+	handler = sloghttp.NewWithConfig(logger.Logger, logger.HttpLogConfig())(handler)
+	handler = handlers.RecoveryHandler()(handler)
+	server := newWebserver(port, handler)
 
 	errChan := make(chan error, 1)
 	go func() {

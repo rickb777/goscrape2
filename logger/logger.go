@@ -4,10 +4,33 @@ package logger
 
 import (
 	"fmt"
+	sloghttp "github.com/samber/slog-http"
+	"io"
 	"log/slog"
 	"os"
 	"sync/atomic"
 )
+
+func Create(w io.Writer, opts *slog.HandlerOptions) {
+	Logger = slog.New(slog.NewTextHandler(w, opts))
+}
+
+func HttpLogConfig() sloghttp.Config {
+	for _, hdr := range []string{
+		"connection", "dnt", "sec-gpc", "sec-fetch-dest", "sec-fetch-mode", "sec-fetch-site", "user-agent",
+	} {
+		sloghttp.HiddenRequestHeaders[hdr] = struct{}{}
+	}
+
+	return sloghttp.Config{
+		DefaultLevel:       slog.LevelInfo,
+		ClientErrorLevel:   slog.LevelWarn,
+		ServerErrorLevel:   slog.LevelError,
+		WithRequestID:      false,
+		WithRequestHeader:  true,
+		WithResponseHeader: false,
+	}
+}
 
 var errorCount atomic.Int64
 

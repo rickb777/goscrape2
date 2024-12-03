@@ -125,6 +125,8 @@ func declareFlags() Arguments {
 func main() {
 	args := declareFlags()
 
+	createLogger(args)
+
 	var err error
 	args.URLs, err = parseAll(flag.Args())
 	if err != nil {
@@ -140,8 +142,6 @@ func main() {
 		flag.Usage()
 		logger.Exit()
 	}
-
-	logger.Logger = createLogger(args)
 
 	cfg, err := buildConfig(args)
 	if err != nil {
@@ -161,7 +161,7 @@ func main() {
 		}
 
 	} else if args.Serve {
-		if err := server.ServeDirectory(ctx, cfg.Directory, int16(args.ServerPort), nil); err != nil {
+		if err := server.ServeDirectory(ctx, nil, cfg.Directory, int16(args.ServerPort)); err != nil {
 			logger.Errorf("Server execution error: %s\n", err)
 		}
 	}
@@ -275,7 +275,7 @@ func reportHistogram() {
 	}
 }
 
-func createLogger(args Arguments) *slog.Logger {
+func createLogger(args Arguments) {
 	opts := &slog.HandlerOptions{Level: slog.LevelWarn}
 
 	if args.Debug {
@@ -287,7 +287,7 @@ func createLogger(args Arguments) *slog.Logger {
 		opts.Level = slog.LevelWarn
 	}
 
-	return slog.New(slog.NewTextHandler(os.Stdout, opts))
+	logger.Create(os.Stdout, opts)
 }
 
 func readCookieFile(cookieFile string) ([]config.Cookie, error) {
