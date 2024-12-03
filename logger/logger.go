@@ -3,8 +3,13 @@
 package logger
 
 import (
+	"fmt"
 	"log/slog"
+	"os"
+	"sync/atomic"
 )
+
+var errorCount atomic.Int64
 
 // Logger is a global logger that is able to handle concurrent logging safely.
 var Logger = slog.Default()
@@ -27,4 +32,14 @@ func Warn(msg string, args ...any) {
 
 func Error(msg string, args ...any) {
 	Log(slog.LevelError, msg, args...)
+	errorCount.Add(1)
+}
+
+func Errorf(msg string, args ...any) {
+	Log(slog.LevelError, fmt.Sprintf(msg, args...))
+	errorCount.Add(1)
+}
+
+var Exit = func() {
+	os.Exit(int(errorCount.Load()))
 }

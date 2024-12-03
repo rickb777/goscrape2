@@ -128,24 +128,25 @@ func main() {
 	var err error
 	args.URLs, err = parseAll(flag.Args())
 	if err != nil {
-		fmt.Printf("Invalid URL: %s\n", err)
-		os.Exit(1)
+		logger.Errorf("Invalid URL: %s\n", err)
+		logger.Exit()
 	}
 
 	ctx := context.Background()
 	//ctx := app.Context() // provides signal handler cancellation
 
-	if !args.Serve || len(args.URLs) == 0 {
+	if !args.Serve && len(args.URLs) == 0 {
+		logger.Errorf("Must provide -serve or URLs to scrape\n")
 		flag.Usage()
-		os.Exit(0)
+		logger.Exit()
 	}
 
 	logger.Logger = createLogger(args)
 
 	cfg, err := buildConfig(args)
 	if err != nil {
-		fmt.Printf("Config error: %s\n", err)
-		os.Exit(1)
+		logger.Errorf("Config error: %s\n", err)
+		logger.Exit()
 	}
 
 	fs := afero.NewOsFs()
@@ -156,16 +157,15 @@ func main() {
 
 	if len(args.URLs) > 0 {
 		if err := scrapeURLs(ctx, fs, *cfg, args.SaveCookieFile, args.Serve, int16(args.ServerPort), args.URLs); err != nil {
-			fmt.Printf("Scraping execution error: %s\n", err)
-			os.Exit(1)
+			logger.Errorf("Scraping execution error: %s\n", err)
 		}
 
 	} else if args.Serve {
 		if err := server.ServeDirectory(ctx, cfg.Directory, int16(args.ServerPort), nil); err != nil {
-			fmt.Printf("Server execution error: %s\n", err)
-			os.Exit(1)
+			logger.Errorf("Server execution error: %s\n", err)
 		}
 	}
+	logger.Exit()
 }
 
 func parseAll(urls []string) (list []*urlpkg.URL, err error) {
@@ -247,7 +247,7 @@ func scrapeURLs(ctx context.Context, fs afero.Fs, cfg config.Config, saveCookieF
 		logger.Info("Scraping", slog.String("url", sc.URL.String()))
 		if err = sc.Start(ctx); err != nil {
 			if errors.Is(err, context.Canceled) {
-				os.Exit(0)
+				logger.Exit()
 			}
 
 			return fmt.Errorf("scraping '%s': %w", sc.URL, err)
