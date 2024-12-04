@@ -3,11 +3,12 @@ package stubclient
 import (
 	"bytes"
 	"fmt"
-	"github.com/rickb777/acceptable/header"
-	"github.com/rickb777/acceptable/headername"
-	"git
 	"io"
 	"net/http"
+
+	"github.com/rickb777/acceptable/header"
+	"github.com/rickb777/acceptable/headername"
+	"github.com/rickb777/goscrape2/db"
 )
 
 // Client is for http testing.

@@ -9,9 +9,8 @@ import (
 	"strings"
 
 	"github.com/gorilla/css/scanner"
-	"git
 	"github.com/rickb777/goscrape2/logger"
-	"github.com/gorilla/css/scanner"
+	"github.com/rickb777/goscrape2/work"
 )
 
 var cssURLRe = regexp.MustCompile(`^url\(['"]?(.*?)['"]?\)$`)

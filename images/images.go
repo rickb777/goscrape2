@@ -12,7 +12,7 @@ import (
 	"github.com/h2non/filetype"
 	"github.com/h2non/filetype/matchers"
 	"github.com/h2non/filetype/types"
-	
+	"github.com/rickb777/goscrape2/logger"
 )
 
 type ImageQuality int

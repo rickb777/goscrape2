@@ -9,10 +9,9 @@ import (
 	"os"
 
 	"github.com/gorilla/handlers"
-	"github
 	"github.com/rickb777/goscrape2/logger"
 	"github.com/rickb777/goscrape2/scraper"
-	"github.com/gorilla/handlers"
+	"github.com/rickb777/goscrape2/work"
 	"github.com/rickb777/servefiles/v3"
 	sloghttp "github.com/samber/slog-http"
 	"github.com/spf13/afero"
