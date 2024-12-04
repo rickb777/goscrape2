@@ -9,8 +9,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/cornelk/goscrape/htmlindex"
-	"github.com/cornelk/goscrape/logger"
+	"github.com/rickb777/goscrape2/htmlindex"
+	"github.com/rickb777/goscrape2/logger"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 )

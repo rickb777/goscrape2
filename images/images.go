@@ -9,10 +9,10 @@ import (
 	"log/slog"
 	"net/url"
 
-	"github.com/cornelk/goscrape/logger"
 	"github.com/h2non/filetype"
 	"github.com/h2non/filetype/matchers"
 	"github.com/h2non/filetype/types"
+	
 )
 
 type ImageQuality int

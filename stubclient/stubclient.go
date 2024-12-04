@@ -3,9 +3,9 @@ package stubclient
 import (
 	"bytes"
 	"fmt"
-	"github.com/cornelk/goscrape/db"
 	"github.com/rickb777/acceptable/header"
 	"github.com/rickb777/acceptable/headername"
+	"git
 	"io"
 	"net/http"
 )

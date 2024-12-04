@@ -3,17 +3,17 @@ package download
 import (
 	"bytes"
 	"fmt"
-	"github.com/cornelk/goscrape/mapping"
+	"github.com/rickb777/goscrape2/mapping"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"path"
 	"strings"
 
-	"github.com/cornelk/goscrape/document"
-	"github.com/cornelk/goscrape/download/ioutil"
-	"github.com/cornelk/goscrape/logger"
-	"github.com/cornelk/goscrape/work"
+	"github.com/rickb777/goscrape2/document"
+	"github.com/rickb777/goscrape2/download/ioutil"
+	"github.com/rickb777/goscrape2/logger"
+	"github.com/rickb777/goscrape2/work"
 )
 
 func (d *Download) response304(item work.Item, resp *http.Response) (*url.URL, *work.Result, error) {

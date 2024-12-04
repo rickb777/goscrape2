@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/cornelk/goscrape/logger"
+	"github.com/rickb777/goscrape2/logger"
 	"github.com/spf13/afero"
 )
 

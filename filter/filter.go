@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"regexp"
 
-	"github.com/cornelk/goscrape/logger"
+	"github.com/rickb777/goscrape2/logger"
 )
 
 type Filter []*regexp.Regexp

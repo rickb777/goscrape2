@@ -1,7 +1,7 @@
 package scraper
 
 import (
-	"github.com/cornelk/goscrape/work"
+	"github.com/rickb777/goscrape2/work"
 	"net/url"
 )
 

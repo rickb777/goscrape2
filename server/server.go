@@ -8,9 +8,10 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/cornelk/goscrape/logger"
-	"github.com/cornelk/goscrape/scraper"
-	"github.com/cornelk/goscrape/work"
+	"github.com/gorilla/handlers"
+	"github
+	"github.com/rickb777/goscrape2/logger"
+	"github.com/rickb777/goscrape2/scraper"
 	"github.com/gorilla/handlers"
 	"github.com/rickb777/servefiles/v3"
 	sloghttp "github.com/samber/slog-http"

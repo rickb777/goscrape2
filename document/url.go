@@ -1,7 +1,7 @@
 package document
 
 import (
-	"github.com/cornelk/goscrape/mapping"
+	"github.com/rickb777/goscrape2/mapping"
 	"net/url"
 	"path"
 	"strings"

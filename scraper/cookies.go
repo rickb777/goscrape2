@@ -2,7 +2,7 @@ package scraper
 
 import (
 	"fmt"
-	"github.com/cornelk/goscrape/config"
+	"github.com/rickb777/goscrape2/config"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"

@@ -6,8 +6,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/cornelk/goscrape/config"
-	"github.com/cornelk/goscrape/stubclient"
+	"github.com/rickb777/goscrape2/config"
+	"github.com/rickb777/goscrape2/stubclient"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

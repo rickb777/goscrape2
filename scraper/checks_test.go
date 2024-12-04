@@ -2,9 +2,9 @@ package scraper
 
 import (
 	"fmt"
-	"github.com/cornelk/goscrape/filter"
-	"github.com/cornelk/goscrape/logger"
-	"github.com/cornelk/goscrape/stubclient"
+	"github.com/rickb777/goscrape2/filter"
+	"github.com/rickb777/goscrape2/logger"
+	"github.com/rickb777/goscrape2/stubclient"
 	"github.com/rickb777/servefiles/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

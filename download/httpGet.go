@@ -4,16 +4,16 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/cornelk/goscrape/utc"
+	"github.com/rickb777/goscrape2/utc"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"time"
 
-	"github.com/cornelk/goscrape/logger"
 	"github.com/rickb777/acceptable/header"
 	"github.com/rickb777/acceptable/headername"
+	"github.com/rickb777/goscrape2/logger"
 )
 
 // Counters accumulates HTTP response status codes.

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/beevik/etree"
-	"github.com/cornelk/goscrape/work"
+	"github.com/rickb777/goscrape2/work"
 	"io"
 	"net/url"
 )

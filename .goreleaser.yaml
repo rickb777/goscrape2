@@ -20,7 +20,7 @@ builds:
 dockers:
   - id: goscrape
     image_templates:
-      - "ghcr.io/cornelk/goscrape:{{ .Version }}"
+      - "ghcr.io/rickb777/goscrape2:{{ .Version }}"
 
 universal_binaries:
   - replace: false

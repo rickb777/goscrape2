@@ -1,9 +1,9 @@
 package document
 
 import (
-	"github.com/cornelk/goscrape/htmlindex"
-	"github.com/cornelk/goscrape/logger"
-	"github.com/cornelk/goscrape/work"
+	"github.com/rickb777/goscrape2/htmlindex"
+	"github.com/rickb777/goscrape2/logger"
+	"github.com/rickb777/goscrape2/work"
 	"log/slog"
 )
 

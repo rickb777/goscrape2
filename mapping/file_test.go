@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cornelk/goscrape/logger"
+	"github.com/rickb777/goscrape2/logger"
 	"github.com/stretchr/testify/assert"
 )
 

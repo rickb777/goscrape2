@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cornelk/goscrape/images"
+	"github.com/rickb777/goscrape2/images"
 )
 
 // Config contains the scraper configuration.

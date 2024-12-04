@@ -63,6 +63,6 @@ func Errorf(msg string, args ...any) {
 	errorCount.Add(1)
 }
 
-var Exit = func() {
-	os.Exit(int(errorCount.Load()))
+var Exit = func(code int) {
+	os.Exit(code + int(errorCount.Load()))
 }

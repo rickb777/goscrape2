@@ -1,4 +1,4 @@
-module github.com/cornelk/goscrape
+module github.com/rickb777/goscrape2
 
 go 1.23
 

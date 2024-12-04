@@ -3,7 +3,7 @@ package db
 import (
 	"bufio"
 	"fmt"
-	"github.com/cornelk/goscrape/logger"
+	"github.com/rickb777/goscrape2/logger"
 	"github.com/spf13/afero"
 	"io"
 	"log/slog"

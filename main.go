@@ -16,21 +16,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cornelk/goscrape/config"
-	"github.com/cornelk/goscrape/db"
-	"github.com/cornelk/goscrape/download"
-	"github.com/cornelk/goscrape/download/ioutil"
-	"github.com/cornelk/goscrape/images"
-	"github.com/cornelk/goscrape/logger"
-	"github.com/cornelk/goscrape/scraper"
-	"github.com/cornelk/goscrape/server"
+	"github.com/rickb777/goscrape2/config"
+	"github.com/rickb777/goscrape2/db"
+	"github.com/rickb777/goscrape2/download"
+	"github.com/rickb777/goscrape2/download/ioutil"
+	"github.com/rickb777/goscrape2/images"
+	"github.com/rickb777/goscrape2/logger"
+	"github.com/rickb777/goscrape2/scraper"
+	"github.com/rickb777/goscrape2/server"
 	"github.com/rickb777/servefiles/v3"
 	"github.com/spf13/afero"
 )
 
 var (
 	version = "dev"
-	commit  = ""
 	date    = ""
 )
 
@@ -94,7 +93,7 @@ func declareFlags() Arguments {
 	flag.DurationVar(&arguments.LaxAge, "laxage", 0, "adds to the 'expires' timestamp specified by the origin server, or creates one if absent; if the origin is too conservative, this helps when doing successive runs; a negative value causes revalidation instead")
 	flag.IntVar(&arguments.Tries, "tries", 1, "the number of tries to download each file if the server gives a 5xx error")
 
-	flag.BoolVar(&arguments.Serve, "serve", false, "serve the website using a webserver; scraping will only happen on demand")
+	flag.BoolVar(&arguments.Serve, "serve", false, "serve the website using a webserver; scraping will happen only on demand using the first URL you provide")
 	flag.IntVar(&arguments.ServerPort, "port", 8080, "port to use for the webserver")
 
 	flag.StringVar(&arguments.CookieFile, "cookies", "", "file containing the cookie content")
@@ -113,9 +112,9 @@ func declareFlags() Arguments {
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Scrape a website and create an offline browsable version on the disk.\n\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage:\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "  %s [options] <url> ...\n\n", os.Args[0])
+		fmt.Fprintf(flag.CommandLine.Output(), "  %s [options] [<url> ...]\n\n", os.Args[0])
 		flag.PrintDefaults()
-		fmt.Fprintf(flag.CommandLine.Output(), "\nOptions also accept '--'.\nVersion %s\n", formatVersion(version, commit, date))
+		fmt.Fprintf(flag.CommandLine.Output(), "\nOptions also accept '--'.\nVersion %s\n", formatVersion(version, date))
 	}
 	return arguments
 }
@@ -130,23 +129,23 @@ func main() {
 	var err error
 	args.URLs, err = parseAll(flag.Args())
 	if err != nil {
-		logger.Errorf("Invalid URL: %s\n", err)
-		logger.Exit()
+		fmt.Printf("Invalid URL: %s\n", err)
+		logger.Exit(1)
 	}
 
 	ctx := context.Background()
 	//ctx := app.Context() // provides signal handler cancellation
 
 	if !args.Serve && len(args.URLs) == 0 {
-		logger.Errorf("Must provide -serve or URLs to scrape\n")
+		fmt.Printf("Must provide -serve or URLs to scrape\n")
 		flag.Usage()
-		logger.Exit()
+		logger.Exit(1)
 	}
 
 	cfg, err := buildConfig(args)
 	if err != nil {
-		logger.Errorf("Config error: %s\n", err)
-		logger.Exit()
+		fmt.Printf("Config error: %s\n", err)
+		logger.Exit(1)
 	}
 
 	fs := afero.NewOsFs()
@@ -165,7 +164,7 @@ func main() {
 			logger.Errorf("Server execution error: %s\n", err)
 		}
 	}
-	logger.Exit()
+	logger.Exit(0)
 }
 
 func parseAll(urls []string) (list []*urlpkg.URL, err error) {
@@ -247,7 +246,7 @@ func scrapeURLs(ctx context.Context, fs afero.Fs, cfg config.Config, saveCookieF
 		logger.Info("Scraping", slog.String("url", sc.URL.String()))
 		if err = sc.Start(ctx); err != nil {
 			if errors.Is(err, context.Canceled) {
-				logger.Exit()
+				logger.Exit(1)
 			}
 
 			return fmt.Errorf("scraping '%s': %w", sc.URL, err)
@@ -325,17 +324,16 @@ func saveCookies(cookieFile string, cookies []config.Cookie) error {
 }
 
 // formatVersion builds a version string based on binary release information.
-func formatVersion(version, commit, date string) string {
+func formatVersion(version, date string) string {
 	buf := strings.Builder{}
 	buf.WriteString(version)
 
-	if commit != "" {
-		buf.WriteString(" commit: " + commit)
-	}
+	buf.WriteString(" built with ")
+	buf.WriteString(runtime.Version())
 	if date != "" {
-		buf.WriteString(" built at: " + date)
+		buf.WriteString(" on ")
+		buf.WriteString(date)
 	}
-	goVersion := runtime.Version()
-	buf.WriteString(" built with: " + goVersion)
+	buf.WriteString(".")
 	return buf.String()
 }

@@ -9,13 +9,13 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/cornelk/goscrape/config"
-	"github.com/cornelk/goscrape/db"
-	"github.com/cornelk/goscrape/download/throttle"
-	"github.com/cornelk/goscrape/logger"
-	"github.com/cornelk/goscrape/mapping"
-	"github.com/cornelk/goscrape/utc"
-	"github.com/cornelk/goscrape/work"
+	"github.com/rickb777/goscrape2/config"
+	"github.com/rickb777/goscrape2/db"
+	"github.com/rickb777/goscrape2/download/throttle"
+	"github.com/rickb777/goscrape2/logger"
+	"github.com/rickb777/goscrape2/mapping"
+	"github.com/rickb777/goscrape2/utc"
+	"github.com/rickb777/goscrape2/work"
 	"github.com/spf13/afero"
 )
 

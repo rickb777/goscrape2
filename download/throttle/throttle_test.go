@@ -1,7 +1,7 @@
 package throttle_test
 
 import (
-	"github.com/cornelk/goscrape/download/throttle"
+	"github.com/rickb777/goscrape2/download/throttle"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"

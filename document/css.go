@@ -8,8 +8,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/cornelk/goscrape/logger"
-	"github.com/cornelk/goscrape/work"
+	"github.com/gorilla/css/scanner"
+	"git
+	"github.com/rickb777/goscrape2/logger"
 	"github.com/gorilla/css/scanner"
 )
 
