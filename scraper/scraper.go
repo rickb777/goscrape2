@@ -151,12 +151,16 @@ func (sc *Scraper) Start(ctx context.Context) error {
 	firstItem := work.Item{URL: sc.URL}
 
 	if !sc.shouldURLBeDownloaded(firstItem.URL, 0) {
-		return errors.New("start page is excluded from downloading")
+		return fmt.Errorf("start page is excluded from downloading: %s", firstItem.URL)
 	}
 
 	redirect, firstResult, err := d.ProcessURL(ctx, firstItem)
 	if err != nil {
 		return err
+	}
+
+	if firstResult.StatusCode != http.StatusOK {
+		return fmt.Errorf("start page failed: %d %s", firstResult.StatusCode, http.StatusText(firstResult.StatusCode))
 	}
 
 	if redirect != nil {

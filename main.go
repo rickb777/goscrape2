@@ -156,12 +156,12 @@ func main() {
 
 	if len(args.URLs) > 0 {
 		if err := scrapeURLs(ctx, fs, *cfg, args.SaveCookieFile, args.Serve, int16(args.ServerPort), args.URLs); err != nil {
-			logger.Errorf("Scraping execution error: %s\n", err)
+			logger.Error("Scraping execution error", slog.Any("error", err))
 		}
 
 	} else if args.Serve {
 		if err := server.ServeDirectory(ctx, nil, cfg.Directory, int16(args.ServerPort)); err != nil {
-			logger.Errorf("Server execution error: %s\n", err)
+			logger.Error("Server execution error", slog.Any("error", err))
 		}
 	}
 	logger.Exit(0)
@@ -249,12 +249,22 @@ func scrapeURLs(ctx context.Context, fs afero.Fs, cfg config.Config, saveCookieF
 				logger.Exit(1)
 			}
 
-			return fmt.Errorf("scraping '%s': %w", sc.URL, err)
+			var ue *urlpkg.Error
+			if errors.As(err, &ue) {
+				if serve {
+					logger.Warn("HTTP request failed",
+						slog.String("url", url.String()),
+						slog.Any("error", err))
+					continue // ignore because the webserver is operational
+				}
+			}
+
+			return fmt.Errorf("HTTP get %s failed: %w", url, err)
 		}
 
 		if saveCookieFile != "" {
 			if err := saveCookies(saveCookieFile, sc.Cookies()); err != nil {
-				return fmt.Errorf("saving cookies: %w", err)
+				return fmt.Errorf("saving cookies url=%s: %w", url, err)
 			}
 		}
 	}

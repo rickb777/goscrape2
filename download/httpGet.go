@@ -82,8 +82,7 @@ func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Ti
 
 		resp, err = d.Client.Do(req)
 		if err != nil {
-			// halt the application
-			return nil, fmt.Errorf("sending HTTP GET %s: %w", u, err)
+			return nil, err
 		}
 
 		Counters.Increment(resp.StatusCode)

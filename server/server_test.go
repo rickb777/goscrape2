@@ -63,11 +63,12 @@ func TestServeDirectory(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
+	// not testing what it actually does here - see below
 	err := ServeDirectory(ctx, sc, "", 14141)
 	require.NoError(t, err)
 }
 
-func TestWebserver(t *testing.T) {
+func TestLaunchWebserver_connectedToOrigin(t *testing.T) {
 	indexPage := `
 <html>
 <head>
@@ -75,17 +76,6 @@ func TestWebserver(t *testing.T) {
 </head>
 <body>Index
 <a href="page2">Example</a>
-</body>
-</html>
-`
-
-	subPage := `
-<html>
-<head>
-<link href='../style.css' rel='stylesheet' type='text/css'>
-</head>
-<body>Sub
-<a href="../page2">Example</a>
 </body>
 </html>
 `
@@ -118,19 +108,10 @@ It's here!
 	sc.Fs = afero.NewMemMapFs()
 	writeFile(sc.Fs, "example.org/index.html", indexPage)
 	writeFile(sc.Fs, "example.org/page2/index.html", page2)
-	writeFile(sc.Fs, "example.org/sub/index.html", subPage)
-	writeFile(sc.Fs, "example.org/style.css", "{}")
 
-	fileServer := assetHandlerWith404Handler(sc)
-	server := newWebserver(14141, fileServer)
+	server, errChan, err := LaunchWebserver(sc, "", 14141)
+	require.NoError(t, err)
 	require.NotNil(t, server)
-
-	go func() {
-		e2 := server.ListenAndServe()
-		if e2 != http.ErrServerClosed {
-			panic(e2)
-		}
-	}()
 
 	c := &http.Client{}
 
@@ -138,16 +119,79 @@ It's here!
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "/")
 
-	resp, err = c.Get("http://localhost:14141/page2/")
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode, "/page2/")
-
 	resp, err = c.Get("http://localhost:14141/missing.html")
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "/missing.html")
 
+	resp, err = c.Get("http://localhost:14141/page2/")
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode, "/page2/")
+
 	err = server.Shutdown(context.Background())
 	require.NoError(t, err)
+
+	require.Equal(t, http.ErrServerClosed, <-errChan)
+}
+
+func TestLaunchWebserver_notConnected(t *testing.T) {
+	indexPage := `
+<html>
+<head>
+<link href='style.css' rel='stylesheet' type='text/css'>
+</head>
+<body>Index
+<a href="page2">Example</a>
+</body>
+</html>
+`
+
+	page2 := `
+<html>
+<body>
+
+<a href="/">a</a>
+<a href="/sub/">a</a>
+
+</body>
+</html>
+`
+
+	originStub := &stubclient.Client{}
+	originStub.GivenError("https://example.org/missing.html",
+		&url.Error{
+			Op:  "Get",
+			URL: "https://example.org/missing.html",
+		})
+
+	sc := newTestScraper(t, "https://example.org/", originStub)
+	require.NotNil(t, sc)
+
+	sc.Fs = afero.NewMemMapFs()
+	writeFile(sc.Fs, "example.org/index.html", indexPage)
+	writeFile(sc.Fs, "example.org/page2/index.html", page2)
+
+	server, errChan, err := LaunchWebserver(sc, "", 14141)
+	require.NoError(t, err)
+	require.NotNil(t, server)
+
+	c := &http.Client{}
+
+	resp, err := c.Get("http://localhost:14141/")
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode, "/")
+
+	resp, err = c.Get("http://localhost:14141/missing.html")
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusBadGateway, resp.StatusCode, "/missing.html")
+
+	resp, err = c.Get("http://localhost:14141/page2/")
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode, "/page2/")
+
+	err = server.Shutdown(context.Background())
+	require.NoError(t, err)
+
+	require.Equal(t, http.ErrServerClosed, <-errChan)
 }
 
 func writeFile(fs afero.Fs, name, text string) {

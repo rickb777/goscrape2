@@ -14,7 +14,7 @@
 
 .testCoverage
 dist/
-goscrape
+goscrape2
 .idea/
 tmp/
 

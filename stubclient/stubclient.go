@@ -14,6 +14,7 @@ import (
 // Client is for http testing.
 type Client struct {
 	responses map[string]http.Response // more configurable responses
+	errors    map[string]error
 	Metadata  *db.DB
 }
 
@@ -35,8 +36,20 @@ func (c *Client) GivenResponse(statusCode int, url, contentType, body string, et
 	c.responses[url] = resp
 }
 
+func (c *Client) GivenError(url string, expected error) {
+	if c.errors == nil {
+		c.errors = make(map[string]error)
+	}
+	c.errors[url] = expected
+}
+
 func (c *Client) Do(req *http.Request) (resp *http.Response, err error) {
 	ur := req.URL.String()
+	e, ok := c.errors[ur]
+	if ok {
+		return nil, e
+	}
+
 	r, ok := c.responses[ur]
 	if !ok {
 		panic(fmt.Sprintf("url '%s' not found in test data", ur))

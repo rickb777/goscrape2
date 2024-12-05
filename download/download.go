@@ -3,7 +3,6 @@ package download
 import (
 	"context"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -12,7 +11,6 @@ import (
 	"github.com/rickb777/goscrape2/config"
 	"github.com/rickb777/goscrape2/db"
 	"github.com/rickb777/goscrape2/download/throttle"
-	"github.com/rickb777/goscrape2/logger"
 	"github.com/rickb777/goscrape2/mapping"
 	"github.com/rickb777/goscrape2/utc"
 	"github.com/rickb777/goscrape2/work"
@@ -52,9 +50,6 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 
 	resp, err := d.httpGet(ctx, item.URL, existingModified)
 	if err != nil {
-		logger.Error("Processing HTTP Request failed",
-			slog.String("url", item.URL.String()),
-			slog.Any("error", err))
 		return nil, nil, err
 	}
 
