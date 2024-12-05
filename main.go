@@ -46,6 +46,31 @@ func (i *Strings) Set(value string) error {
 	return nil
 }
 
+// Getenv populates the strings from an environment variable, splitting the value on a separator.
+func (i *Strings) Getenv(key, separator string) error {
+	*i = getenvList(key, separator)
+	return nil
+}
+
+func getenvList(key, separator string) []string {
+	value := strings.TrimSpace(os.Getenv(key))
+	if len(value) == 0 {
+		return nil
+	}
+	return filterNonBlank(strings.Split(value, separator))
+}
+
+func filterNonBlank(ss []string) []string {
+	list := make([]string, 0, len(ss))
+	for _, s := range ss {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			list = append(list, s)
+		}
+	}
+	return list
+}
+
 //-------------------------------------------------------------------------------------------------
 
 type Arguments struct {
@@ -81,6 +106,9 @@ type Arguments struct {
 func declareFlags() Arguments {
 	var arguments Arguments
 
+	arguments.Include.Getenv("GOSCRAPE_INCLUDE", " ")
+	arguments.Exclude.Getenv("GOSCRAPE_EXCLUDE", " ")
+
 	flag.Var(&arguments.Include, "i", "only include URLs that match a `regular expression` (can be repeated)")
 	flag.Var(&arguments.Exclude, "x", "exclude URLs that match a `regular expression` (can be repeated)")
 	flag.StringVar(&arguments.Directory, "dir", "", "`directory` to write files to and to serve files from")
@@ -90,10 +118,10 @@ func declareFlags() Arguments {
 	flag.IntVar(&arguments.ImageQuality, "imagequality", 0, "image quality reduction, minimum 1 to maximum 99 (re-encoding disabled by default)")
 	flag.DurationVar(&arguments.Timeout, "timeout", 0, "time limit (with units, e.g. 1s) for each HTTP request to connect and read the response")
 	flag.DurationVar(&arguments.LoopDelay, "loopdelay", 0, "delay (with units, e.g. 1s) used between any two downloads")
-	flag.DurationVar(&arguments.LaxAge, "laxage", 0, "adds to the 'expires' timestamp specified by the origin server, or creates one if absent; if the origin is too conservative, this helps when doing successive runs; a negative value causes revalidation instead")
+	flag.DurationVar(&arguments.LaxAge, "laxage", 0, "adds to the 'expires' timestamp specified by the origin server, or creates one if absent.\nIf the origin is too conservative, this helps when doing successive runs; a negative value causes\nrevalidation instead.")
 	flag.IntVar(&arguments.Tries, "tries", 1, "the number of tries to download each file if the server gives a 5xx error")
 
-	flag.BoolVar(&arguments.Serve, "serve", false, "serve the website using a webserver; scraping will happen only on demand using the first URL you provide")
+	flag.BoolVar(&arguments.Serve, "serve", false, "serve the website using a webserver.\nScraping will happen only on demand using the first URL you provide.")
 	flag.IntVar(&arguments.ServerPort, "port", 8080, "port to use for the webserver")
 
 	flag.StringVar(&arguments.CookieFile, "cookies", "", "file containing the cookie content")
@@ -110,11 +138,26 @@ func declareFlags() Arguments {
 	flag.Parse()
 
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Scrape a website and create an offline browsable version on the disk.\n\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage:\n")
+		fmt.Fprintf(flag.CommandLine.Output(),
+			`Scrape a website and create an offline browsable version on the disk.
+
+Usage:
+`)
 		fmt.Fprintf(flag.CommandLine.Output(), "  %s [options] [<url> ...]\n\n", os.Args[0])
 		flag.PrintDefaults()
-		fmt.Fprintf(flag.CommandLine.Output(), "\nOptions also accept '--'.\nVersion %s\n", formatVersion(version, date))
+		fmt.Fprintf(flag.CommandLine.Output(), `
+Options also accept '--'.
+
+Environment:
+  GOSCRAPE_URLS
+	adds URLs to the list to process (space separated)
+  GOSCRAPE_INCLUDE
+	adds regular expressions to the -i include list (space separated)
+  GOSCRAPE_EXCLUDE
+	adds regular expressions to the -x exclude list (space separated)
+
+Version `)
+		fmt.Fprintln(flag.CommandLine.Output(), formatVersion(version, date))
 	}
 	return arguments
 }
@@ -126,8 +169,10 @@ func main() {
 
 	createLogger(args)
 
+	allStartURLs := append(getenvList("GOSCRAPE_URLS", " "), flag.Args()...)
+
 	var err error
-	args.URLs, err = parseAll(flag.Args())
+	args.URLs, err = parseAll(allStartURLs)
 	if err != nil {
 		fmt.Printf("Invalid URL: %s\n", err)
 		logger.Exit(1)
@@ -168,6 +213,7 @@ func main() {
 }
 
 func parseAll(urls []string) (list []*urlpkg.URL, err error) {
+	urls = filterNonBlank(urls)
 	list = make([]*urlpkg.URL, len(urls))
 	for i, url := range urls {
 		list[i], err = urlpkg.Parse(url)
