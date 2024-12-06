@@ -55,11 +55,11 @@ goscrape2 --serve website.com
 
 ## Options
 
-Options can use single or double dash (`-v` or `--v`).
+Options can use single or double dash (e.g. `-v` or `--v`).
 
 ```
 Usage:
-  goscrape2 [options] [<url> ...]
+  ./goscrape2 [options] [<url> ...]
 
   -H value
     	"name:value" HTTP header to use for scraping (can be repeated)
@@ -76,7 +76,11 @@ Usage:
   -imagequality int
     	image quality reduction, minimum 1 to maximum 99 (re-encoding disabled by default)
   -laxage duration
-    	adds to the 'expires' timestamp specified by the origin server, or creates one if absent; if the origin is too conservative, this helps when doing successive runs; a negative value causes revalidation instead
+    	adds to the 'expires' timestamp specified by the origin server, or creates one if absent.
+    	If the origin is too conservative, this helps when doing successive runs; a negative value causes
+    	revalidation instead.
+  -log string
+    	output log file; use "-" for stdout (default "-")
   -loopdelay duration
     	delay (with units, e.g. 1s) used between any two downloads
   -port int
@@ -86,7 +90,8 @@ Usage:
   -savecookiefile string
     	file to save the cookie content
   -serve
-    	serve the website using a webserver; scraping will only happen on demand
+    	serve the website using a webserver.
+    	Scraping will happen only on demand using the first URL you provide.
   -timeout duration
     	time limit (with units, e.g. 1s) for each HTTP request to connect and read the response
   -tries int
@@ -101,6 +106,14 @@ Usage:
   -z	debug output
 
 ```
+
+## Environment
+
+These environment variables may be set
+
+ * GOSCRAPE_URLS adds URLs to the list to process (use a space separated list)
+ * GOSCRAPE_INCLUDE adds regular expressions to the -i include list (use a space separated list)
+ * GOSCRAPE_EXCLUDE adds regular expressions to the -x exclude list (use a space separated list)
 
 ## Cookies
 

@@ -4,17 +4,21 @@ package logger
 
 import (
 	"fmt"
+	"github.com/rickb777/logrotate"
 	sloghttp "github.com/samber/slog-http"
-	"io"
 	"log/slog"
 	"os"
 	"sync/atomic"
 )
 
-func Create(w io.Writer, opts *slog.HandlerOptions) {
-	Logger = slog.New(slog.NewTextHandler(w, opts))
+// Create updates Logger to use a specific log file (or stdout), based
+// on a specified log file name.
+func Create(logFile string, opts *slog.HandlerOptions) {
+	logWriter := logrotate.MustLogWriterWithSignals(logFile, os.Stdout)
+	Logger = slog.New(slog.NewTextHandler(logWriter, opts))
 }
 
+// HttpLogConfig provides configuration options for the HTTP logger, if used.
 func HttpLogConfig() sloghttp.Config {
 	for _, hdr := range []string{
 		"connection", "dnt", "sec-gpc", "sec-fetch-dest", "sec-fetch-mode", "sec-fetch-site", "user-agent",

@@ -99,6 +99,7 @@ type Arguments struct {
 	User      string
 	UserAgent string
 
+	LogFile string
 	Verbose bool
 	Debug   bool
 }
@@ -132,6 +133,7 @@ func declareFlags() Arguments {
 	flag.StringVar(&arguments.User, "user", "", "user[:password] to use for HTTP authentication")
 	flag.StringVar(&arguments.UserAgent, "useragent", "", "user agent to use for scraping")
 
+	flag.StringVar(&arguments.LogFile, "log", "-", `output log file; use "-" for stdout`)
 	flag.BoolVar(&arguments.Verbose, "v", false, "verbose output")
 	flag.BoolVar(&arguments.Debug, "z", false, "debug output")
 
@@ -342,7 +344,7 @@ func createLogger(args Arguments) {
 		opts.Level = slog.LevelWarn
 	}
 
-	logger.Create(os.Stdout, opts)
+	logger.Create(args.LogFile, opts)
 }
 
 func readCookieFile(cookieFile string) ([]config.Cookie, error) {
