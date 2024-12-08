@@ -22,10 +22,10 @@ test-coverage-web: test-coverage ## run unit tests and show test coverage in bro
 	go tool cover -html=.testCoverage
 
 install: ## install all binaries
-	go install -buildvcs=false .
+	go install -buildvcs=false -ldflags "-s -X main.version=`./.version.sh` -X main.date=`date '+%F'`" .
 
-install-linters: ## install all linters
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@${GOLANGCI_VERSION}
+#install-linters: ## install all linters
+#	go install github.com/golangci/golangci-lint/cmd/golangci-lint@${GOLANGCI_VERSION}
 
 release-snapshot: ## build release binaries from current git state as snapshot
 	goreleaser release --snapshot --clean

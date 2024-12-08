@@ -139,12 +139,14 @@ func declareFlags() Arguments {
 
 	flag.Parse()
 
-	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(),
-			`Scrape a website and create an offline browsable version on the disk.
+	setUsageInfo("Scrape a website and create an offline browsable version on the disk.\n")
+	return arguments
+}
 
-Usage:
-`)
+func setUsageInfo(headline string) {
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), headline)
+		fmt.Fprintf(flag.CommandLine.Output(), "\nUsage:\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "  %s [options] [<url> ...]\n\n", os.Args[0])
 		flag.PrintDefaults()
 		fmt.Fprintf(flag.CommandLine.Output(), `
@@ -161,7 +163,6 @@ Environment:
 Version `)
 		fmt.Fprintln(flag.CommandLine.Output(), formatVersion(version, date))
 	}
-	return arguments
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -184,7 +185,7 @@ func main() {
 	//ctx := app.Context() // provides signal handler cancellation
 
 	if !args.Serve && len(args.URLs) == 0 {
-		fmt.Printf("Must provide -serve or URLs to scrape\n")
+		setUsageInfo("Must provide -serve or URLs to scrape\n")
 		flag.Usage()
 		logger.Exit(1)
 	}
