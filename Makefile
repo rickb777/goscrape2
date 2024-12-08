@@ -1,12 +1,17 @@
 GOLANGCI_VERSION = v1.60.3
 
-help: ## show help, shown by default if no target is specified
+default: test
+	go vet ./...
+	go build -o goscrape2 -ldflags "-s -X main.version=`./.version.sh` -X main.date=`date '+%F'`" .
+
+help: ## show help
 	@grep -E '^[0-9a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 lint: ## run code linters
 	golangci-lint run
 
 test: ## run tests
+	@rm -f goscrape2
 	go test -timeout 10s -race ./...
 
 test-coverage: ## run unit tests and create test coverage
