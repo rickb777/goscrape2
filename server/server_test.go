@@ -174,6 +174,8 @@ func TestLaunchWebserver_notConnected(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, server)
 
+	time.Sleep(50 * time.Millisecond)
+
 	c := &http.Client{}
 
 	resp, err := c.Get("http://localhost:14141/")
