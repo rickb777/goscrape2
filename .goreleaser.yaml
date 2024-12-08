@@ -5,8 +5,8 @@ before:
     - go mod download
 
 builds:
-  - id: goscrape
-    binary: goscrape
+  - id: goscrape2
+    binary: goscrape2
     dir: .
     env:
       - CGO_ENABLED=0
@@ -15,10 +15,10 @@ builds:
     flags:
       - -trimpath
     ldflags:
-      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{ .CommitDate }}
+      - -s -w -X main.version={{.Version}} -X main.date={{ .CommitDate }}
 
 dockers:
-  - id: goscrape
+  - id: goscrape2
     image_templates:
       - "ghcr.io/rickb777/goscrape2:{{ .Version }}"
 
@@ -26,8 +26,8 @@ universal_binaries:
   - replace: false
 
 archives:
-  - id: goscrape
-    builds: ['goscrape']
+  - id: goscrape2
+    builds: ['goscrape2']
     name_template: >-
       {{ .ProjectName }}_v{{ .Version }}_
       {{- if eq .Os "darwin" }}macos
