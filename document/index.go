@@ -9,6 +9,7 @@ import (
 
 func (d *HTMLDocument) FindReferences() (work.Refs, error) {
 	var result work.Refs
+
 	for tag := range htmlindex.Nodes {
 		references, err := d.index.URLs(tag)
 		if err != nil {

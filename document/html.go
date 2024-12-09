@@ -12,7 +12,6 @@ import (
 	"github.com/rickb777/goscrape2/htmlindex"
 	"github.com/rickb777/goscrape2/logger"
 	"golang.org/x/net/html"
-	"golang.org/x/net/html/atom"
 )
 
 // ignoredURLPrefixes contains a list of URL prefixes that do not need to bo adjusted.
@@ -47,7 +46,8 @@ func ParseHTML(u, startURL *url.URL, rdr io.Reader) (*HTMLDocument, error) {
 // in this case the returned HTML string will be empty.
 func (d *HTMLDocument) FixURLReferences() ([]byte, bool, error) {
 	relativeToRoot := urlRelativeToRoot(d.u)
-	if !fixHTMLNodeURLs(d.u, d.startURL.Host, relativeToRoot, d.index) {
+
+	if changed := fixHTMLNodeURLs(d.u, d.startURL.Host, relativeToRoot, d.index); !changed {
 		return nil, false, nil
 	}
 
@@ -55,6 +55,7 @@ func (d *HTMLDocument) FixURLReferences() ([]byte, bool, error) {
 	if err := html.Render(&rendered, d.doc); err != nil {
 		return nil, false, fmt.Errorf("rendering html: %w", err)
 	}
+
 	return rendered.Bytes(), true, nil
 }
 
@@ -62,12 +63,10 @@ func (d *HTMLDocument) FixURLReferences() ([]byte, bool, error) {
 // to link to downloaded files. It returns whether any URLS have been fixed.
 func fixHTMLNodeURLs(baseURL *url.URL, startURLHost string, relativeToRoot string, index *htmlindex.Index) (changed bool) {
 	for tag, nodeInfo := range htmlindex.Nodes {
-		isHyperlink := tag == atom.A
-
 		urls := index.Nodes(tag)
 		for _, nodes := range urls {
 			for _, node := range nodes {
-				if fixHTMLNodeURL(baseURL, nodeInfo.Attributes, node, startURLHost, isHyperlink, relativeToRoot) {
+				if fixHTMLNodeURL(baseURL, nodeInfo.Attributes, node, startURLHost, relativeToRoot) {
 					changed = true
 				}
 			}
@@ -79,7 +78,7 @@ func fixHTMLNodeURLs(baseURL *url.URL, startURLHost string, relativeToRoot strin
 
 // fixHTMLNodeURL fixes the URL references of a HTML node to point to a relative file name.
 // It returns true if any attribute value bas been adjusted.
-func fixHTMLNodeURL(baseURL *url.URL, attributes []string, node *html.Node, startURLHost string, isHyperlink bool, relativeToRoot string) (changed bool) {
+func fixHTMLNodeURL(baseURL *url.URL, attributes []string, node *html.Node, startURLHost string, relativeToRoot string) (changed bool) {
 	for i, attr := range node.Attr {
 		if !slices.Contains(attributes, attr.Key) {
 			continue
@@ -99,7 +98,7 @@ func fixHTMLNodeURL(baseURL *url.URL, attributes []string, node *html.Node, star
 		var adjusted string
 
 		if _, isSrcSet := htmlindex.SrcSetAttributes[attr.Key]; isSrcSet {
-			adjusted = resolveSrcSetURLs(baseURL, value, startURLHost, isHyperlink, relativeToRoot)
+			adjusted = resolveSrcSetURLs(baseURL, value, startURLHost, relativeToRoot)
 		} else {
 			adjusted = resolveURL(baseURL, value, startURLHost, relativeToRoot)
 		}
@@ -118,7 +117,7 @@ func fixHTMLNodeURL(baseURL *url.URL, attributes []string, node *html.Node, star
 	return changed
 }
 
-func resolveSrcSetURLs(base *url.URL, srcSetValue, startURLHost string, isHyperlink bool, relativeToRoot string) string {
+func resolveSrcSetURLs(base *url.URL, srcSetValue, startURLHost, relativeToRoot string) string {
 	// split the set of responsive images
 	values := strings.Split(srcSetValue, ",")
 

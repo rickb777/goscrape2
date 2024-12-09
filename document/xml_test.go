@@ -3,7 +3,6 @@ package document
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"net/url"
 	"strings"
 	"testing"
 )
@@ -16,8 +15,8 @@ height="30" width="200">
   <a href="http://example.com/there/link3.svg"><text>Link3</text></a>
 </svg>`
 
-	u1, _ := url.Parse("http://example.com/dir/page.svg")
-	u2, _ := url.Parse("http://example.com/")
+	u1 := mustParseURL("http://example.com/dir/page.svg")
+	u2 := mustParseURL("http://example.com/")
 
 	doc, err := ParseSVG(u1, u2, strings.NewReader(sample))
 	require.NoError(t, err)

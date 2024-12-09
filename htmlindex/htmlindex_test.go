@@ -17,6 +17,7 @@ func TestIndex(t *testing.T) {
 <script src="//api.html5media.info/1.1.8/html5media.min.js"></script>
 <a href="https://domain.com/wp-content/uploads/document%2Bindex.pdf" rel="doc">Guide</a>
 <a href="https://domain.com/about.html">About</a>
+<a href="things">Things</a>
 <img src="/test%24file.jpg"/> 
 <script src="/func.min.js"></script> 
 </html>
@@ -29,28 +30,32 @@ func TestIndex(t *testing.T) {
 
 	idx.Index(mustParse("https://domain.com/"), doc)
 
-	// check a tag
+	// check <a> tag
 	{
 		references, err := idx.URLs(atom.A)
 		require.NoError(t, err)
-		require.Len(t, references, 2)
+		require.Len(t, references, 3)
 
-		u2 := "https://domain.com/about.html"
-		assert.Equal(t, u2, references[0].String())
+		u0 := "https://domain.com/about.html"
+		assert.Equal(t, u0, references[0].String())
 		assert.Equal(t, "/about.html", references[0].Path)
 
-		u1 := "https://domain.com/wp-content/uploads/document%2Bindex.pdf"
+		u1 := "https://domain.com/things"
 		assert.Equal(t, u1, references[1].String())
-		assert.Equal(t, "/wp-content/uploads/document+index.pdf", references[1].Path)
+		assert.Equal(t, "/things", references[1].Path)
+
+		u2 := "https://domain.com/wp-content/uploads/document%2Bindex.pdf"
+		assert.Equal(t, u2, references[2].String())
+		assert.Equal(t, "/wp-content/uploads/document+index.pdf", references[2].Path)
 
 		urls := idx.Nodes(atom.A)
-		require.Len(t, urls, 2)
-		nodes, ok := urls[u1]
+		require.Len(t, urls, 3)
+		nodes, ok := urls[u2]
 		require.True(t, ok)
 		require.Len(t, nodes, 1)
 		assert.Equal(t, "a", nodes[0].Data)
 	}
-	// check img tag
+	// check <img> tag
 	{
 		references, err := idx.URLs(atom.Img)
 		require.NoError(t, err)
@@ -60,7 +65,7 @@ func TestIndex(t *testing.T) {
 		assert.Equal(t, tagURL, references[0].String())
 		assert.Equal(t, "/test$file.jpg", references[0].Path)
 	}
-	// check script tag
+	// check <script> tag
 	{
 		references, err := idx.URLs(atom.Script)
 		require.NoError(t, err)
@@ -85,7 +90,10 @@ func TestIndex(t *testing.T) {
 func TestIndexWithBase(t *testing.T) {
 	input := []byte(`
 <html lang="es"><head><base href=' https://domain.com '/></head>
-<body><a href=" /about.html ">About</a></body>
+<body>
+<a href=" /about.html ">About</a>
+<a href="things">Things</a>
+</body>
 </html>
 `)
 
@@ -96,19 +104,23 @@ func TestIndexWithBase(t *testing.T) {
 
 	idx.Index(mustParse("https://www.domain.com/"), doc)
 
-	// check a tag
+	// check <a> tag
 	{
 		references, err := idx.URLs(atom.A)
 		require.NoError(t, err)
-		require.Len(t, references, 1)
+		require.Len(t, references, 2)
 
-		u1 := "https://domain.com/about.html"
-		assert.Equal(t, u1, references[0].String())
+		u0 := "https://domain.com/about.html"
+		assert.Equal(t, u0, references[0].String())
 		assert.Equal(t, "/about.html", references[0].Path)
 
+		u1 := "https://domain.com/things"
+		assert.Equal(t, u1, references[1].String())
+		assert.Equal(t, "/things", references[1].Path)
+
 		urls := idx.Nodes(atom.A)
-		require.Len(t, urls, 1)
-		nodes, ok := urls[u1]
+		require.Len(t, urls, 2)
+		nodes, ok := urls[u0]
 		require.True(t, ok)
 		require.Len(t, nodes, 1)
 		assert.Equal(t, "a", nodes[0].Data)

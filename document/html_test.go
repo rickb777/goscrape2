@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"io"
 	"log/slog"
-	"net/url"
 	"testing"
 
 	"github.com/rickb777/goscrape2/logger"
@@ -14,7 +13,7 @@ import (
 
 func TestFixURLReferences(t *testing.T) {
 	logger.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
-	u, _ := url.Parse("http://domain.com")
+	u := mustParseURL("http://domain.com")
 
 	b := []byte(`<html lang="es"><head></head>
 <body>
