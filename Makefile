@@ -7,9 +7,6 @@ default: test
 help: ## show help
 	@grep -E '^[0-9a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-lint: ## run code linters
-	golangci-lint run
-
 test: ## run tests
 	@rm -f goscrape2
 	go test -timeout 10s -race ./...
@@ -23,9 +20,6 @@ test-coverage-web: test-coverage ## run unit tests and show test coverage in bro
 
 install: ## install all binaries
 	go install -buildvcs=false -ldflags "-s -X main.version=`./.version.sh` -X main.date=`date '+%F'`" .
-
-#install-linters: ## install all linters
-#	go install github.com/golangci/golangci-lint/cmd/golangci-lint@${GOLANGCI_VERSION}
 
 release-snapshot: ## build release binaries from current git state as snapshot
 	goreleaser release --snapshot --clean
