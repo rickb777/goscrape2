@@ -1,6 +1,7 @@
 package db
 
 import (
+	"github.com/rickb777/acceptable/header"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"net/url"
@@ -13,13 +14,14 @@ import (
 func TestStringRepresentation(t *testing.T) {
 	buf := &strings.Builder{}
 	t1 := time.Date(2000, 1, 1, 1, 1, 1, 0, time.UTC)
+	textHtml := header.ContentType{Type: "text", Subtype: "html"}
 	writeItem(buf, "k1", Item{Expires: t1})
-	writeItem(buf, "k2", Item{Expires: t1.Add(time.Hour), ETags: `"abc123"`})
+	writeItem(buf, "k2", Item{Content: textHtml, Expires: t1.Add(time.Hour), ETags: `"abc123"`})
 	writeItem(buf, "k3", Item{ETags: `"def123"`})
 	s := buf.String()
-	assert.Equal(t, `k1	2000-01-01T01:01:01Z
-k2	2000-01-01T02:01:01Z	"abc123"
-k3	-	"def123"
+	assert.Equal(t, `k1	/	2000-01-01T01:01:01Z	-
+k2	text/html	2000-01-01T02:01:01Z	"abc123"
+k3	/	-	"def123"
 `, s)
 }
 
@@ -59,7 +61,7 @@ func TestDB(t *testing.T) {
 	store2.Store(u3, Item{})
 
 	w1 := store2.Lookup(u1)
-	assert.Equal(t, w1, Item{ETags: `"h1a", "h1b"`})
+	assert.Equal(t, w1, Item{Content: header.ContentType{Type: "*", Subtype: "*"}, ETags: `"h1a", "h1b"`})
 
 	w2 := store2.Lookup(u2)
 	assert.Equal(t, w2.ETags, `"h2"`)

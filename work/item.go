@@ -16,6 +16,13 @@ type Item struct {
 	FilePath  string // returned when the item is processed
 }
 
+func (it Item) ChangePath(newPath string) Item {
+	u2 := *it.URL
+	u2.Path = newPath
+	it.URL = &u2
+	return it
+}
+
 func (it Item) String() string {
 	return fmt.Sprintf("%s (depth:%d)", it.URL.String(), it.Depth)
 }

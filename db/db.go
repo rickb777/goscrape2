@@ -3,6 +3,7 @@ package db
 import (
 	"bufio"
 	"fmt"
+	"github.com/rickb777/acceptable/header"
 	"github.com/rickb777/goscrape2/logger"
 	"github.com/spf13/afero"
 	"io"
@@ -17,21 +18,32 @@ import (
 )
 
 type Item struct {
+	Content header.ContentType
 	ETags   string
 	Expires time.Time
 }
 
-func (i Item) Empty() bool { return len(i.ETags) == 0 && i.Expires.IsZero() }
+func (i Item) EmptyContentType() bool {
+	return (i.Content.Type == "" && i.Content.Subtype == "") ||
+		(i.Content.Type == "*" && i.Content.Subtype == "*")
+}
+
+func (i Item) Empty() bool {
+	return i.EmptyContentType() && len(i.ETags) == 0 && i.Expires.IsZero()
+}
 
 func (i Item) String() string {
-	expires := i.Expires.Format(time.RFC3339)
-	if i.Expires.IsZero() {
-		expires = "-"
+	ct := i.Content.String()
+
+	expires := "-"
+	if !i.Expires.IsZero() {
+		expires = i.Expires.Format(time.RFC3339)
 	}
+
 	if len(i.ETags) == 0 {
-		return expires
+		return fmt.Sprintf("%s\t%s\t-", ct, expires)
 	} else {
-		return fmt.Sprintf("%s\t%s", expires, i.ETags)
+		return fmt.Sprintf("%s\t%s\t%s", ct, expires, i.ETags)
 	}
 }
 
@@ -75,29 +87,27 @@ func OpenDB(dir string, fs afero.Fs) *DB {
 	return store
 }
 
-func readItem(records map[string]Item, line string) {
-	parts := strings.Split(line, "\t")
-	if len(parts) >= 2 {
+func readItem(records map[string]Item, parts []string) {
+	if len(parts) == 4 {
+		if parts[1] == "-" {
+			return // discard legacy record
+		}
+
 		key := parts[0]
-		val1 := parts[1]
 
 		var value Item
 
-		switch len(parts) {
-		case 2:
-			expires, err := time.Parse(time.RFC3339, val1)
-			if err == nil {
-				value.Expires = expires
-			} else {
-				value.ETags = val1
-			}
+		value.Content = header.ParseContentType(parts[1])
 
-		case 3:
-			if val1 != "-" {
-				expires, _ := time.Parse(time.RFC3339, val1)
-				value.Expires = expires
-			}
-			value.ETags = parts[2]
+		val2 := parts[2]
+		if val2 != "-" {
+			expires, _ := time.Parse(time.RFC3339, val2)
+			value.Expires = expires
+		}
+
+		val3 := parts[3]
+		if val3 != "-" {
+			value.ETags = parts[3]
 		}
 
 		records[key] = value
@@ -110,7 +120,7 @@ func readFile(rdr io.Reader) (map[string]Item, error) {
 	for s.Scan() {
 		line := strings.TrimSpace(s.Text())
 		if !strings.HasPrefix(line, "#") {
-			readItem(records, line)
+			readItem(records, strings.Split(line, "\t"))
 		}
 	}
 	return records, nil
@@ -190,6 +200,8 @@ func (store *DB) flush() {
 	for key := range store.records {
 		keys = append(keys, key)
 	}
+
+	// the keys are sorted - not strictly necessary but it aids manual inspection
 	slices.Sort(keys)
 
 	buf := bufio.NewWriter(file)
@@ -202,11 +214,11 @@ func (store *DB) flush() {
 	buf.Flush()
 }
 
-func writeItem(w io.Writer, key string, value Item) (err error) {
-	if value.Empty() {
+func writeItem(w io.Writer, key string, item Item) (err error) {
+	if item.Empty() {
 		return nil
 	}
-	_, err = fmt.Fprintf(w, "%s\t%s\n", key, value)
+	_, err = fmt.Fprintf(w, "%s\t%s\n", key, item)
 	return err
 }
 

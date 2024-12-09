@@ -33,7 +33,9 @@ func TestScraperLinks(t *testing.T) {
 <link href=' //example.org/style.css#fragment' rel='stylesheet' type='text/css'>
 </head>
 <body>
-<a href="https://example.org/page2">Example</a>
+<a href="/page2">Example 2</a>
+<a href="/page3/">Example 3</a>
+<a href="/page4">Example 4</a>
 </body>
 </html>
 `
@@ -53,7 +55,10 @@ func TestScraperLinks(t *testing.T) {
 
 	stub := &stubclient.Client{}
 	stub.GivenResponse(http.StatusOK, "https://example.org/", "text/html", indexPage)
-	stub.GivenResponse(http.StatusOK, "https://example.org/page2", "text/html", page2)
+	stub.GivenResponse(http.StatusOK, "https://example.org/page2/", "text/html", page2)
+	stub.GivenResponse(http.StatusOK, "https://example.org/page3/", "text/html", page2) // same
+	stub.GivenResponse(http.StatusNotFound, "https://example.org/page4", "*/*", "")
+	stub.GivenResponse(http.StatusNotFound, "https://example.org/page4/", "*/*", "")
 	stub.GivenResponse(http.StatusOK, "https://example.org/sub/", "text/html", indexPage)
 	stub.GivenResponse(http.StatusOK, "https://example.org/style.css", "text/css", "")
 
@@ -67,6 +72,8 @@ func TestScraperLinks(t *testing.T) {
 	expectedProcessed := []string{
 		"/",
 		"/page2",
+		"/page3/",
+		"/page4",
 		"/style.css",
 		"/sub/",
 	}

@@ -7,7 +7,7 @@ require (
 	github.com/gorilla/css v1.0.1
 	github.com/gorilla/handlers v1.5.2
 	github.com/h2non/filetype v1.1.4-0.20231228185113-6469358c2bcb
-	github.com/rickb777/acceptable v0.41.0
+	github.com/rickb777/acceptable v0.42.0
 	github.com/rickb777/logrotate v0.14.0
 	github.com/rickb777/process/v2 v2.1.0
 	github.com/rickb777/servefiles/v3 v3.9.0

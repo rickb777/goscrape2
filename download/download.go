@@ -2,10 +2,13 @@ package download
 
 import (
 	"context"
+	"github.com/rickb777/acceptable/header"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"path"
+	"strings"
 	"time"
 
 	"github.com/rickb777/goscrape2/config"
@@ -37,6 +40,26 @@ type Download struct {
 }
 
 func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *work.Result, error) {
+	metadata := d.ETagsDB.Lookup(item.URL)
+
+	if isAmbiguousPath(item.URL.Path) {
+		item2 := item.ChangePath(item.URL.Path + "/")
+		m2 := d.ETagsDB.Lookup(item2.URL)
+		if !m2.EmptyContentType() {
+			// we know it existed earlier; go straight to item2 and skip original item
+			return d.doProcessURL(ctx, item2, m2)
+		} else {
+			_, result2, err2 := d.doProcessURL(ctx, item2, m2)
+			if err2 == nil && result2.StatusCode != http.StatusNotFound {
+				return item2.URL, result2, nil
+			}
+		}
+	}
+
+	return d.doProcessURL(ctx, item, metadata)
+}
+
+func (d *Download) doProcessURL(ctx context.Context, item work.Item, metadata db.Item) (*url.URL, *work.Result, error) {
 	var existingModified time.Time
 
 	item.FilePath = mapping.GetFilePath(item.URL, true)
@@ -48,7 +71,7 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 
 	item.StartTime = utc.Now()
 
-	resp, err := d.httpGet(ctx, item.URL, existingModified)
+	resp, err := d.httpGet(ctx, item.URL, existingModified, metadata)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -77,7 +100,7 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 
 	case http.StatusNotFound:
 		discardData(resp.Body) // discard anything present
-		d.ETagsDB.Store(item.URL, db.Item{Expires: utc.Now().Add(d.Config.GetLaxAge())})
+		d.ETagsDB.Store(item.URL, db.Item{Content: starStar, Expires: utc.Now().Add(d.Config.GetLaxAge())})
 		return item.URL, &work.Result{Item: item, StatusCode: resp.StatusCode}, nil
 
 	case http.StatusForbidden, http.StatusGone, http.StatusUnavailableForLegalReasons:
@@ -115,7 +138,17 @@ func (d *Download) response429(item work.Item, resp *http.Response) (*url.URL, *
 
 //-------------------------------------------------------------------------------------------------
 
+// isAmbiguousPath returns true if the path has a filename without any extension. It might
+// be that the server is representing a directory without a trailing slash, which is a commonly
+// used pattern.
+func isAmbiguousPath(p string) bool {
+	ext := path.Ext(p)
+	return ext == "" && !strings.HasSuffix(p, "/")
+}
+
 func discardData(rdr io.Reader) {
 	// Consume any response body - necessary for correct operation of the TCP connection pool
 	_, _ = io.Copy(io.Discard, rdr)
 }
+
+var starStar = header.ContentType{Type: "*", Subtype: "*"}

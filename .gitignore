@@ -16,6 +16,7 @@
 dist/
 goscrape2
 .idea/
+.run/
 tmp/
 
 example.org/

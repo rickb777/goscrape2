@@ -35,7 +35,7 @@ func TestGet200(t *testing.T) {
 
 	lastModified := time.Date(2000, 1, 1, 1, 1, 1, 0, time.UTC)
 
-	resp, err := d.httpGet(context.Background(), mustParse("http://example.org/"), lastModified)
+	resp, err := d.httpGet(context.Background(), mustParse("http://example.org/"), lastModified, db.Item{})
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -59,7 +59,7 @@ func TestGet404(t *testing.T) {
 
 	lastModified := time.Date(2000, 1, 1, 1, 1, 1, 0, time.UTC)
 
-	resp, err := d.httpGet(context.Background(), mustParse("http://example.org/"), lastModified)
+	resp, err := d.httpGet(context.Background(), mustParse("http://example.org/"), lastModified, db.Item{})
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -83,7 +83,7 @@ func TestGet429(t *testing.T) {
 
 	lastModified := time.Date(2000, 1, 1, 1, 1, 1, 0, time.UTC)
 
-	resp, err := d.httpGet(context.Background(), mustParse("http://example.org/"), lastModified)
+	resp, err := d.httpGet(context.Background(), mustParse("http://example.org/"), lastModified, db.Item{})
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusTooManyRequests, resp.StatusCode)
@@ -98,7 +98,8 @@ func TestGet200RevalidateWhenExpired(t *testing.T) {
 	stub.GivenResponse(http.StatusOK, "http://example.org/", "text/html", `<html></html>`)
 
 	u := mustParse("http://example.org/")
-	stub.Metadata.Store(u, db.Item{ETags: `"hash"`, Expires: utc.Now().Add(-time.Hour)}) // expired
+	item := db.Item{ETags: `"hash"`, Expires: utc.Now().Add(-time.Hour)}
+	stub.Metadata.Store(u, item) // expired
 
 	d := &Download{
 		Config: config.Config{
@@ -111,7 +112,7 @@ func TestGet200RevalidateWhenExpired(t *testing.T) {
 
 	lastModified := time.Date(2000, 1, 1, 1, 1, 1, 0, time.UTC)
 
-	resp, err := d.httpGet(context.Background(), u, lastModified)
+	resp, err := d.httpGet(context.Background(), u, lastModified, item)
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -126,7 +127,8 @@ func TestGet200RevalidateWhenLaxIsNegative(t *testing.T) {
 	stub.GivenResponse(http.StatusOK, "http://example.org/", "text/html", `<html></html>`)
 
 	u := mustParse("http://example.org/")
-	stub.Metadata.Store(u, db.Item{ETags: `"hash"`, Expires: utc.Now().Add(time.Hour)}) // not expired
+	item := db.Item{ETags: `"hash"`, Expires: utc.Now().Add(time.Hour)}
+	stub.Metadata.Store(u, item) // not expired
 
 	d := &Download{
 		Config: config.Config{
@@ -140,7 +142,7 @@ func TestGet200RevalidateWhenLaxIsNegative(t *testing.T) {
 
 	lastModified := time.Date(2000, 1, 1, 1, 1, 1, 0, time.UTC)
 
-	resp, err := d.httpGet(context.Background(), u, lastModified)
+	resp, err := d.httpGet(context.Background(), u, lastModified, item)
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -159,7 +161,8 @@ func TestGet304UsingEtag(t *testing.T) {
 	defer stub.Metadata.Close()
 
 	u := mustParse("http://example.org/")
-	stub.Metadata.Store(u, db.Item{ETags: `"hash"`})
+	item := db.Item{ETags: `"hash"`}
+	stub.Metadata.Store(u, item)
 
 	d := &Download{
 		Config: config.Config{
@@ -173,7 +176,7 @@ func TestGet304UsingEtag(t *testing.T) {
 
 	lastModified := time.Date(2000, 1, 1, 1, 1, 1, 0, time.UTC)
 
-	resp, err := d.httpGet(context.Background(), u, lastModified)
+	resp, err := d.httpGet(context.Background(), u, lastModified, item)
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusNotModified, resp.StatusCode)
@@ -187,7 +190,8 @@ func TestNotYetExpired(t *testing.T) {
 	defer stub.Metadata.Close()
 
 	u := mustParse("http://example.org/")
-	stub.Metadata.Store(u, db.Item{ETags: `"hash"`, Expires: utc.Now().Add(time.Hour)}) // not expired
+	item := db.Item{ETags: `"hash"`, Expires: utc.Now().Add(time.Hour)}
+	stub.Metadata.Store(u, item) // not expired
 
 	d := &Download{
 		Config: config.Config{
@@ -201,7 +205,7 @@ func TestNotYetExpired(t *testing.T) {
 
 	lastModified := time.Date(2000, 1, 1, 1, 1, 1, 0, time.UTC)
 
-	resp, err := d.httpGet(context.Background(), u, lastModified)
+	resp, err := d.httpGet(context.Background(), u, lastModified, item)
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusTeapot, resp.StatusCode)
@@ -218,7 +222,7 @@ func TestGet500(t *testing.T) {
 		Client: stub,
 	}
 
-	resp, err := d.httpGet(context.Background(), mustParse("http://example.org/"), time.Time{})
+	resp, err := d.httpGet(context.Background(), mustParse("http://example.org/"), time.Time{}, db.Item{})
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)

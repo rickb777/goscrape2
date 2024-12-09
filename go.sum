@@ -26,6 +26,8 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/rickb777/acceptable v0.41.0 h1:CoR+jBvA3jo+zneNri5yjNWhNaPPipUSZ8cK4mJBMCo=
 github.com/rickb777/acceptable v0.41.0/go.mod h1:/KkBflODTuQkUC75UUYWWw8tQCU1vvfi7svIqpdZwjM=
+github.com/rickb777/acceptable v0.42.0 h1:a0UbZgzeXoItP8oBNChx4Wt1SjeVkRs8FlZV+aUOzI8=
+github.com/rickb777/acceptable v0.42.0/go.mod h1:/KkBflODTuQkUC75UUYWWw8tQCU1vvfi7svIqpdZwjM=
 github.com/rickb777/logrotate v0.13.0 h1:rbjMwceCE2dLRV2P0aRXTdsTyxyZur9YiYAraV2Xddo=
 github.com/rickb777/logrotate v0.13.0/go.mod h1:EfdMkX41YL9eQnaZWOQI2Zyy07KUhaWzrbPthZPm+T8=
 github.com/rickb777/logrotate v0.14.0 h1:m7bJVvKiqiVNDJIxDAlQYfJopxWZqrsBKR1bf1mAmv4=

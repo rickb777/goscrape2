@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/rickb777/goscrape2/utc"
 	"io"
 	"log/slog"
 	"net/http"
@@ -13,7 +12,9 @@ import (
 
 	"github.com/rickb777/acceptable/header"
 	"github.com/rickb777/acceptable/headername"
+	"github.com/rickb777/goscrape2/db"
 	"github.com/rickb777/goscrape2/logger"
+	"github.com/rickb777/goscrape2/utc"
 )
 
 // Counters accumulates HTTP response status codes.
@@ -22,7 +23,7 @@ var Counters = NewHistogram()
 // httpGet performs one HTTP 'get' request, with as many retries as needed, up to the
 // configured limit. Unless an error arises, the response body must be fully
 // consumed and then closed.
-func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Time) (resp *http.Response, err error) {
+func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Time, metadata db.Item) (resp *http.Response, err error) {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
@@ -42,7 +43,6 @@ func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Ti
 	if !lastModified.IsZero() {
 		req.Header.Set(headername.IfModifiedSince, lastModified.Format(header.RFC1123))
 
-		metadata := d.ETagsDB.Lookup(u)
 		if d.Config.LaxAge >= 0 {
 			now := utc.Now()
 			if now.Before(metadata.Expires.Add(d.Config.LaxAge)) ||
@@ -50,7 +50,7 @@ func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Ti
 				// not yet expired so no need for any HTTP traffic - report as 'teapot'
 				return &http.Response{
 					Request:       req,
-					Status:        http.StatusText(http.StatusTeapot),
+					Status:        "Not Yet Expired",
 					StatusCode:    http.StatusTeapot, // treated like StatusNotModified
 					Header:        http.Header{},
 					Body:          io.NopCloser(&bytes.Buffer{}),
