@@ -160,7 +160,7 @@ func (sc *Scraper) Start(ctx context.Context) error {
 	}
 
 	switch firstResult.StatusCode {
-	case http.StatusOK, http.StatusNotModified:
+	case http.StatusOK, http.StatusNotModified, http.StatusTeapot:
 		// ok
 	default:
 		return fmt.Errorf("start page failed: %d %s", firstResult.StatusCode, http.StatusText(firstResult.StatusCode))

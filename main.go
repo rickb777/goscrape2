@@ -185,7 +185,7 @@ func main() {
 	//ctx := app.Context() // provides signal handler cancellation
 
 	if !args.Serve && len(args.URLs) == 0 {
-		setUsageInfo("Must provide -serve or URLs to scrape\n")
+		setUsageInfo("Must provide -serve to run webserver and/or URLs to scrape\n")
 		flag.Usage()
 		logger.Exit(1)
 	}
