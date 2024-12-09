@@ -4,7 +4,8 @@
 [![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white&style=flat-square)](https://pkg.go.dev/github.com/rickb777/goscrape2)
 [![Go Report Card](https://goreportcard.com/badge/github.com/rickb777/goscrape2)](https://goreportcard.com/report/github.com/rickb777/goscrape2)
 
-A web scraper built with [Go](https://go.dev/). It downloads the content of a website and allows it to be archived and read offline.
+A web scraper built with [Go](https://go.dev/). It downloads the content of a website and allows it to be archived and
+read offline.
 
 ## Features
 
@@ -20,6 +21,7 @@ Features and advantages over existing tools like wget, httrack, Teleport Pro:
 * Assets from external domains are downloaded automatically
 * Sane default values
 * Built-in webserver provides easy local access to the downloaded files
+* Supports logging and logfile rotation - can run as a long-lived service
 
 ## Limitations
 
@@ -39,16 +41,18 @@ or
 go install github.com/rickb777/goscrape2@latest
 ```
 
-Compiling the tool from source code needs to have a recent version of [Go](https://go.dev/) installed.
+Compiling the tool from source code needs to have a recent version of [Go](https://go.dev/) installed (v1.23 or later).
 
 ## Usage
 
 Scrape a website by running
+
 ```
 goscrape2 http://website.com/interesting/stuff
 ```
 
-To serve the downloaded website directory in a local run webserver use
+To serve the downloaded website directory in a locally-run webserver, use
+
 ```
 goscrape2 --serve website.com
 ```
@@ -111,9 +115,9 @@ Usage:
 
 These environment variables may be set
 
- * GOSCRAPE_URLS adds URLs to the list to process (use a space separated list)
- * GOSCRAPE_INCLUDE adds regular expressions to the -i include list (use a space separated list)
- * GOSCRAPE_EXCLUDE adds regular expressions to the -x exclude list (use a space separated list)
+* GOSCRAPE_URLS adds URLs to the list to process (use a space separated list)
+* GOSCRAPE_INCLUDE adds regular expressions to the -i include list (use a space separated list)
+* GOSCRAPE_EXCLUDE adds regular expressions to the -x exclude list (use a space separated list)
 
 ## Cookies
 
@@ -126,15 +130,15 @@ cookies in the following format:
 
 ## Conditional requests: ETags and last-modified
 
-HTTP uses ETags to tag the version of each resource. Each ETag is a hash constructed by 
+HTTP uses ETags to tag the version of each resource. Each ETag is a hash constructed by
 the server somehow. Also, each file usually has a last-modified date.
 
 `goscrape2` will use both of these items provided by the server to reduce the amount of
-work needed if multiple sessions of downloading are run on the same start URL. Any file 
+work needed if multiple sessions of downloading are run on the same start URL. Any file
 that is not modified doesn't need to be downloaded more than once.
 
 A small database containing ETags is stored in `~/.config/goscrape2-etags.txt`, which can
-be manually deleted to purge this cache. It is automatically purged if the output directory 
+be manually deleted to purge this cache. It is automatically purged if the output directory
 doesn't exist when `goscrape2` is started.
 
 ## Thanks
