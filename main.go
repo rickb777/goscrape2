@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/rickb777/path"
 	"log/slog"
 	"maps"
 	"net/http"
@@ -259,7 +260,7 @@ func buildConfig(args Arguments) (*config.Config, error) {
 		LaxAge:       args.LaxAge,
 		Tries:        args.Tries,
 
-		Directory: args.Directory,
+		Directory: path.Path(args.Directory),
 		Username:  username,
 		Password:  password,
 
@@ -278,7 +279,7 @@ func scrapeURLs(ctx context.Context, fs afero.Fs, cfg config.Config, saveCookieF
 	var errChan chan error
 
 	for i, url := range urls {
-		sc, err := scraper.New(cfg, url, afero.NewBasePathFs(fs, cfg.Directory))
+		sc, err := scraper.New(cfg, url, afero.NewBasePathFs(fs, string(cfg.Directory)))
 		if err != nil {
 			return fmt.Errorf("initializing scraper: %w", err)
 		}

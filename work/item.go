@@ -2,6 +2,7 @@ package work
 
 import (
 	"fmt"
+	"github.com/rickb777/path"
 	"net/url"
 	"strings"
 	"time"
@@ -13,7 +14,7 @@ type Item struct {
 	StartTime time.Time
 	Referrer  *url.URL
 	Depth     int
-	FilePath  string // returned when the item is processed
+	FilePath  path.Path // returned when the item is processed
 }
 
 func (it Item) ChangePath(newPath string) Item {
@@ -27,17 +28,9 @@ func (it Item) String() string {
 	return fmt.Sprintf("%s (depth:%d)", it.URL.String(), it.Depth)
 }
 
-type Refs []*url.URL
+//-------------------------------------------------------------------------------------------------
 
-type Result struct {
-	Item
-	StatusCode    int
-	References    Refs
-	Excluded      Refs
-	ContentLength int64
-	FileSize      int64
-	Gzip          bool
-}
+type Refs []*url.URL
 
 func (refs Refs) String() string {
 	buf := &strings.Builder{}
@@ -49,4 +42,16 @@ func (refs Refs) String() string {
 		spacer = " "
 	}
 	return buf.String()
+}
+
+//-------------------------------------------------------------------------------------------------
+
+type Result struct {
+	Item
+	StatusCode    int
+	References    Refs
+	Excluded      Refs
+	ContentLength int64
+	FileSize      int64
+	Gzip          bool
 }

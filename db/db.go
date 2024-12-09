@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/rickb777/acceptable/header"
 	"github.com/rickb777/goscrape2/logger"
+	"github.com/rickb777/path"
 	"github.com/spf13/afero"
 	"io"
 	"log/slog"
@@ -18,9 +19,11 @@ import (
 )
 
 type Item struct {
-	Content header.ContentType
-	ETags   string
-	Expires time.Time
+	Location string // redirection
+	File     path.Path
+	Content  header.ContentType
+	ETags    string
+	Expires  time.Time
 }
 
 func (i Item) EmptyContentType() bool {
@@ -29,22 +32,33 @@ func (i Item) EmptyContentType() bool {
 }
 
 func (i Item) Empty() bool {
-	return i.EmptyContentType() && len(i.ETags) == 0 && i.Expires.IsZero()
+	return i.Location == "" && i.File == "" && i.EmptyContentType() && len(i.ETags) == 0 && i.Expires.IsZero()
+}
+
+func dashIfBlank(s string) string {
+	if s == "" {
+		s = "-"
+	}
+	return s
 }
 
 func (i Item) String() string {
-	ct := i.Content.String()
+	ct := "-"
+	if i.Content.Type != "" {
+		ct = i.Content.String()
+	}
 
 	expires := "-"
 	if !i.Expires.IsZero() {
 		expires = i.Expires.Format(time.RFC3339)
 	}
 
-	if len(i.ETags) == 0 {
-		return fmt.Sprintf("%s\t%s\t-", ct, expires)
-	} else {
-		return fmt.Sprintf("%s\t%s\t%s", ct, expires, i.ETags)
-	}
+	return fmt.Sprintf("%s\t%s\t%s\t%s\t%s",
+		dashIfBlank(i.Location),
+		dashIfBlank(string(i.File)),
+		ct,
+		expires,
+		dashIfBlank(i.ETags))
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -87,30 +101,34 @@ func OpenDB(dir string, fs afero.Fs) *DB {
 	return store
 }
 
-func readItem(records map[string]Item, parts []string) {
-	if len(parts) == 4 {
-		if parts[1] == "-" {
-			return // discard legacy record
-		}
+func strNotDash(s string) string {
+	if s == "-" {
+		s = ""
+	}
+	return s
+}
 
+func readItem(records map[string]Item, parts []string) {
+	if len(parts) == 6 {
 		key := parts[0]
 
-		var value Item
-
-		value.Content = header.ParseContentType(parts[1])
-
-		val2 := parts[2]
-		if val2 != "-" {
-			expires, _ := time.Parse(time.RFC3339, val2)
-			value.Expires = expires
+		var ct header.ContentType
+		if parts[3] != "-" {
+			ct = header.ParseContentType(parts[3])
 		}
 
-		val3 := parts[3]
-		if val3 != "-" {
-			value.ETags = parts[3]
+		var expires time.Time
+		if parts[4] != "-" {
+			expires, _ = time.Parse(time.RFC3339, parts[4])
 		}
 
-		records[key] = value
+		records[key] = Item{
+			Location: strNotDash(parts[1]),
+			File:     path.Path(strNotDash(parts[2])),
+			Content:  ct,
+			Expires:  expires,
+			ETags:    strNotDash(parts[5]),
+		}
 	}
 }
 

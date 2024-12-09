@@ -64,7 +64,7 @@ func urlRelativeToRoot(u *url.URL) string {
 
 func urlRelativeToOther(src, base *url.URL) string {
 	srcSplits := strings.Split(src.Path, "/")
-	baseSplits := strings.Split(mapping.GetPageFilePath(base), "/")
+	baseSplits := mapping.GetPageFilePath(base).Segments()
 
 	for {
 		if len(srcSplits) == 0 || len(baseSplits) == 0 {

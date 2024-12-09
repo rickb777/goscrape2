@@ -15,14 +15,18 @@ func TestStringRepresentation(t *testing.T) {
 	buf := &strings.Builder{}
 	t1 := time.Date(2000, 1, 1, 1, 1, 1, 0, time.UTC)
 	textHtml := header.ContentType{Type: "text", Subtype: "html"}
-	writeItem(buf, "k1", Item{Expires: t1})
-	writeItem(buf, "k2", Item{Content: textHtml, Expires: t1.Add(time.Hour), ETags: `"abc123"`})
-	writeItem(buf, "k3", Item{ETags: `"def123"`})
-	s := buf.String()
-	assert.Equal(t, `k1	/	2000-01-01T01:01:01Z	-
-k2	text/html	2000-01-01T02:01:01Z	"abc123"
-k3	/	-	"def123"
-`, s)
+
+	writeItem(buf, "k1", Item{File: "./foo.html", Expires: t1})
+	writeItem(buf, "k2", Item{File: "./foo.html", Content: textHtml, Expires: t1.Add(time.Hour), ETags: `"abc123"`})
+	writeItem(buf, "k3", Item{File: "./foo.html", ETags: `"def123"`})
+	writeItem(buf, "k4", Item{Location: "/foo/bar.html"})
+
+	s := strings.Split(buf.String(), "\n")
+
+	assert.Equal(t, `k1	-	./foo.html	-	2000-01-01T01:01:01Z	-`, s[0])
+	assert.Equal(t, `k2	-	./foo.html	text/html	2000-01-01T02:01:01Z	"abc123"`, s[1])
+	assert.Equal(t, `k3	-	./foo.html	-	-	"def123"`, s[2])
+	assert.Equal(t, `k4	/foo/bar.html	-	-	-	-`, s[3])
 }
 
 func TestDB(t *testing.T) {
@@ -43,14 +47,14 @@ func TestDB(t *testing.T) {
 	store1.Store(u3, Item{ETags: `W/"h3"`})
 
 	v1 := store1.Lookup(u1)
-	assert.Equal(t, v1, Item{ETags: `"h1a", "h1b"`})
+	assert.Equal(t, Item{ETags: `"h1a", "h1b"`}, v1)
 
 	v2 := store1.Lookup(u2)
-	assert.Equal(t, v2.ETags, `"h2"`)
+	assert.Equal(t, `"h2"`, v2.ETags)
 	assert.True(t, v2.Expires.Equal(t1), "%s %s", t1, v2.Expires)
 
 	v3 := store1.Lookup(u3)
-	assert.Equal(t, v3, Item{ETags: `W/"h3"`})
+	assert.Equal(t, Item{ETags: `W/"h3"`}, v3)
 
 	store1.Close()
 	store1 = nil
@@ -61,14 +65,14 @@ func TestDB(t *testing.T) {
 	store2.Store(u3, Item{})
 
 	w1 := store2.Lookup(u1)
-	assert.Equal(t, w1, Item{Content: header.ContentType{Type: "*", Subtype: "*"}, ETags: `"h1a", "h1b"`})
+	assert.Equal(t, Item{ETags: `"h1a", "h1b"`}, w1)
 
 	w2 := store2.Lookup(u2)
-	assert.Equal(t, w2.ETags, `"h2"`)
+	assert.Equal(t, `"h2"`, w2.ETags)
 	assert.True(t, w2.Expires.Equal(t1), "%s %s", t1, w2.Expires)
 
 	w3 := store2.Lookup(u3)
-	assert.Equal(t, w3.ETags, "")
+	assert.Equal(t, "", w3.ETags)
 	assert.True(t, w3.Expires.IsZero())
 }
 

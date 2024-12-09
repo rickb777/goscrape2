@@ -1,6 +1,7 @@
 package config
 
 import (
+	pathpkg "github.com/rickb777/path"
 	"math"
 	"net/http"
 	"strings"
@@ -22,7 +23,7 @@ type Config struct {
 	LaxAge       time.Duration       // added to origin server's expires timestamp
 	Tries        int                 // download attempts, 0 for unlimited
 
-	Directory string
+	Directory pathpkg.Path
 	Username  string
 	Password  string
 
