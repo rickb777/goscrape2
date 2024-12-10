@@ -14,13 +14,6 @@ import (
 	"github.com/spf13/afero"
 )
 
-// randomSuffix is appended to files temporarily whilst they are being written
-var randomSuffix string
-
-func init() {
-	randomSuffix = "." + strconv.FormatInt(rand.Int64N(2^20), 36)
-}
-
 // CreateDirectory creates the download path if it does not exist yet.
 func CreateDirectory(fs afero.Fs, path string) error {
 	if path == "" {
@@ -42,17 +35,18 @@ func WriteFileAtomically(fs afero.Fs, filePath string, data io.Reader) (int64, e
 	}
 
 	logger.Debug("Creating file", slog.String("path", filePath))
+
 	// writing the file may take much time, so write to a temporary file first
-	f, err := fs.Create(filePath + randomSuffix)
+	temporaryName := dir + randomName()
+	f, err := fs.Create(temporaryName)
 	if err != nil {
 		return 0, fmt.Errorf("creating file '%s': %w", filePath, err)
 	}
 
 	var length int64
 	if length, err = io.Copy(f, data); err != nil {
-		// nolint: wrapcheck
 		_ = f.Close() // try to close and remove file but ignore any error
-		_ = fs.Remove(filePath + randomSuffix)
+		_ = fs.Remove(temporaryName)
 		return length, fmt.Errorf("writing to file: %w", err)
 	}
 
@@ -61,8 +55,9 @@ func WriteFileAtomically(fs afero.Fs, filePath string, data io.Reader) (int64, e
 	}
 
 	// rename the file so it appears (almost) instantly in the filesystem
-	if err := fs.Rename(filePath+randomSuffix, filePath); err != nil {
-		return length, fmt.Errorf("renaming %s to %s: %w", filePath+randomSuffix, filePath, err)
+	if err := fs.Rename(temporaryName, filePath); err != nil {
+		_ = fs.Remove(temporaryName)
+		return length, fmt.Errorf("renaming %s to %s: %w", temporaryName, filePath, err)
 	}
 	return length, nil
 }
@@ -87,4 +82,8 @@ func ReadFile(fs afero.Fs, filePath string) ([]byte, error) {
 func FileExists(fs afero.Fs, filePath string) bool {
 	_, err := fs.Stat(filePath)
 	return !os.IsNotExist(err)
+}
+
+func randomName() string {
+	return "/." + strconv.FormatUint(rand.Uint64N(1<<24), 36)
 }
