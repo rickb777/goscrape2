@@ -2,8 +2,6 @@ package download
 
 import (
 	"context"
-	"github.com/rickb777/acceptable/headername"
-	"github.com/rickb777/goscrape2/logger"
 	"io"
 	"log/slog"
 	"net/http"
@@ -11,9 +9,11 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/rickb777/acceptable/headername"
 	"github.com/rickb777/goscrape2/config"
 	"github.com/rickb777/goscrape2/db"
 	"github.com/rickb777/goscrape2/download/throttle"
+	"github.com/rickb777/goscrape2/logger"
 	"github.com/rickb777/goscrape2/mapping"
 	"github.com/rickb777/goscrape2/utc"
 	"github.com/rickb777/goscrape2/work"
@@ -41,20 +41,6 @@ type Download struct {
 
 func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *work.Result, error) {
 	metadata := d.ETagsDB.Lookup(item.URL)
-
-	//if isAmbiguousPath(item.URL.Path) {
-	//	item2 := item.ChangePath(item.URL.Path + "/")
-	//	m2 := d.ETagsDB.Lookup(item2.URL)
-	//	if !m2.EmptyContentType() {
-	//		// we know it existed earlier; go straight to item2 and skip original item
-	//		return d.doProcessURL(ctx, item2, m2)
-	//	} else {
-	//		_, result2, err2 := d.doProcessURL(ctx, item2, m2)
-	//		if err2 == nil && result2.StatusCode != http.StatusNotFound {
-	//			return item2.URL, result2, nil
-	//		}
-	//	}
-	//}
 
 	var existingModified time.Time
 

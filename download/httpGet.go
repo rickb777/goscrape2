@@ -21,22 +21,13 @@ import (
 var Counters = NewHistogram()
 
 // httpGet performs one HTTP 'get' request, with as many retries as needed, up to the
-// configured limit. Unless an error arises, the response body must be fully
-// consumed and then closed.
+// configured limit.
+//
+// Unless an error arises, the response body must be fully consumed and closed by the caller.
 func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Time, metadata db.Item) (resp *http.Response, err error) {
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating HTTP request: %w", err)
-	}
-	req.Header.Set(headername.AcceptEncoding, "gzip")
-
-	if d.Config.UserAgent != "" {
-		req.Header.Set(headername.UserAgent, d.Config.UserAgent)
-	}
-
-	if d.Auth != "" {
-		req.Header.Set(headername.Authorization, d.Auth)
 	}
 
 	// lastModified is only set when a locally-cached file exists
@@ -58,10 +49,20 @@ func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Ti
 				}, nil
 			}
 		}
+	}
 
-		if len(metadata.ETags) > 0 {
-			req.Header.Set(headername.IfNoneMatch, metadata.ETags)
-		}
+	if len(metadata.ETags) > 0 {
+		req.Header.Set(headername.IfNoneMatch, metadata.ETags)
+	}
+
+	req.Header.Set(headername.AcceptEncoding, "gzip")
+
+	if d.Config.UserAgent != "" {
+		req.Header.Set(headername.UserAgent, d.Config.UserAgent)
+	}
+
+	if d.Auth != "" {
+		req.Header.Set(headername.Authorization, d.Auth)
 	}
 
 	for key, values := range d.Config.Header {
@@ -70,6 +71,12 @@ func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Ti
 		}
 	}
 
+	return d.doHttpGet(req)
+}
+
+//-------------------------------------------------------------------------------------------------
+
+func (d *Download) doHttpGet(req *http.Request) (resp *http.Response, err error) {
 	tries := d.Config.Tries
 	if tries < 1 {
 		tries = 1
@@ -86,7 +93,8 @@ func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Ti
 		}
 
 		Counters.Increment(resp.StatusCode)
-		args := []any{slog.String("url", u.String()), slog.Int("status", resp.StatusCode)}
+
+		args := []any{slog.String("url", req.URL.String()), slog.Int("status", resp.StatusCode)}
 		args = addHeaderValue(args, resp.Header, headername.ContentType)
 		args = addHeaderValue(args, resp.Header, headername.ContentLength)
 		args = addHeaderValue(args, resp.Header, headername.LastModified)
@@ -138,6 +146,8 @@ func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Ti
 
 	return resp, nil // allow this URL to be abandoned
 }
+
+//-------------------------------------------------------------------------------------------------
 
 func closeResponseBody(c io.Closer, u *url.URL) {
 	if err := c.Close(); err != nil {

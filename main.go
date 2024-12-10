@@ -329,7 +329,7 @@ func reportHistogram() {
 	slices.Sort(keys)
 	logger.Warn("Scraping finished", slog.Int("response-codes", len(keys)))
 	for _, key := range keys {
-		logger.Warn(fmt.Sprintf("%3d: %d", key, m[key]))
+		logger.Warn(fmt.Sprintf("%3d: %d %s", key, m[key], http.StatusText(key)))
 	}
 }
 
