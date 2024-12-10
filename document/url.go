@@ -2,22 +2,22 @@ package document
 
 import (
 	"github.com/rickb777/goscrape2/mapping"
-	"net/url"
+	urlpkg "net/url"
 	"path"
 	"strings"
 )
 
-func resolveURL(base *url.URL, reference, startURLHost, relativeToRoot string) string {
-	ur, err := url.Parse(reference)
+func resolveURL(base *urlpkg.URL, reference, startURLHost, relativeToRoot string) string {
+	url, err := urlpkg.Parse(reference)
 	if err != nil {
 		return ""
 	}
 
-	if ur.Host != "" && ur.Host != startURLHost {
+	if url.Host != "" && url.Host != startURLHost {
 		return reference // points to a different website - leave unchanged
 	}
 
-	resolvedURL := base.ResolveReference(ur)
+	resolvedURL := base.ResolveReference(url)
 
 	if resolvedURL.Host == startURLHost {
 		resolvedURL.Path = urlRelativeToOther(resolvedURL, base)
@@ -38,22 +38,13 @@ func resolveURL(base *url.URL, reference, startURLHost, relativeToRoot string) s
 		}
 	}
 
-	if resolved[len(resolved)-1] == '/' {
-		resolved += mapping.PageDirIndex // link dir index to index.html
-	} else {
-		l := strings.LastIndexByte(resolved, '/')
-		if 0 <= l && l < len(resolved)-1 && resolved[l+1] == '#' {
-			resolved = resolved[:l+1] + mapping.PageDirIndex + resolved[l+1:] // link fragment correct
-		}
-	}
-
 	resolved = strings.TrimPrefix(resolved, "/")
 	return resolved
 }
 
-func urlRelativeToRoot(u *url.URL) string {
+func urlRelativeToRoot(url *urlpkg.URL) string {
 	var rel string
-	splits := strings.Split(u.Path, "/")
+	splits := strings.Split(url.Path, "/")
 	for i := range splits {
 		if (len(splits[i]) > 0) && (i < len(splits)-1) {
 			rel += "../"
@@ -62,7 +53,7 @@ func urlRelativeToRoot(u *url.URL) string {
 	return rel
 }
 
-func urlRelativeToOther(src, base *url.URL) string {
+func urlRelativeToOther(src, base *urlpkg.URL) string {
 	srcSplits := strings.Split(src.Path, "/")
 	baseSplits := strings.Split(mapping.GetPageFilePath(base), "/")
 

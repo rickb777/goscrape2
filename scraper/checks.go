@@ -8,6 +8,10 @@ import (
 // shouldURLBeDownloaded checks whether a page should be downloaded.
 // nolint: cyclop
 func (sc *Scraper) shouldURLBeDownloaded(item *url.URL, depth int) bool {
+	if item.Scheme == "" && item.Host == "" {
+		return true
+	}
+
 	if item.Scheme != "http" && item.Scheme != "https" {
 		return false
 	}

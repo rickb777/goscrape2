@@ -13,12 +13,14 @@ import (
 
 func TestFixURLReferences(t *testing.T) {
 	logger.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
-	u := mustParseURL("http://domain.com")
+	u := mustParseURL("http://domain.com/content/")
 
 	b := []byte(`<html lang="es"><head></head>
 <body>
+  <a href="https://domain.com/">Home</a>
   <a href="https://domain.com/wp-content/uploads/document.pdf" rel="doc">Guide</a>
-  <img src="https://domain.com/test.jpg" srcset="https://domain.com/test-480w.jpg 480w, https://domain.com/test-800w.jpg 800w"/>
+  <img src="https://domain.com/content/test.jpg" srcset="https://domain.com/content/test-480w.jpg 480w, https://domain.com/content/test-800w.jpg 800w"/>
+  <img src="/other.jpg" srcset="/other-480w.jpg 480w, /other-800w.jpg 800w"/>
 </body></html>
 `)
 
@@ -31,8 +33,10 @@ func TestFixURLReferences(t *testing.T) {
 
 	expected := `<html lang="es"><head></head>
 <body>
-  <a href="wp-content/uploads/document.pdf" rel="doc">Guide</a>
+  <a href="../">Home</a>
+  <a href="../wp-content/uploads/document.pdf" rel="doc">Guide</a>
   <img src="test.jpg" srcset="test-480w.jpg 480w, test-800w.jpg 800w"/>
+  <img src="../other.jpg" srcset="../other-480w.jpg 480w, ../other-800w.jpg 800w"/>
 
 </body></html>`
 	assert.Equal(t, expected, string(ref))

@@ -28,7 +28,7 @@ func TestResolveURL(t *testing.T) {
 	}
 
 	var cases = []filePathCase{
-		{baseURL: pathlessURL, resolved: "index.html"},
+		{baseURL: pathlessURL, resolved: ""},
 		{baseURL: pathlessURL, reference: "#contents", resolved: "#contents"},
 		{baseURL: pathlessURL, reference: "//any.other.xyz/a/path", resolved: "//any.other.xyz/a/path"},
 		{baseURL: URL, reference: "brasil/index.html", resolved: "brasil/index.html"},

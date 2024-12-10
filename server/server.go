@@ -9,6 +9,8 @@ import (
 	"os"
 
 	"github.com/gorilla/handlers"
+	"github.com/rickb777/acceptable/headername"
+	"github.com/rickb777/goscrape2/db"
 	"github.com/rickb777/goscrape2/logger"
 	"github.com/rickb777/goscrape2/scraper"
 	"github.com/rickb777/goscrape2/work"
@@ -23,9 +25,13 @@ var mimeTypes = map[string]string{
 	".asp": "text/html; charset=utf-8",
 }
 
+//-------------------------------------------------------------------------------------------------
+
+// onDemand is a HTTP handler that processes 404-not found requests by trying to download
+// the missing items from the origin server.
 type onDemand struct {
-	sc         *scraper.Scraper
-	fileServer *servefiles.Assets
+	sc   *scraper.Scraper
+	next http.Handler
 }
 
 func (h *onDemand) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -40,7 +46,36 @@ func (h *onDemand) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	} else if result.StatusCode >= 300 {
 		http.Error(w, fmt.Sprintf("Internal server error: upstream %d", result.StatusCode), http.StatusInternalServerError)
 	} else {
-		h.fileServer.ServeHTTP(w, r)
+		h.next.ServeHTTP(w, r)
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+
+// redirecter uses the cache database to decide which URLs to redirect and where to redirect those
+// URls. Everything else is handled by the next handler.
+type redirecter struct {
+	eTagsDB *db.DB
+	scheme  string
+	host    string
+	next    http.Handler
+}
+
+const (
+	minRedirectCode = http.StatusMovedPermanently
+	maxRedirectCode = http.StatusPermanentRedirect
+)
+
+func (h *redirecter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	u := *r.URL
+	u.Scheme = h.scheme
+	u.Host = h.host
+	metadata := h.eTagsDB.Lookup(&u)
+	if minRedirectCode <= metadata.Code && metadata.Code <= maxRedirectCode && metadata.Location != "" {
+		w.Header().Set(headername.Location, metadata.Location)
+		w.WriteHeader(metadata.Code)
+	} else {
+		h.next.ServeHTTP(w, r)
 	}
 }
 
@@ -60,7 +95,8 @@ func LaunchWebserver(sc *scraper.Scraper, path string, port int16) (*http.Server
 		slog.String("path", path),
 		slog.String("address", fmt.Sprintf("http://%s:%d", hostname(), port)))
 
-	handler := selectAssetServer(sc, path)
+	handler := constructAssetServer(sc, path)
+	handler = &redirecter{eTagsDB: sc.ETagsDB, scheme: sc.URL.Scheme, host: sc.URL.Host, next: handler}
 	handler = sloghttp.NewWithConfig(logger.Logger, logger.HttpLogConfig())(handler)
 	handler = handlers.RecoveryHandler()(handler)
 	server := newWebserver(port, handler)
@@ -97,7 +133,7 @@ func newWebserver(port int16, fileServer http.Handler) *http.Server {
 	return &http.Server{Addr: addr, Handler: mux}
 }
 
-func selectAssetServer(sc *scraper.Scraper, path string) http.Handler {
+func constructAssetServer(sc *scraper.Scraper, path string) http.Handler {
 	var fileServer http.Handler
 	if sc == nil {
 		fs := afero.NewBasePathFs(afero.NewOsFs(), path)
@@ -110,10 +146,10 @@ func selectAssetServer(sc *scraper.Scraper, path string) http.Handler {
 
 func assetHandlerWith404Handler(sc *scraper.Scraper) http.Handler {
 	fs := afero.NewBasePathFs(sc.Fs, sc.URL.Host)
-	fileServer := servefiles.NewAssetHandlerFS(fs)
 	secondary := servefiles.NewAssetHandlerFS(fs) // secondary has default 404 handler
-	fileServer.NotFound = &onDemand{sc: sc, fileServer: secondary}
-	return fileServer
+	primary := servefiles.NewAssetHandlerFS(fs)
+	primary.NotFound = &onDemand{sc: sc, next: secondary}
+	return primary
 }
 
 func hostname() string {

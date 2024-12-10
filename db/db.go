@@ -12,12 +12,14 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
 
 type Item struct {
+	Code     int
 	Location string // redirection
 	Content  header.ContentType
 	ETags    string
@@ -51,7 +53,8 @@ func (i Item) String() string {
 		expires = i.Expires.Format(time.RFC3339)
 	}
 
-	return fmt.Sprintf("%s\t%s\t%s\t%s",
+	return fmt.Sprintf("%d\t%s\t%s\t%s\t%s",
+		i.Code,
 		dashIfBlank(i.Location),
 		ct,
 		expires,
@@ -106,28 +109,30 @@ func strNotDash(s string) string {
 }
 
 func readItem(records map[string]Item, parts []string) {
-	if len(parts) == 5 {
+	if len(parts) == 6 {
 		key := parts[0]
-		v1 := parts[1]
+		v1, _ := strconv.Atoi(parts[1])
 		v2 := parts[2]
 		v3 := parts[3]
 		v4 := parts[4]
+		v5 := parts[5]
 
 		var ct header.ContentType
-		if v2 != "-" {
-			ct = header.ParseContentType(v2)
+		if v3 != "-" {
+			ct = header.ParseContentType(v3)
 		}
 
 		var expires time.Time
-		if v3 != "-" {
-			expires, _ = time.Parse(time.RFC3339, v3)
+		if v4 != "-" {
+			expires, _ = time.Parse(time.RFC3339, v4)
 		}
 
 		records[key] = Item{
-			Location: strNotDash(v1),
+			Code:     v1,
+			Location: strNotDash(v2),
 			Content:  ct,
 			Expires:  expires,
-			ETags:    strNotDash(v4),
+			ETags:    strNotDash(v5),
 		}
 	}
 }

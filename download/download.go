@@ -96,7 +96,7 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 
 	case http.StatusNotFound:
 		discardData(resp.Body) // discard anything present
-		d.ETagsDB.Store(item.URL, db.Item{Expires: utc.Now().Add(d.Config.GetLaxAge())})
+		d.ETagsDB.Store(item.URL, db.Item{Code: resp.StatusCode, Expires: utc.Now().Add(d.Config.GetLaxAge())})
 		return item.URL, &work.Result{Item: item, StatusCode: resp.StatusCode}, nil
 
 	case http.StatusForbidden, http.StatusGone, http.StatusUnavailableForLegalReasons:
@@ -143,7 +143,7 @@ func (d *Download) responseRedirect(item work.Item, resp *http.Response) (*url.U
 	}
 
 	// store so that the webserver can replay the redirect
-	d.ETagsDB.Store(item.URL, db.Item{Location: location})
+	d.ETagsDB.Store(item.URL, db.Item{Code: resp.StatusCode, Location: location})
 
 	// put this URL back into the work queue to be processed later
 	item.FilePath = ""

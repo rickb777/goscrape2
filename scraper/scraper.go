@@ -224,7 +224,8 @@ func (sc *Scraper) Start(ctx context.Context) error {
 			sc.partitionResult(&result, newDepth)
 			logger.Debug("Partitioned", slog.Any("item", result.Item), slog.Any("include", result.References), slog.Any("exclude", result.Excluded))
 			for _, ref := range result.References {
-				workQueueIn <- work.Item{URL: ref, Referrer: result.Item.URL, Depth: newDepth}
+				u := absoluteURL(ref, result)
+				workQueueIn <- work.Item{URL: u, Referrer: result.Item.URL, Depth: newDepth}
 			}
 			todo += len(result.References)
 			if todo == 0 {
@@ -241,6 +242,23 @@ func (sc *Scraper) Start(ctx context.Context) error {
 	// all the pool processes are busy until this unblocks.
 	pool.Wait()
 	return pool.Err()
+}
+
+func absoluteURL(u *urlpkg.URL, result work.Result) *urlpkg.URL {
+	if u.Scheme == "" {
+		u.Scheme = result.URL.Scheme
+	} else if u.Scheme == "http" && result.URL.Scheme == "https" {
+		logger.Warn("HTTPS downgraded",
+			slog.Any("url", result.URL),
+			slog.Int("code", result.StatusCode),
+			slog.Any("location", u))
+	}
+
+	if u.Host == "" {
+		u.Host = result.URL.Host
+	}
+
+	return u
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -273,7 +291,9 @@ func timeTaken(before time.Time) string {
 }
 
 func chooseLevel(statusCode int) slog.Level {
-	if statusCode >= 400 {
+	if statusCode == http.StatusTeapot {
+		return slog.LevelInfo
+	} else if statusCode >= 400 {
 		return slog.LevelWarn
 	}
 	return slog.LevelInfo

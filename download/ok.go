@@ -25,7 +25,7 @@ func (d *Download) response200(item work.Item, resp *http.Response) (*url.URL, *
 	lastModified, _ := header.ParseHTTPDateTime(resp.Header.Get(headername.LastModified))
 	isGzip := resp.Header.Get(headername.ContentEncoding) == "gzip"
 
-	metadata := db.Item{Content: contentType, ETags: resp.Header.Get(headername.ETag)}
+	metadata := db.Item{Code: resp.StatusCode, Content: contentType, ETags: resp.Header.Get(headername.ETag)}
 	if expires := resp.Header.Get(headername.Expires); expires != "" {
 		metadata.Expires, _ = header.ParseHTTPDateTime(expires)
 	}
