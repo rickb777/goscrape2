@@ -61,10 +61,45 @@ func (i Item) String() string {
 		dashIfBlank(i.ETags))
 }
 
+func parseItem(line string) (string, Item) {
+	parts := strings.Split(line, "\t")
+
+	if len(parts) != 6 {
+		return "", Item{}
+	}
+
+	key := parts[0]
+	v1, _ := strconv.Atoi(parts[1])
+	v2 := parts[2]
+	v3 := parts[3]
+	v4 := parts[4]
+	v5 := parts[5]
+
+	var ct header.ContentType
+	if v3 != "-" {
+		ct = header.ParseContentType(v3)
+	}
+
+	var expires time.Time
+	if v4 != "-" {
+		// time.Parse conveniently returns the zero value on error
+		expires, _ = time.Parse(time.RFC3339, v4)
+	}
+
+	return key, Item{
+		Code:     v1,
+		Location: strNotDash(v2),
+		Content:  ct,
+		Expires:  expires,
+		ETags:    strNotDash(v5),
+	}
+
+}
+
 //-------------------------------------------------------------------------------------------------
 
-// DB provides a persistent store for HTTP ETags to reduce network traffic when repeating
-// a download session. If the store is unavailable for some reason, its methods are no-ops.
+// DB provides a persistent store for HTTP ETags and other metadata to reduce network traffic when
+// repeating a download session. If the store is unavailable for some reason, its methods are no-ops.
 type DB struct {
 	file    string
 	records map[string]Item
@@ -108,42 +143,16 @@ func strNotDash(s string) string {
 	return s
 }
 
-func readItem(records map[string]Item, parts []string) {
-	if len(parts) == 6 {
-		key := parts[0]
-		v1, _ := strconv.Atoi(parts[1])
-		v2 := parts[2]
-		v3 := parts[3]
-		v4 := parts[4]
-		v5 := parts[5]
-
-		var ct header.ContentType
-		if v3 != "-" {
-			ct = header.ParseContentType(v3)
-		}
-
-		var expires time.Time
-		if v4 != "-" {
-			expires, _ = time.Parse(time.RFC3339, v4)
-		}
-
-		records[key] = Item{
-			Code:     v1,
-			Location: strNotDash(v2),
-			Content:  ct,
-			Expires:  expires,
-			ETags:    strNotDash(v5),
-		}
-	}
-}
-
 func readFile(rdr io.Reader) (map[string]Item, error) {
 	records := make(map[string]Item)
 	s := bufio.NewScanner(rdr)
 	for s.Scan() {
 		line := strings.TrimSpace(s.Text())
 		if !strings.HasPrefix(line, "#") {
-			readItem(records, strings.Split(line, "\t"))
+			key, item := parseItem(line)
+			if key != "" {
+				records[key] = item
+			}
 		}
 	}
 	return records, nil
@@ -173,24 +182,33 @@ func (store *DB) Close() error {
 	if store == nil {
 		return nil // no-op if absent
 	}
+
 	store.mu.Lock()
 	defer store.mu.Unlock()
+
 	store.flush()
 	return nil
 }
 
-// Lookup finds the ETags for a given URL.
+func keyOf(u *urlpkg.URL) string {
+	v := *u
+	v.Fragment = ""
+	return v.String()
+}
+
+// Lookup finds the metadata for a given URL.
 func (store *DB) Lookup(u *urlpkg.URL) Item {
 	if store == nil {
 		return Item{} // no-op if absent
 	}
 
-	v := *u
-	v.Fragment = ""
-	return store.records[v.String()]
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	return store.records[keyOf(u)]
 }
 
-// Store stores the ETags for a given URL.
+// Store stores the metadata for a given URL.
 func (store *DB) Store(u *urlpkg.URL, item Item) {
 	if store == nil {
 		return // no-op if absent
@@ -199,19 +217,18 @@ func (store *DB) Store(u *urlpkg.URL, item Item) {
 	store.mu.Lock()
 	defer store.mu.Unlock()
 
-	v := *u
-	v.Fragment = ""
-	key := v.String()
 	if item.Empty() {
-		delete(store.records, key)
+		delete(store.records, keyOf(u))
 	} else {
-		store.records[key] = item
+		store.records[keyOf(u)] = item
 	}
 
 	store.syncPeriodically()
 }
 
 func (store *DB) flush() {
+	// store.mu is already locked
+
 	file, err := store.fs.Create(store.file)
 	if err != nil {
 		logger.Warn("Cannot create DB", slog.Any("err", err), slog.String("file", store.file))
