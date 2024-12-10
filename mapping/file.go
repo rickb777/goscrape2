@@ -1,8 +1,8 @@
 package mapping
 
 import (
-	"github.com/rickb777/path"
 	"net/url"
+	"path"
 	"strings"
 )
 
@@ -15,18 +15,18 @@ const (
 )
 
 // GetFilePath returns a file path for a URL to store the URL content in.
-func GetFilePath(url *url.URL, isAPage bool) path.Path {
-	tailingSlash := strings.HasSuffix(url.Path, "/")
-	if isAPage || tailingSlash {
+func GetFilePath(url *url.URL, isAPage bool) string {
+	trailingSlash := strings.HasSuffix(url.Path, "/")
+	if isAPage || trailingSlash {
 		fileName := GetPageFilePath(url)
 		return "." + fileName
 	} else {
-		return path.Path("." + url.Path)
+		return "." + url.Path
 	}
 }
 
 // GetPageFilePath returns a filename for a URL that represents a page.
-func GetPageFilePath(url *url.URL) path.Path {
+func GetPageFilePath(url *url.URL) string {
 	fileName := url.Path
 
 	switch {
@@ -45,5 +45,5 @@ func GetPageFilePath(url *url.URL) path.Path {
 		}
 	}
 
-	return path.Path(fileName)
+	return fileName
 }

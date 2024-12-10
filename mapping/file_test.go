@@ -1,7 +1,6 @@
 package mapping
 
 import (
-	pathpkg "github.com/rickb777/path"
 	"io"
 	"log/slog"
 	urlpkg "net/url"
@@ -15,7 +14,7 @@ import (
 func TestGetFilePath(t *testing.T) {
 	type filePathCase struct {
 		downloadURL      string
-		expectedFilePath pathpkg.Path
+		expectedFilePath string
 	}
 
 	pathSeparator := string(os.PathSeparator)
@@ -24,7 +23,7 @@ func TestGetFilePath(t *testing.T) {
 		{downloadURL: "https://github.com/", expectedFilePath: "./index.html"},
 		{downloadURL: "https://github.com/#fragment", expectedFilePath: "./index.html"},
 		{downloadURL: "https://github.com/test", expectedFilePath: "./test.html"},
-		{downloadURL: "https://github.com/test/", expectedFilePath: pathpkg.Path("./test" + pathSeparator + "index.html")},
+		{downloadURL: "https://github.com/test/", expectedFilePath: "./test" + pathSeparator + "index.html"},
 		{downloadURL: "https://github.com/test.aspx", expectedFilePath: "./test.aspx"},
 		{downloadURL: "https://google.com/settings", expectedFilePath: "./settings.html"},
 	}

@@ -202,16 +202,16 @@ func (d *Download) storeDownload(u *url.URL, data io.Reader, lastModified time.T
 	if fileSize, err = ioutil.WriteFileAtomically(d.Fs, filePath, data); err != nil {
 		logger.Error("Writing to file failed",
 			slog.String("URL", u.String()),
-			slog.String("file", string(filePath)),
+			slog.String("file", filePath),
 			slog.Any("error", err))
 		return fileSize
 	}
 
 	if !lastModified.IsZero() {
-		if err := d.Fs.Chtimes(string(filePath), lastModified, lastModified); err != nil {
+		if err := d.Fs.Chtimes(filePath, lastModified, lastModified); err != nil {
 			logger.Error("Updating file timestamps failed",
 				slog.String("URL", u.String()),
-				slog.String("file", string(filePath)),
+				slog.String("file", filePath),
 				slog.Any("error", err))
 		}
 	}

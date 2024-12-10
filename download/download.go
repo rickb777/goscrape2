@@ -58,13 +58,9 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 
 	var existingModified time.Time
 
-	if !metadata.Empty() {
-		item.FilePath = metadata.File
-	} else {
-		item.FilePath = mapping.GetFilePath(item.URL, true)
-	}
+	item.FilePath = mapping.GetFilePath(item.URL, true)
 
-	fileInfo, err := d.Fs.Stat(string(item.FilePath))
+	fileInfo, err := d.Fs.Stat(item.FilePath)
 	if err == nil && fileInfo != nil {
 		existingModified = fileInfo.ModTime()
 	}
@@ -122,14 +118,14 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 // responseGone deletes obsolete/inaccessible files
 func (d *Download) responseGone(item work.Item, resp *http.Response) (*url.URL, *work.Result, error) {
 	filePath := mapping.GetFilePath(item.URL, true)
-	_ = d.Fs.Remove(string(filePath))
+	_ = d.Fs.Remove(filePath)
 	return item.URL, &work.Result{Item: item, StatusCode: resp.StatusCode}, nil
 }
 
 //-------------------------------------------------------------------------------------------------
 
 // response429 handles too-many-request responses.
-func (d *Download) response429(item work.Item, resp *http.Response) (*url.URL, *work.Result, error) {
+func (d *Download) response429(item work.Item, _ *http.Response) (*url.URL, *work.Result, error) {
 	// put this URL back into the work queue to be re-tried later
 	repeat := &work.Result{Item: item, StatusCode: http.StatusTooManyRequests, References: []*url.URL{item.URL}}
 	repeat.Item.Depth-- // because it will get incremented and we need the retry depth to be unchanged

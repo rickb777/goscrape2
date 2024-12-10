@@ -16,17 +16,17 @@ func TestStringRepresentation(t *testing.T) {
 	t1 := time.Date(2000, 1, 1, 1, 1, 1, 0, time.UTC)
 	textHtml := header.ContentType{Type: "text", Subtype: "html"}
 
-	writeItem(buf, "k1", Item{File: "./foo.html", Expires: t1})
-	writeItem(buf, "k2", Item{File: "./foo.html", Content: textHtml, Expires: t1.Add(time.Hour), ETags: `"abc123"`})
-	writeItem(buf, "k3", Item{File: "./foo.html", ETags: `"def123"`})
+	writeItem(buf, "k1", Item{Expires: t1})
+	writeItem(buf, "k2", Item{Content: textHtml, Expires: t1.Add(time.Hour), ETags: `"abc123"`})
+	writeItem(buf, "k3", Item{ETags: `"def123"`})
 	writeItem(buf, "k4", Item{Location: "/foo/bar.html"})
 
 	s := strings.Split(buf.String(), "\n")
 
-	assert.Equal(t, `k1	-	./foo.html	-	2000-01-01T01:01:01Z	-`, s[0])
-	assert.Equal(t, `k2	-	./foo.html	text/html	2000-01-01T02:01:01Z	"abc123"`, s[1])
-	assert.Equal(t, `k3	-	./foo.html	-	-	"def123"`, s[2])
-	assert.Equal(t, `k4	/foo/bar.html	-	-	-	-`, s[3])
+	assert.Equal(t, `k1	-	-	2000-01-01T01:01:01Z	-`, s[0])
+	assert.Equal(t, `k2	-	text/html	2000-01-01T02:01:01Z	"abc123"`, s[1])
+	assert.Equal(t, `k3	-	-	-	"def123"`, s[2])
+	assert.Equal(t, `k4	/foo/bar.html	-	-	-`, s[3])
 }
 
 func TestDB(t *testing.T) {

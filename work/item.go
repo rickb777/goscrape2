@@ -2,7 +2,6 @@ package work
 
 import (
 	"fmt"
-	"github.com/rickb777/path"
 	"net/url"
 	"strings"
 	"time"
@@ -14,7 +13,7 @@ type Item struct {
 	StartTime time.Time
 	Referrer  *url.URL
 	Depth     int
-	FilePath  path.Path // returned when the item is processed
+	FilePath  string // returned when the item is processed
 }
 
 func (it Item) ChangePath(newPath string) Item {

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/rickb777/acceptable/header"
 	"github.com/rickb777/goscrape2/logger"
-	"github.com/rickb777/path"
 	"github.com/spf13/afero"
 	"io"
 	"log/slog"
@@ -20,7 +19,6 @@ import (
 
 type Item struct {
 	Location string // redirection
-	File     path.Path
 	Content  header.ContentType
 	ETags    string
 	Expires  time.Time
@@ -32,7 +30,7 @@ func (i Item) EmptyContentType() bool {
 }
 
 func (i Item) Empty() bool {
-	return i.Location == "" && i.File == "" && i.EmptyContentType() && len(i.ETags) == 0 && i.Expires.IsZero()
+	return i.Location == "" && i.EmptyContentType() && len(i.ETags) == 0 && i.Expires.IsZero()
 }
 
 func dashIfBlank(s string) string {
@@ -53,9 +51,8 @@ func (i Item) String() string {
 		expires = i.Expires.Format(time.RFC3339)
 	}
 
-	return fmt.Sprintf("%s\t%s\t%s\t%s\t%s",
+	return fmt.Sprintf("%s\t%s\t%s\t%s",
 		dashIfBlank(i.Location),
-		dashIfBlank(string(i.File)),
 		ct,
 		expires,
 		dashIfBlank(i.ETags))
@@ -81,7 +78,7 @@ func Open() *DB {
 	return OpenDB(localStateDir(), afero.NewOsFs())
 }
 
-const FileName = "goscrape-etags.txt"
+const FileName = "goscrape-cache.txt"
 
 func OpenDB(dir string, fs afero.Fs) *DB {
 	if err := fs.MkdirAll(dir, 0755); err != nil {
@@ -109,25 +106,28 @@ func strNotDash(s string) string {
 }
 
 func readItem(records map[string]Item, parts []string) {
-	if len(parts) == 6 {
+	if len(parts) == 5 {
 		key := parts[0]
+		v1 := parts[1]
+		v2 := parts[2]
+		v3 := parts[3]
+		v4 := parts[4]
 
 		var ct header.ContentType
-		if parts[3] != "-" {
-			ct = header.ParseContentType(parts[3])
+		if v2 != "-" {
+			ct = header.ParseContentType(v2)
 		}
 
 		var expires time.Time
-		if parts[4] != "-" {
-			expires, _ = time.Parse(time.RFC3339, parts[4])
+		if v3 != "-" {
+			expires, _ = time.Parse(time.RFC3339, v3)
 		}
 
 		records[key] = Item{
-			Location: strNotDash(parts[1]),
-			File:     path.Path(strNotDash(parts[2])),
+			Location: strNotDash(v1),
 			Content:  ct,
 			Expires:  expires,
-			ETags:    strNotDash(parts[5]),
+			ETags:    strNotDash(v4),
 		}
 	}
 }

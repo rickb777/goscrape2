@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	pathpkg "github.com/rickb777/path"
 	"log/slog"
 	"mime"
 	"net/http"
@@ -47,7 +46,7 @@ func (h *onDemand) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 //-------------------------------------------------------------------------------------------------
 
-func ServeDirectory(ctx context.Context, sc *scraper.Scraper, path pathpkg.Path, port int16) error {
+func ServeDirectory(ctx context.Context, sc *scraper.Scraper, path string, port int16) error {
 	server, errChan, err := LaunchWebserver(sc, path, port)
 	if err != nil {
 		return err
@@ -56,9 +55,9 @@ func ServeDirectory(ctx context.Context, sc *scraper.Scraper, path pathpkg.Path,
 	return AwaitWebserver(ctx, server, errChan)
 }
 
-func LaunchWebserver(sc *scraper.Scraper, path pathpkg.Path, port int16) (*http.Server, chan error, error) {
+func LaunchWebserver(sc *scraper.Scraper, path string, port int16) (*http.Server, chan error, error) {
 	logger.Info("Serving directory",
-		slog.String("path", string(path)),
+		slog.String("path", path),
 		slog.String("address", fmt.Sprintf("http://%s:%d", hostname(), port)))
 
 	handler := selectAssetServer(sc, path)
@@ -98,10 +97,10 @@ func newWebserver(port int16, fileServer http.Handler) *http.Server {
 	return &http.Server{Addr: addr, Handler: mux}
 }
 
-func selectAssetServer(sc *scraper.Scraper, path pathpkg.Path) http.Handler {
+func selectAssetServer(sc *scraper.Scraper, path string) http.Handler {
 	var fileServer http.Handler
 	if sc == nil {
-		fs := afero.NewBasePathFs(afero.NewOsFs(), string(path))
+		fs := afero.NewBasePathFs(afero.NewOsFs(), path)
 		fileServer = servefiles.NewAssetHandlerFS(fs)
 	} else {
 		fileServer = assetHandlerWith404Handler(sc)
