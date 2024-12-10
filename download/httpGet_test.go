@@ -161,7 +161,7 @@ func TestGet304UsingEtag(t *testing.T) {
 	defer stub.Metadata.Close()
 
 	u := mustParse("http://example.org/")
-	item := db.Item{ETags: `"hash"`}
+	item := db.Item{Code: 200, ETags: `"hash"`}
 	stub.Metadata.Store(u, item)
 
 	d := &Download{
@@ -190,7 +190,7 @@ func TestNotYetExpired(t *testing.T) {
 	defer stub.Metadata.Close()
 
 	u := mustParse("http://example.org/")
-	item := db.Item{ETags: `"hash"`, Expires: utc.Now().Add(time.Hour)}
+	item := db.Item{Code: 200, ETags: `"hash"`, Expires: utc.Now().Add(time.Hour)}
 	stub.Metadata.Store(u, item) // not expired
 
 	d := &Download{

@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/afero"
 	"io"
 	"log/slog"
+	"net/http"
 	urlpkg "net/url"
 	"os"
 	"path/filepath"
@@ -32,7 +33,7 @@ func (i Item) EmptyContentType() bool {
 }
 
 func (i Item) Empty() bool {
-	return i.Location == "" && i.EmptyContentType() && len(i.ETags) == 0 && i.Expires.IsZero()
+	return i.Code == 0 && i.Location == "" && i.EmptyContentType() && i.ETags == "" && i.Expires.IsZero()
 }
 
 func dashIfBlank(s string) string {
@@ -42,7 +43,7 @@ func dashIfBlank(s string) string {
 	return s
 }
 
-func (i Item) String() string {
+func (i Item) Strings() []string {
 	ct := "-"
 	if i.Content.Type != "" {
 		ct = i.Content.String()
@@ -53,12 +54,17 @@ func (i Item) String() string {
 		expires = i.Expires.Format(time.RFC3339)
 	}
 
-	return fmt.Sprintf("%d\t%s\t%s\t%s\t%s",
-		i.Code,
+	return []string{
+		strconv.Itoa(i.Code),
 		dashIfBlank(i.Location),
 		ct,
 		expires,
-		dashIfBlank(i.ETags))
+		dashIfBlank(i.ETags),
+	}
+}
+
+func (i Item) String() string {
+	return strings.Join(i.Strings(), "\t")
 }
 
 func parseItem(line string) (string, Item) {
@@ -209,7 +215,7 @@ func (store *DB) Lookup(u *urlpkg.URL) Item {
 }
 
 // Store stores the metadata for a given URL.
-func (store *DB) Store(u *urlpkg.URL, item Item) {
+func (store *DB) Store(url *urlpkg.URL, item Item) {
 	if store == nil {
 		return // no-op if absent
 	}
@@ -217,10 +223,21 @@ func (store *DB) Store(u *urlpkg.URL, item Item) {
 	store.mu.Lock()
 	defer store.mu.Unlock()
 
-	if item.Empty() {
-		delete(store.records, keyOf(u))
-	} else {
-		store.records[keyOf(u)] = item
+	switch item.Code {
+	case http.StatusOK, http.StatusNotFound:
+		store.records[keyOf(url)] = item
+
+	case http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther, http.StatusTemporaryRedirect, http.StatusPermanentRedirect:
+		if item.Location != "" {
+			store.records[keyOf(url)] = item
+		}
+
+	default:
+		if item.Empty() {
+			delete(store.records, keyOf(url))
+		} else {
+			panic(fmt.Sprintf("%s %+v", url, item))
+		}
 	}
 
 	store.syncPeriodically()
@@ -258,7 +275,10 @@ func writeItem(w io.Writer, key string, item Item) (err error) {
 	if item.Empty() {
 		return nil
 	}
-	_, err = fmt.Fprintf(w, "%s\t%s\n", key, item)
+	ss := make([]string, 1, 6)
+	ss[0] = key
+	ss = append(ss, item.Strings()...)
+	_, err = fmt.Fprintln(w, strings.Join(ss, "\t"))
 	return err
 }
 

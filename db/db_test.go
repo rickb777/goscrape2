@@ -38,23 +38,23 @@ func TestDB(t *testing.T) {
 	t1 := time.Date(2001, 2, 3, 4, 5, 6, 0, time.UTC)
 
 	u1 := mustParse("http://example.org/")
-	store1.Store(u1, Item{ETags: `"h1a", "h1b"`})
+	store1.Store(u1, Item{Code: 200, ETags: `"h1a", "h1b"`})
 
 	u2 := mustParse("http://example.org/a/b/c/index.html#sec1")
-	store1.Store(u2, Item{ETags: `"h2"`, Expires: t1})
+	store1.Store(u2, Item{Code: 200, ETags: `"h2"`, Expires: t1})
 
 	u3 := mustParse("http://example.org/a/b/c/style.css")
-	store1.Store(u3, Item{ETags: `W/"h3"`})
+	store1.Store(u3, Item{Code: 200, ETags: `W/"h3"`})
 
 	v1 := store1.Lookup(u1)
-	assert.Equal(t, Item{ETags: `"h1a", "h1b"`}, v1)
+	assert.Equal(t, Item{Code: 200, ETags: `"h1a", "h1b"`}, v1)
 
 	v2 := store1.Lookup(u2)
 	assert.Equal(t, `"h2"`, v2.ETags)
 	assert.True(t, v2.Expires.Equal(t1), "%s %s", t1, v2.Expires)
 
 	v3 := store1.Lookup(u3)
-	assert.Equal(t, Item{ETags: `W/"h3"`}, v3)
+	assert.Equal(t, Item{Code: 200, ETags: `W/"h3"`}, v3)
 
 	store1.Close()
 	store1 = nil
@@ -65,7 +65,7 @@ func TestDB(t *testing.T) {
 	store2.Store(u3, Item{})
 
 	w1 := store2.Lookup(u1)
-	assert.Equal(t, Item{ETags: `"h1a", "h1b"`}, w1)
+	assert.Equal(t, Item{Code: 200, ETags: `"h1a", "h1b"`}, w1)
 
 	w2 := store2.Lookup(u2)
 	assert.Equal(t, `"h2"`, w2.ETags)
