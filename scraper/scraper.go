@@ -85,6 +85,9 @@ func New(cfg config.Config, url *urlpkg.URL, fs afero.Fs) (*Scraper, error) {
 	client := &http.Client{
 		Jar:     cookies,
 		Timeout: cfg.Timeout,
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
 	}
 
 	if cfg.Proxy != "" {
@@ -161,13 +164,15 @@ func (sc *Scraper) Start(ctx context.Context) error {
 
 	switch firstResult.StatusCode {
 	case http.StatusOK, http.StatusNotModified, http.StatusTeapot:
-		// ok
+		if redirect != nil {
+			sc.URL = redirect // sc.URL is not altered subsequently
+		}
+
+	case http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther, http.StatusTemporaryRedirect, http.StatusPermanentRedirect:
+		sc.URL = firstResult.References[0]
+
 	default:
 		return fmt.Errorf("start page failed: %d %s", firstResult.StatusCode, http.StatusText(firstResult.StatusCode))
-	}
-
-	if redirect != nil {
-		sc.URL = redirect // sc.URL is not altered subsequently
 	}
 
 	// WorkQueue has unlimited buffering and so prevents deadlock
@@ -230,6 +235,7 @@ func (sc *Scraper) Start(ctx context.Context) error {
 	}()
 
 	// start the ball rolling: this creates the first batch of work items
+	logResult(firstResult)
 	results <- *firstResult
 
 	// all the pool processes are busy until this unblocks.
@@ -246,6 +252,9 @@ func logResult(result *work.Result) {
 		slog.Int("depth", result.Item.Depth),
 		slog.Int("code", result.StatusCode),
 		slog.String("took", timeTaken(result.Item.StartTime)),
+	}
+	if result.IsRedirect() {
+		args = append(args, slog.Any("location", result.References[0]))
 	}
 	if result.ContentLength > 0 && result.ContentLength != result.FileSize {
 		args = append(args, slog.Int64("length", result.ContentLength))

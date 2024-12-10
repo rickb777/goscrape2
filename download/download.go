@@ -2,13 +2,13 @@ package download
 
 import (
 	"context"
-	"github.com/rickb777/acceptable/header"
+	"github.com/rickb777/acceptable/headername"
+	"github.com/rickb777/goscrape2/logger"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
-	"path"
-	"strings"
 	"time"
 
 	"github.com/rickb777/goscrape2/config"
@@ -107,6 +107,10 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 		discardData(resp.Body) // discard anything present
 		return d.response429(item, resp)
 
+	case http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther, http.StatusTemporaryRedirect, http.StatusPermanentRedirect:
+		discardData(resp.Body) // discard anything present
+		return d.responseRedirect(item, resp)
+
 	default:
 		discardData(resp.Body) // didn't want it
 		return item.URL, &work.Result{Item: item, StatusCode: resp.StatusCode}, nil
@@ -124,9 +128,36 @@ func (d *Download) responseGone(item work.Item, resp *http.Response) (*url.URL, 
 
 //-------------------------------------------------------------------------------------------------
 
+// responseRedirect handles redirection
+func (d *Download) responseRedirect(item work.Item, resp *http.Response) (*url.URL, *work.Result, error) {
+	location := resp.Header.Get(headername.Location)
+
+	locURL, err := url.Parse(location)
+	if err != nil {
+		logger.Error("Parse location header failed",
+			slog.Any("url", item.URL),
+			slog.Int("code", resp.StatusCode),
+			slog.String("location", location),
+			slog.Any("error", err))
+		return nil, nil, err
+	}
+
+	// store so that the webserver can replay the redirect
+	d.ETagsDB.Store(item.URL, db.Item{Location: location})
+
+	// put this URL back into the work queue to be processed later
+	item.FilePath = ""
+	redirect := &work.Result{Item: item, StatusCode: resp.StatusCode, References: []*url.URL{locURL}}
+	redirect.Item.Depth-- // because it will get incremented and we need the redirect depth to be unchanged
+	return item.URL, redirect, nil
+}
+
+//-------------------------------------------------------------------------------------------------
+
 // response429 handles too-many-request responses.
 func (d *Download) response429(item work.Item, _ *http.Response) (*url.URL, *work.Result, error) {
 	// put this URL back into the work queue to be re-tried later
+	item.FilePath = ""
 	repeat := &work.Result{Item: item, StatusCode: http.StatusTooManyRequests, References: []*url.URL{item.URL}}
 	repeat.Item.Depth-- // because it will get incremented and we need the retry depth to be unchanged
 	return item.URL, repeat, nil
@@ -134,17 +165,7 @@ func (d *Download) response429(item work.Item, _ *http.Response) (*url.URL, *wor
 
 //-------------------------------------------------------------------------------------------------
 
-// isAmbiguousPath returns true if the path has a filename without any extension. It might
-// be that the server is representing a directory without a trailing slash, which is a commonly
-// used pattern.
-func isAmbiguousPath(p string) bool {
-	ext := path.Ext(p)
-	return ext == "" && !strings.HasSuffix(p, "/")
-}
-
 func discardData(rdr io.Reader) {
 	// Consume any response body - necessary for correct operation of the TCP connection pool
 	_, _ = io.Copy(io.Discard, rdr)
 }
-
-var starStar = header.ContentType{Type: "*", Subtype: "*"}

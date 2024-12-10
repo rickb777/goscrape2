@@ -2,6 +2,7 @@ package work
 
 import (
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -53,4 +54,13 @@ type Result struct {
 	ContentLength int64
 	FileSize      int64
 	Gzip          bool
+}
+
+func (r Result) IsRedirect() bool {
+	switch r.StatusCode {
+	case http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther, http.StatusTemporaryRedirect, http.StatusPermanentRedirect:
+		return true
+	default:
+		return false
+	}
 }

@@ -96,17 +96,21 @@ func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Ti
 
 		switch {
 		// 1xx status codes are never returned
-		// 3xx redirect status code - handled by http.Client (up to 10 redirections)
-
-		// 5xx status code = server error - retry the specified number of times
-		case resp.StatusCode >= 500:
-			d.Lockdown.SlowDown() // back off request rate whilst the server is abnormal
-			// retry logic continues below
 
 		case resp.StatusCode == http.StatusTooManyRequests:
 			d.Lockdown.SlowDown()  // back off request rate whilst we're being throttled by the server
 			d.LoopDelay.SlowDown() // never return to the original speed
 			return resp, nil       // this URL will be re-tried later
+
+		// 304 not modified - no download but scan for links if possible
+		case resp.StatusCode == http.StatusNotModified:
+			d.Lockdown.Reset()
+			return resp, nil
+
+		// 5xx status code = server error - retry the specified number of times
+		case resp.StatusCode >= 500:
+			d.Lockdown.SlowDown() // back off request rate whilst the server is abnormal
+			// retry logic continues below
 
 		// 4xx status code = client error
 		case resp.StatusCode >= 400:
@@ -114,13 +118,9 @@ func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Ti
 			// returning no error allows ongoing downloading of other URLs
 			return resp, nil // this url will be logged then discarded
 
-		// 304 not modified - no download but scan for links if possible
-		case resp.StatusCode == http.StatusNotModified:
-			d.Lockdown.Reset()
-			return resp, nil
-
 		// 2xx status code = success
-		case 200 <= resp.StatusCode && resp.StatusCode < 300:
+		// 3xx status code = redirect assumed
+		case 200 <= resp.StatusCode && resp.StatusCode < 400:
 			d.Lockdown.Reset()
 			return resp, nil
 
