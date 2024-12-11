@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	urlpkg "net/url"
@@ -21,7 +22,6 @@ import (
 	"github.com/rickb777/goscrape2/work"
 	"github.com/rickb777/process/v2"
 	"github.com/spf13/afero"
-	"golang.org/x/net/proxy"
 )
 
 // Scraper contains all scraping data, starts the process and handles the concurrency.
@@ -48,7 +48,6 @@ type Scraper struct {
 //-------------------------------------------------------------------------------------------------
 
 // New creates a new Scraper instance.
-// nolint: funlen
 func New(cfg config.Config, url *urlpkg.URL, fs afero.Fs) (*Scraper, error) {
 	var errs []error
 
@@ -60,11 +59,6 @@ func New(cfg config.Config, url *urlpkg.URL, fs afero.Fs) (*Scraper, error) {
 	}
 
 	excludes, err := filter.New(cfg.Excludes)
-	if err != nil {
-		errs = append(errs, err)
-	}
-
-	proxyURL, err := urlpkg.Parse(cfg.Proxy)
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -82,28 +76,9 @@ func New(cfg config.Config, url *urlpkg.URL, fs afero.Fs) (*Scraper, error) {
 		return nil, err
 	}
 
-	client := &http.Client{
-		Jar:     cookies,
-		Timeout: cfg.Timeout,
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-
-	if cfg.Proxy != "" {
-		dialer, err := proxy.FromURL(proxyURL, proxy.Direct)
-		if err != nil {
-			return nil, fmt.Errorf("creating proxy from URL: %w", err)
-		}
-
-		dialerCtx, ok := dialer.(proxy.ContextDialer)
-		if !ok {
-			return nil, errors.New("proxy dialer is not a context dialer")
-		}
-
-		client.Transport = &http.Transport{
-			DialContext: dialerCtx.DialContext,
-		}
+	client, err2 := buildHttpClient(cfg, cookies)
+	if err2 != nil {
+		return nil, err2
 	}
 
 	s := &Scraper{
@@ -127,6 +102,25 @@ func New(cfg config.Config, url *urlpkg.URL, fs afero.Fs) (*Scraper, error) {
 	return s, nil
 }
 
+func buildHttpClient(cfg config.Config, cookies *cookiejar.Jar) (*http.Client, error) {
+	netDialer := &net.Dialer{
+		Timeout:   cfg.ConnectTimeout,
+		KeepAlive: 30 * time.Second,
+	}
+
+	transport := http.DefaultTransport.(*http.Transport)
+	transport.DialContext = netDialer.DialContext
+
+	return &http.Client{
+		Jar:     cookies,
+		Timeout: cfg.RequestTimeout,
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+		Transport: transport,
+	}, nil
+}
+
 //-------------------------------------------------------------------------------------------------
 
 func (sc *Scraper) Downloader() *download.Download {
@@ -134,7 +128,6 @@ func (sc *Scraper) Downloader() *download.Download {
 
 	return &download.Download{
 		Config:    sc.config,
-		Cookies:   sc.cookies,
 		ETagsDB:   sc.ETagsDB,
 		StartURL:  sc.URL,
 		Auth:      sc.auth,

@@ -14,13 +14,14 @@ type Config struct {
 	Includes []string
 	Excludes []string
 
-	Concurrency  int                 // number of concurrent downloads; default 1
-	MaxDepth     int                 // download depth, 0 for unlimited
-	ImageQuality images.ImageQuality // image quality from 0 to 100%, 0 to disable reencoding
-	Timeout      time.Duration       // time limit to process each http request
-	LoopDelay    time.Duration       // fixed value sleep time per request
-	LaxAge       time.Duration       // added to origin server's expires timestamp
-	Tries        int                 // download attempts, 0 for unlimited
+	Concurrency    int                 // number of concurrent downloads; default 1
+	MaxDepth       int                 // download depth, 0 for unlimited
+	ImageQuality   images.ImageQuality // image quality from 0 to 100%, 0 to disable reencoding
+	RequestTimeout time.Duration       // overall time limit to process each http request
+	ConnectTimeout time.Duration       // time limit for connecting to the origin server
+	LoopDelay      time.Duration       // fixed value sleep time per request
+	LaxAge         time.Duration       // added to origin server's expires timestamp
+	Tries          int                 // download attempts, 0 for unlimited
 
 	Directory string
 	Username  string
@@ -28,7 +29,6 @@ type Config struct {
 
 	Cookies   []Cookie
 	Header    http.Header
-	Proxy     string
 	UserAgent string
 }
 
@@ -52,12 +52,20 @@ func (c *Config) SensibleDefaults() {
 		c.MaxDepth = math.MaxInt
 	}
 
-	if c.Timeout < 0 {
-		c.Timeout = 0
+	if c.RequestTimeout < 0 {
+		c.RequestTimeout = 0
 	}
 
 	if c.LoopDelay < 0 {
 		c.LoopDelay = 0
+	}
+
+	if c.ConnectTimeout == 0 {
+		c.ConnectTimeout = 30 * time.Second
+	}
+
+	if c.RequestTimeout <= c.ConnectTimeout {
+		c.RequestTimeout = c.ConnectTimeout + time.Second
 	}
 }
 

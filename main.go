@@ -80,13 +80,14 @@ type Arguments struct {
 	Exclude   Strings
 	Directory string
 
-	Concurrency  int
-	Depth        int
-	ImageQuality int
-	Timeout      time.Duration
-	LoopDelay    time.Duration
-	LaxAge       time.Duration
-	Tries        int
+	Concurrency    int
+	Depth          int
+	ImageQuality   int
+	RequestTimeout time.Duration
+	ConnectTimeout time.Duration
+	LoopDelay      time.Duration
+	LaxAge         time.Duration
+	Tries          int
 
 	Serve      bool
 	ServerPort int
@@ -95,7 +96,6 @@ type Arguments struct {
 	SaveCookieFile string
 
 	Headers   Strings
-	Proxy     string
 	User      string
 	UserAgent string
 
@@ -117,7 +117,8 @@ func declareFlags() Arguments {
 	flag.IntVar(&arguments.Concurrency, "concurrency", 1, "the number of concurrent downloads")
 	flag.IntVar(&arguments.Depth, "depth", 0, "download depth limit (default unlimited)")
 	flag.IntVar(&arguments.ImageQuality, "imagequality", 0, "image quality reduction, minimum 1 to maximum 99 (re-encoding disabled by default)")
-	flag.DurationVar(&arguments.Timeout, "timeout", 0, "time limit (with units, e.g. 1s) for each HTTP request to connect and read the response")
+	flag.DurationVar(&arguments.RequestTimeout, "timeout", 60*time.Second, "overall time limit (with units, e.g. 31s) for each HTTP request to connect and read the response\nThis is dependent on -connect and will always be greater than that timeout.")
+	flag.DurationVar(&arguments.ConnectTimeout, "connect", 30*time.Second, "time limit (with units, e.g. 1s) for each HTTP request to connect")
 	flag.DurationVar(&arguments.LoopDelay, "loopdelay", 0, "delay (with units, e.g. 1s) used between any two downloads")
 	flag.DurationVar(&arguments.LaxAge, "laxage", 0, "adds to the 'expires' timestamp specified by the origin server, or creates one if absent.\nIf the origin is too conservative, this helps when doing successive runs; a negative value causes\nrevalidation instead.")
 	flag.IntVar(&arguments.Tries, "tries", 1, "the number of tries to download each file if the server gives a 5xx error")
@@ -129,7 +130,6 @@ func declareFlags() Arguments {
 	flag.StringVar(&arguments.SaveCookieFile, "savecookiefile", "", "file to save the cookie content")
 
 	flag.Var(&arguments.Headers, "H", "\"name:value\" HTTP header to use for scraping (can be repeated)")
-	flag.StringVar(&arguments.Proxy, "proxy", "", "HTTP proxy to use for scraping")
 	flag.StringVar(&arguments.User, "user", "", "user[:password] to use for HTTP authentication")
 	flag.StringVar(&arguments.UserAgent, "useragent", "", "user agent to use for scraping")
 
@@ -154,11 +154,21 @@ Options also accept '--'.
 
 Environment:
   GOSCRAPE_URLS
-	adds URLs to the list to process (space separated)
+	Adds URLs to the list to process (space separated)
   GOSCRAPE_INCLUDE
-	adds regular expressions to the -i include list (space separated)
+	Adds regular expressions to the -i include list (space separated)
   GOSCRAPE_EXCLUDE
-	adds regular expressions to the -x exclude list (space separated)
+	Adds regular expressions to the -x exclude list (space separated)
+  HTTP_PROXY, HTTPS_PROXY
+	Controls the proxy used for outbound connections: either a complete URL or a "host[:port]", in which
+	case the "http" scheme is assumed. Authentication can be included with a complete URL.
+  NO_PROXY
+	A comma-separated list of values specifying hosts that should be excluded from proxying. Each value is
+	represented by an IP address prefix (1.2.3.4), an IP address prefix in CIDR notation (1.2.3.4/8), a domain
+	name, or a special DNS label (*). An IP address prefix and domain name can also include a literal port 
+	number (1.2.3.4:80). A domain name matches that name and all subdomains. A domain name with a leading "."
+	matches subdomains only. For example "foo.com" matches "foo.com" and "bar.foo.com"; ".y.com" matches
+	"x.y.com" but not "y.com". A single asterisk (*) indicates that no proxying should be done.
 
 Version `)
 		fmt.Fprintln(flag.CommandLine.Output(), formatVersion(version, date))
@@ -251,13 +261,13 @@ func buildConfig(args Arguments) (*config.Config, error) {
 		Includes: args.Include,
 		Excludes: args.Exclude,
 
-		Concurrency:  args.Concurrency,
-		MaxDepth:     args.Depth,
-		ImageQuality: images.ImageQuality(imageQuality),
-		Timeout:      args.Timeout,
-		LoopDelay:    args.LoopDelay,
-		LaxAge:       args.LaxAge,
-		Tries:        args.Tries,
+		Concurrency:    args.Concurrency,
+		MaxDepth:       args.Depth,
+		ImageQuality:   images.ImageQuality(imageQuality),
+		RequestTimeout: args.RequestTimeout,
+		LoopDelay:      args.LoopDelay,
+		LaxAge:         args.LaxAge,
+		Tries:          args.Tries,
 
 		Directory: args.Directory,
 		Username:  username,
@@ -265,7 +275,6 @@ func buildConfig(args Arguments) (*config.Config, error) {
 
 		Cookies:   cookies,
 		Header:    config.MakeHeaders(args.Headers),
-		Proxy:     args.Proxy,
 		UserAgent: args.UserAgent,
 	}, nil
 }

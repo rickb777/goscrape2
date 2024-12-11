@@ -5,7 +5,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"net/http/cookiejar"
 	"net/url"
 	"os"
 	"time"
@@ -28,7 +27,6 @@ type HttpClient interface {
 // Download fetches URLs one by one, sequentially.
 type Download struct {
 	Config   config.Config
-	Cookies  *cookiejar.Jar
 	ETagsDB  *db.DB
 	StartURL *url.URL
 

@@ -71,6 +71,8 @@ Usage:
     	"name:value" HTTP header to use for scraping (can be repeated)
   -concurrency int
     	the number of concurrent downloads (default 1)
+  -connect duration
+    	time limit (with units, e.g. 1s) for each HTTP request to connect (default 30s)
   -cookies string
     	file containing the cookie content
   -depth int
@@ -91,15 +93,14 @@ Usage:
     	delay (with units, e.g. 1s) used between any two downloads
   -port int
     	port to use for the webserver (default 8080)
-  -proxy string
-    	HTTP proxy to use for scraping
   -savecookiefile string
     	file to save the cookie content
   -serve
     	serve the website using a webserver.
     	Scraping will happen only on demand using the first URL you provide.
   -timeout duration
-    	time limit (with units, e.g. 1s) for each HTTP request to connect and read the response
+    	overall time limit (with units, e.g. 31s) for each HTTP request to connect and read the response
+    	This is dependent on -connect and will always be greater than that timeout. (default 1m0s)
   -tries int
     	the number of tries to download each file if the server gives a 5xx error (default 1)
   -user string
@@ -110,16 +111,23 @@ Usage:
   -x regular expression
     	exclude URLs that match a regular expression (can be repeated)
   -z	debug output
-
 ```
 
 ## Environment
 
 These environment variables may be set
 
-* GOSCRAPE_URLS adds URLs to the list to process (use a space separated list)
-* GOSCRAPE_INCLUDE adds regular expressions to the -i include list (use a space separated list)
-* GOSCRAPE_EXCLUDE adds regular expressions to the -x exclude list (use a space separated list)
+* GOSCRAPE_URLS - Adds URLs to the list to process (space separated)
+* GOSCRAPE_INCLUDE - Adds regular expressions to the -i include list (space separated)
+* GOSCRAPE_EXCLUDE - Adds regular expressions to the -x exclude list (space separated)
+* HTTP_PROXY, HTTPS_PROXY - Controls the proxy used for outbound connections: either a complete URL or a "host[:port]",
+  in which case the "http" scheme is assumed. Authentication can be included with a complete URL.
+* NO_PROXY - A comma-separated list of values specifying hosts that should be excluded from proxying. Each value is
+  represented by an IP address prefix (1.2.3.4), an IP address prefix in CIDR notation (1.2.3.4/8), a domain name, or a
+  special DNS label (*). An IP address prefix and domain name can also include a literal port number (1.2.3.4:80). A
+  domain name matches that name and all subdomains. A domain name with a leading "." matches subdomains only. For
+  example "foo.com" matches "foo.com" and "bar.foo.com"; ".y.com" matches "x.y.com" but not "y.com". A single
+  asterisk (*) indicates that no proxying should be done.
 
 ## Cookies
 
