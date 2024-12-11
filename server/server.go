@@ -19,6 +19,11 @@ import (
 	"github.com/spf13/afero"
 )
 
+const (
+	minRedirectCode = http.StatusMovedPermanently
+	maxRedirectCode = http.StatusPermanentRedirect
+)
+
 // set more mime types in the browser, this fixes .asp files not being
 // downloaded but handled as html.
 var mimeTypes = map[string]string{
@@ -41,12 +46,21 @@ func (h *onDemand) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		http.Error(w, "Bad gateway: "+err.Error(), http.StatusBadGateway)
+
 	} else if result.StatusCode == http.StatusNotFound {
 		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+
+	} else if minRedirectCode <= result.StatusCode && result.StatusCode <= maxRedirectCode {
+		// store so that the webserver can replay the redirect
+		d.ETagsDB.Store(url, db.Item{Code: result.StatusCode, Location: result.Location})
+		w.Header().Set(headername.Location, result.Location)
+		w.WriteHeader(result.StatusCode)
+
 	} else if result.StatusCode >= 300 {
 		http.Error(w, fmt.Sprintf("Internal server error: upstream %d", result.StatusCode), http.StatusInternalServerError)
+
 	} else {
-		h.next.ServeHTTP(w, r)
+		h.next.ServeHTTP(w, r) // pass this request on to the file server
 	}
 }
 
@@ -60,11 +74,6 @@ type redirecter struct {
 	host    string
 	next    http.Handler
 }
-
-const (
-	minRedirectCode = http.StatusMovedPermanently
-	maxRedirectCode = http.StatusPermanentRedirect
-)
 
 func (h *redirecter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	u := *r.URL

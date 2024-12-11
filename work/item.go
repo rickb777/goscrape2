@@ -51,6 +51,7 @@ type Result struct {
 	StatusCode    int
 	References    Refs
 	Excluded      Refs
+	Location      string // only used for 301-308 redirection
 	ContentLength int64
 	FileSize      int64
 	Gzip          bool

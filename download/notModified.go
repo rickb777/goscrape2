@@ -3,7 +3,6 @@ package download
 import (
 	"bytes"
 	"fmt"
-	"github.com/rickb777/goscrape2/mapping"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -13,6 +12,7 @@ import (
 	"github.com/rickb777/goscrape2/document"
 	"github.com/rickb777/goscrape2/download/ioutil"
 	"github.com/rickb777/goscrape2/logger"
+	"github.com/rickb777/goscrape2/mapping"
 	"github.com/rickb777/goscrape2/work"
 )
 
@@ -39,6 +39,7 @@ func (d *Download) response304(item work.Item, resp *http.Response) (*url.URL, *
 
 //-------------------------------------------------------------------------------------------------
 
+// html304 reads the HTML file from disk so that all the URLs it references can be scraped
 func (d *Download) html304(item work.Item, resp *http.Response) (*url.URL, *work.Result, error) {
 	var references work.Refs
 
@@ -66,6 +67,7 @@ func (d *Download) html304(item work.Item, resp *http.Response) (*url.URL, *work
 
 //-------------------------------------------------------------------------------------------------
 
+// css304 reads the CSS file from disk so that all the URLs it references can be scraped
 func (d *Download) css304(item work.Item, statusCode int) (*url.URL, *work.Result, error) {
 	var references work.Refs
 	filePath := mapping.GetFilePath(item.URL, false)

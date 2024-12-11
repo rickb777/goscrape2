@@ -133,7 +133,7 @@ func (d *Download) responseRedirect(item work.Item, resp *http.Response) (*url.U
 
 	// put this URL back into the work queue to be processed later
 	item.FilePath = ""
-	redirect := &work.Result{Item: item, StatusCode: resp.StatusCode, References: []*url.URL{locURL}}
+	redirect := &work.Result{Item: item, StatusCode: resp.StatusCode, References: []*url.URL{locURL}, Location: location}
 	redirect.Item.Depth-- // because it will get incremented and we need the redirect depth to be unchanged
 	return item.URL, redirect, nil
 }
