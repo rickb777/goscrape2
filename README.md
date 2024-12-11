@@ -15,12 +15,14 @@ Features and advantages over existing tools like wget, httrack, Teleport Pro:
 * Available for all platforms that Go supports
 * Files are downloaded concurrently as required
 * Downloaded asset files are skipped in a new scraper run if unchanged
+* Redirected URLs don't duplicate downloads
 * JPEG and PNG images can be converted down in quality to save disk space
 * Excluded URLS will not be fetched (unlike [wget](https://savannah.gnu.org/bugs/?20808))
 * No incomplete temporary files are left on disk
 * Assets from external domains are downloaded automatically
 * Sane default values
 * Built-in webserver provides easy local access to the downloaded files
+* Webserver replays redirections just like the origin server
 * Supports logging and logfile rotation - can run as a long-lived service
 
 ## Limitations
