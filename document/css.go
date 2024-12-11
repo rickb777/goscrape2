@@ -49,8 +49,6 @@ func CheckCSSForUrls(cssURL *url.URL, startURLHost string, data []byte) ([]byte,
 			continue
 		}
 
-		u = cssURL.ResolveReference(u)
-
 		refs = append(refs, u)
 
 		cssPath := *cssURL

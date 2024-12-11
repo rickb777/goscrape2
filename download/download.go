@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/rickb777/acceptable/headername"
@@ -44,11 +45,12 @@ func (d *Download) ProcessURL(ctx context.Context, item work.Item) (*url.URL, *w
 
 	var existingModified time.Time
 
-	item.FilePath = mapping.GetFilePath(item.URL, true)
+	item.FilePath = mapping.GetFilePath(item.URL, false)
+	existingModified = modificationTime(d.Fs.Stat(item.FilePath))
 
-	fileInfo, err := d.Fs.Stat(item.FilePath)
-	if err == nil && fileInfo != nil {
-		existingModified = fileInfo.ModTime()
+	if existingModified.IsZero() {
+		item.FilePath = mapping.GetFilePath(item.URL, true)
+		existingModified = modificationTime(d.Fs.Stat(item.FilePath))
 	}
 
 	item.StartTime = utc.Now()
@@ -147,6 +149,15 @@ func (d *Download) response429(item work.Item, _ *http.Response) (*url.URL, *wor
 	repeat := &work.Result{Item: item, StatusCode: http.StatusTooManyRequests, References: []*url.URL{item.URL}}
 	repeat.Item.Depth-- // because it will get incremented and we need the retry depth to be unchanged
 	return item.URL, repeat, nil
+}
+
+//-------------------------------------------------------------------------------------------------
+
+func modificationTime(fileInfo os.FileInfo, err error) time.Time {
+	if err == nil && fileInfo != nil {
+		return fileInfo.ModTime()
+	}
+	return time.Time{}
 }
 
 //-------------------------------------------------------------------------------------------------

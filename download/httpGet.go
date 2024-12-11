@@ -49,10 +49,10 @@ func (d *Download) httpGet(ctx context.Context, u *url.URL, lastModified time.Ti
 				}, nil
 			}
 		}
-	}
 
-	if len(metadata.ETags) > 0 {
-		req.Header.Set(headername.IfNoneMatch, metadata.ETags)
+		if len(metadata.ETags) > 0 {
+			req.Header.Set(headername.IfNoneMatch, metadata.ETags)
+		}
 	}
 
 	req.Header.Set(headername.AcceptEncoding, "gzip")

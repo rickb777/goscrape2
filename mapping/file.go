@@ -18,12 +18,18 @@ const (
 
 // GetFilePath returns a file path for a URL to store the URL content in.
 func GetFilePath(url *url.URL, isAPage bool) string {
-	trailingSlash := strings.HasSuffix(url.Path, "/")
-	if trailingSlash {
-		return "." + getHTMLPathWithTrailingSlash(url)
-	} else if isAPage {
-		return "." + getHTMLPathWithName(url)
-	} else {
+	if url.Path == "" {
+		return "." + defaultName(url.Query())
+	}
+
+	switch {
+	case strings.HasSuffix(url.Path, "/"):
+		return "." + urlEndsWithSlash(url)
+
+	case isAPage:
+		return "." + urlEndsWithName(url)
+
+	default:
 		name, ext := path.SplitExt(url.Path)
 		return "." + name + prefixNonBlank(fileSafeQueryString(url.Query())) + ext
 	}
@@ -31,55 +37,42 @@ func GetFilePath(url *url.URL, isAPage bool) string {
 
 // GetPageFilePath returns a filename for a URL that represents a page.
 func GetPageFilePath(url *url.URL) string {
-	trailingSlash := strings.HasSuffix(url.Path, "/")
-	if trailingSlash {
-		return getHTMLPathWithTrailingSlash(url)
+	if url.Path == "" {
+		return defaultName(url.Query())
+	}
+
+	if strings.HasSuffix(url.Path, "/") {
+		return urlEndsWithSlash(url)
 	} else {
-		return getHTMLPathWithName(url)
+		return urlEndsWithName(url)
 	}
 }
 
-func getHTMLPathWithTrailingSlash(url *url.URL) string {
-	fileName := url.Path
-	qs := fileSafeQueryString(url.Query())
+func urlEndsWithSlash(url *url.URL) string {
+	query := url.Query()
 
-	switch {
-	case fileName == "":
-		fileName = "/" + pageDirIndex + prefixNonBlank(qs) + htmlExtension
-
-	case qs == "":
-		fileName += pageDirIndex + htmlExtension
-
-	default:
-		fileName += qs + htmlExtension
+	if len(query) == 0 {
+		return url.Path + pageDirIndex + htmlExtension
 	}
 
-	return fileName
+	qs := fileSafeQueryString(query)
+
+	return url.Path + qs + htmlExtension
 }
 
-func getHTMLPathWithName(url *url.URL) string {
-	fileName := url.Path
+func urlEndsWithName(url *url.URL) string {
 	qs := fileSafeQueryString(url.Query())
 
-	switch {
-	case fileName == "":
-		fileName = "/" + pageDirIndex + prefixNonBlank(qs) + htmlExtension
-		// directory index will be index.html in the directory
-
-	default:
-		name, ext := path.SplitExt(fileName)
-		// if file extension is missing add .html, otherwise keep the existing file extension
-		if ext == "" {
-			ext = htmlExtension
-		}
-		if name != "" {
-			fileName = name + prefixNonBlank(qs) + ext
-		} else {
-			fileName = qs + ext
-		}
+	name, ext := path.SplitExt(url.Path)
+	if ext == "" {
+		ext = htmlExtension
 	}
 
-	return fileName
+	return name + prefixNonBlank(qs) + ext
+}
+
+func defaultName(qs url.Values) string {
+	return "/___" + fileSafeQueryString(qs) + htmlExtension
 }
 
 func fileSafeQueryString(values url.Values) string {
