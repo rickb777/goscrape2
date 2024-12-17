@@ -1,0 +1,79 @@
+; SystemD Unit for Goscrape
+;
+; Background: https://www.freedesktop.org/wiki/Software/systemd/
+;             https://www.freedesktop.org/software/systemd/man/systemd.service.html
+;             https://www.freedesktop.org/software/systemd/man/systemd.exec.html
+;             https://www.freedesktop.org/software/systemd/man/systemd.unit.html
+
+[Unit]
+Description=Goscrape HTTP web server & selective forward cache
+After=network-online.target
+Wants=network-online.target systemd-networkd-wait-online.service
+; Sets the interval during which starts are limited with StartLimitBurst.
+StartLimitIntervalSec=60
+; No more than this number of restarts will happen per StartLimitInterval.
+StartLimitBurst=10
+
+[Service]
+WorkingDirectory=/var/lib/goscrape
+ExecStart=/usr/sbin/goscrape2 -dir /var/lib/goscrape -log /var/log/goscrape.log -connect 3s -timeout 150s -port 80 -serve -concurrency 5 -loopdelay 75ms -tries 10 -v
+ExecReload=/bin/kill -USR1 $MAINPID
+
+; Run slightly below interactive priority
+Nice=5
+
+; Handle exit cases using always, on-success, on-failure, on-abnormal, on-abort, or on-watchdog.
+Restart=on-failure
+
+; User and group the process will run as.
+User=goscrape
+Group=goscrape
+
+; Local configuration will be written to this directory.
+; The text file should contain new-line-separated variable assignments.
+; They are *not* shell syntax, although they are similar.
+EnvironmentFile=/etc/default/goscrape.conf
+
+; The following additional security directives further retrict privileges that can be gained by the service.
+; Note that you may have to add capabilities required by any plugins in use.
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+;AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+; Limit the number of file descriptors; see `man systemd.exec` for more limit settings.
+LimitNOFILE=1048576
+; Unmodified roster4 is not expected to use more than that.
+LimitNPROC=64
+
+; Use private /tmp and /var/tmp, which are discarded after roster4 stops.
+;PrivateTmp=true
+
+; Use a minimal /dev
+;PrivateDevices=true
+
+; Prevent alteration of /home, /root, and /run/user.
+;ProtectHome=read-only
+
+; Make /usr, /boot, /etc and possibly some more folders read-only.
+;ProtectSystem=full
+
+; Make kernel variables in /proc read-only (newer systemd versions only).
+;ProtectKernelTunables=true
+
+; Disable module loading (newer systemd versions only).
+;ProtectKernelModules=true
+
+; Make Linux control groups read-only (newer systemd versions only).
+;ProtectControlGroups=true
+
+; … exceptions that still remain writable
+;   This merely retains r/w access rights, it does not add any new. Must still be writable on the host!
+;ReadWriteDirectories=
+;ReadOnlyPaths=
+;InaccessiblePaths=
+
+; Ensures that the service process and all its children can never gain new privileges
+; (e.g. via setuid or setgid bits, or filesystem capabilities).
+;NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

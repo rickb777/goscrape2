@@ -1,0 +1,13 @@
+/var/log/goscrape.log {
+	daily
+	notifempty
+	minsize 1M
+	missingok
+	rotate 28
+	postrotate
+		pkill -hup goscrape2
+	endscript
+	compress
+	delaycompress
+	nocreate
+}

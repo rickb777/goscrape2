@@ -140,16 +140,65 @@ cookies in the following format:
 
 ## Conditional requests: ETags and last-modified
 
-HTTP uses ETags to tag the version of each resource. Each ETag is a hash constructed by
-the server somehow. Also, each file usually has a last-modified date.
+HTTP uses ETags to tag the version of each resource. Each ETag is a hash constructed by the server somehow. Also, each
+file usually has a last-modified date.
 
-`goscrape2` will use both of these items provided by the server to reduce the amount of
-work needed if multiple sessions of downloading are run on the same start URL. Any file
-that is not modified doesn't need to be downloaded more than once.
+`goscrape2` will use both of these items provided by the server to reduce the amount of work needed if multiple sessions
+of downloading are run on the same start URL. Any file that is not modified doesn't need to be downloaded more than
+once. ETags and other metadata are stored in the state cache.
 
-A small database containing ETags is stored in `~/.config/goscrape2-etags.txt`, which can
-be manually deleted to purge this cache. It is automatically purged if the output directory
-doesn't exist when `goscrape2` is started.
+## State Cache
+
+`goscrape2` keeps its state database in `~/.local/state/goscrape-cache.txt`, which is dependent on the user that is
+running `goscrape2` of course. This is only read in when `goscrape2` starts; any external edits will be overwritten
+whilst `goscrape2` is running.
+
+Provided `goscrape2` has been stopped first, the cached files (see `-dir`) and state database can be safely moved/copied
+between servers, e.g. using `rsync` so that the files retain their timestamps.
+
+The state database is a text file that can be concatenated, in which case any duplicates are resolved by selecting
+whichever comes last. It can also be deleted, in which case future revalidation requests to the origin server will be
+much less network-efficient. In either case, it will be rebuilt when `goscrape2` is restarted, provided the origin
+server is still reachable.
+
+The state database is automatically purged if the output directory doesn't exist when `goscrape2` is started.
+
+## Logfile Rotation
+
+For a long-running service, the logfile should be periodically rotated to avoid filling up the disk. `goscrape2` is
+designed to work well with Linux `logrotate`, for example using `-log /var/log/goscrape.log` and this configuration in
+`/etc/logrotate.d/goscrape2`
+
+```
+`/var/log/goscrape.log` {
+  daily
+  notifempty
+  minsize 1M
+  missingok
+  rotate 28
+  postrotate
+    pkill -hup goscrape2
+  endscript
+  compress
+  delaycompress
+  nocreate
+}
+```
+
+Daily, logrotate will check whether the logfile has grown too big and, if so, move it then poke `goscrape2` with SIGHUP.
+
+## SystemD Service
+
+Example SystemD service and configuration files are in the `systemd/` folder, to be deployed as
+
+* `/usr/sbin/goscrape2` binary
+* `/var/lib/goscrape` directory tree
+* `/var/log/goscrape.log` logfile
+* `/etc/default/goscrape.conf` default configuration
+* `/etc/logrotate.d/goscrape` log rotation
+* `/etc/systemd/system/goscrape.service` service definition
+
+You will need to understand SystemD to use these template files.
 
 ## Thanks
 
