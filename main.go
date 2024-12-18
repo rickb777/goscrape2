@@ -37,8 +37,8 @@ var (
 type Arguments struct {
 	URLs []*urlpkg.URL
 
-	Include   flagvar.Strings
-	Exclude   flagvar.Strings
+	Include   flagvar.Regexps
+	Exclude   flagvar.Regexps
 	Directory string
 
 	Concurrency    int
@@ -56,7 +56,7 @@ type Arguments struct {
 	CookieFile     string
 	SaveCookieFile string
 
-	Headers   flagvar.Strings
+	Headers   flagvar.Assignments
 	User      string
 	UserAgent string
 
@@ -65,11 +65,17 @@ type Arguments struct {
 	Debug   bool
 }
 
-func declareFlags() Arguments {
+func declareFlags() (Arguments, error) {
 	var arguments Arguments
+	arguments.Headers.Separator = ":"
 
-	arguments.Include.Values = getenvList("GOSCRAPE_INCLUDE", " ")
-	arguments.Exclude.Values = getenvList("GOSCRAPE_EXCLUDE", " ")
+	if err := applyEnvList(&arguments.Include, "GOSCRAPE_INCLUDE", " "); err != nil {
+		return arguments, err
+	}
+
+	if err := applyEnvList(&arguments.Exclude, "GOSCRAPE_EXCLUDE", " "); err != nil {
+		return arguments, err
+	}
 
 	flag.Var(&arguments.Include, "i", "only include URLs that match a `regular expression` (can be repeated)")
 	flag.Var(&arguments.Exclude, "x", "exclude URLs that match a `regular expression` (can be repeated)")
@@ -101,7 +107,7 @@ func declareFlags() Arguments {
 	flag.Parse()
 
 	setUsageInfo("Scrape a website and create an offline browsable version on the disk.\n")
-	return arguments
+	return arguments, nil
 }
 
 func setUsageInfo(headline string) {
@@ -139,13 +145,16 @@ Version `)
 //-------------------------------------------------------------------------------------------------
 
 func main() {
-	args := declareFlags()
+	args, err := declareFlags()
+	if err != nil {
+		fmt.Printf("Invalid flags: %s\n", err)
+		logger.Exit(1)
+	}
 
 	createLogger(args)
 
 	allStartURLs := append(getenvList("GOSCRAPE_URLS", " "), flag.Args()...)
 
-	var err error
 	args.URLs, err = parseAll(allStartURLs)
 	if err != nil {
 		fmt.Printf("Invalid URL: %s\n", err)
@@ -375,6 +384,18 @@ func formatVersion(version, date string) string {
 }
 
 //-------------------------------------------------------------------------------------------------
+
+func applyEnvList(f flag.Value, key, separator string) error {
+	value := strings.TrimSpace(os.Getenv(key))
+	if len(value) > 0 {
+		for _, s := range filterNonBlank(strings.Split(value, separator)) {
+			if err := f.Set(s); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
 
 func getenvList(key, separator string) []string {
 	value := strings.TrimSpace(os.Getenv(key))

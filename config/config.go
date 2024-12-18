@@ -3,7 +3,7 @@ package config
 import (
 	"math"
 	"net/http"
-	"strings"
+	"regexp"
 	"time"
 
 	"github.com/rickb777/goscrape2/images"
@@ -11,8 +11,8 @@ import (
 
 // Config contains the scraper configuration.
 type Config struct {
-	Includes []string
-	Excludes []string
+	Includes []*regexp.Regexp
+	Excludes []*regexp.Regexp
 
 	Concurrency    int                 // number of concurrent downloads; default 1
 	MaxDepth       int                 // download depth, 0 for unlimited
@@ -78,13 +78,13 @@ type Cookie struct {
 	Expires *time.Time `json:"expires,omitempty"`
 }
 
-func MakeHeaders(headers []string) http.Header {
+func MakeHeaders(headers []struct {
+	Key   string
+	Value string
+}) http.Header {
 	h := http.Header{}
-	for _, header := range headers {
-		sl := strings.SplitN(header, ":", 2)
-		if len(sl) == 2 {
-			h.Set(sl[0], sl[1])
-		}
+	for _, v := range headers {
+		h.Add(v.Key, v.Value)
 	}
 	return h
 }

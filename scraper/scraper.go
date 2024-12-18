@@ -49,23 +49,7 @@ type Scraper struct {
 
 // New creates a new Scraper instance.
 func New(cfg config.Config, url *urlpkg.URL, fs afero.Fs) (*Scraper, error) {
-	var errs []error
-
 	url.Fragment = ""
-
-	includes, err := filter.New(cfg.Includes)
-	if err != nil {
-		errs = append(errs, err)
-	}
-
-	excludes, err := filter.New(cfg.Excludes)
-	if err != nil {
-		errs = append(errs, err)
-	}
-
-	if errs != nil {
-		return nil, errors.Join(errs...)
-	}
 
 	if url.Scheme == "" {
 		url.Scheme = "http" // if no URL scheme was given default to http
@@ -89,8 +73,8 @@ func New(cfg config.Config, url *urlpkg.URL, fs afero.Fs) (*Scraper, error) {
 		Client: client,
 		Fs:     fs, // filesystem can be replaced with in-memory filesystem for testing
 
-		includes: includes,
-		excludes: excludes,
+		includes: cfg.Includes,
+		excludes: cfg.Excludes,
 
 		processed: work.NewSet[string](),
 	}
