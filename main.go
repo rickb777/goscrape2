@@ -25,6 +25,7 @@ import (
 	"github.com/rickb777/goscrape2/scraper"
 	"github.com/rickb777/goscrape2/server"
 	"github.com/rickb777/servefiles/v3"
+	"github.com/sgreben/flagvar"
 	"github.com/spf13/afero"
 )
 
@@ -33,51 +34,11 @@ var (
 	date    = ""
 )
 
-type Strings []string
-
-// String is an implementation of the flag.Value interface
-func (i *Strings) String() string {
-	return fmt.Sprintf("%v", *i)
-}
-
-// Set is an implementation of the flag.Value interface
-func (i *Strings) Set(value string) error {
-	*i = append(*i, value)
-	return nil
-}
-
-// Getenv populates the strings from an environment variable, splitting the value on a separator.
-func (i *Strings) Getenv(key, separator string) error {
-	*i = getenvList(key, separator)
-	return nil
-}
-
-func getenvList(key, separator string) []string {
-	value := strings.TrimSpace(os.Getenv(key))
-	if len(value) == 0 {
-		return nil
-	}
-	return filterNonBlank(strings.Split(value, separator))
-}
-
-func filterNonBlank(ss []string) []string {
-	list := make([]string, 0, len(ss))
-	for _, s := range ss {
-		s = strings.TrimSpace(s)
-		if s != "" {
-			list = append(list, s)
-		}
-	}
-	return list
-}
-
-//-------------------------------------------------------------------------------------------------
-
 type Arguments struct {
 	URLs []*urlpkg.URL
 
-	Include   Strings
-	Exclude   Strings
+	Include   flagvar.Strings
+	Exclude   flagvar.Strings
 	Directory string
 
 	Concurrency    int
@@ -95,7 +56,7 @@ type Arguments struct {
 	CookieFile     string
 	SaveCookieFile string
 
-	Headers   Strings
+	Headers   flagvar.Strings
 	User      string
 	UserAgent string
 
@@ -107,8 +68,8 @@ type Arguments struct {
 func declareFlags() Arguments {
 	var arguments Arguments
 
-	arguments.Include.Getenv("GOSCRAPE_INCLUDE", " ")
-	arguments.Exclude.Getenv("GOSCRAPE_EXCLUDE", " ")
+	arguments.Include.Values = getenvList("GOSCRAPE_INCLUDE", " ")
+	arguments.Exclude.Values = getenvList("GOSCRAPE_EXCLUDE", " ")
 
 	flag.Var(&arguments.Include, "i", "only include URLs that match a `regular expression` (can be repeated)")
 	flag.Var(&arguments.Exclude, "x", "exclude URLs that match a `regular expression` (can be repeated)")
@@ -258,8 +219,8 @@ func buildConfig(args Arguments) (*config.Config, error) {
 	}
 
 	return &config.Config{
-		Includes: args.Include,
-		Excludes: args.Exclude,
+		Includes: args.Include.Values,
+		Excludes: args.Exclude.Values,
 
 		Concurrency:    args.Concurrency,
 		MaxDepth:       args.Depth,
@@ -274,7 +235,7 @@ func buildConfig(args Arguments) (*config.Config, error) {
 		Password:  password,
 
 		Cookies:   cookies,
-		Header:    config.MakeHeaders(args.Headers),
+		Header:    config.MakeHeaders(args.Headers.Values),
 		UserAgent: args.UserAgent,
 	}, nil
 }
@@ -331,6 +292,8 @@ func scrapeURLs(ctx context.Context, fs afero.Fs, cfg config.Config, saveCookieF
 
 	return server.AwaitWebserver(ctx, webServer, errChan)
 }
+
+//-------------------------------------------------------------------------------------------------
 
 func reportHistogram() {
 	m := download.Counters.Map()
@@ -409,4 +372,25 @@ func formatVersion(version, date string) string {
 	}
 	buf.WriteString(".")
 	return buf.String()
+}
+
+//-------------------------------------------------------------------------------------------------
+
+func getenvList(key, separator string) []string {
+	value := strings.TrimSpace(os.Getenv(key))
+	if len(value) == 0 {
+		return nil
+	}
+	return filterNonBlank(strings.Split(value, separator))
+}
+
+func filterNonBlank(ss []string) []string {
+	list := make([]string, 0, len(ss))
+	for _, s := range ss {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			list = append(list, s)
+		}
+	}
+	return list
 }
