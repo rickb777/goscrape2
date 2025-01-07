@@ -85,5 +85,5 @@ func FileExists(fs afero.Fs, filePath string) bool {
 }
 
 func randomName() string {
-	return "/." + strconv.FormatUint(rand.Uint64N(1<<24), 36)
+	return "/." + strconv.FormatUint(uint64(rand.Uint32()), 36)
 }

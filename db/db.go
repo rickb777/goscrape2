@@ -3,11 +3,11 @@ package db
 import (
 	"bufio"
 	"fmt"
-	"github.com/rickb777/acceptable/header"
 	"github.com/rickb777/goscrape2/logger"
 	"github.com/spf13/afero"
 	"io"
 	"log/slog"
+	"math/rand/v2"
 	"net/http"
 	urlpkg "net/url"
 	"os"
@@ -19,99 +19,16 @@ import (
 	"time"
 )
 
-type Item struct {
-	Code     int
-	Location string // redirection
-	Content  header.ContentType
-	ETags    string
-	Expires  time.Time
-}
-
-func (i Item) EmptyContentType() bool {
-	return (i.Content.Type == "" && i.Content.Subtype == "") ||
-		(i.Content.Type == "*" && i.Content.Subtype == "*")
-}
-
-func (i Item) Empty() bool {
-	return i.Code == 0 && i.Location == "" && i.EmptyContentType() && i.ETags == "" && i.Expires.IsZero()
-}
-
-func dashIfBlank(s string) string {
-	if s == "" {
-		s = "-"
-	}
-	return s
-}
-
-func (i Item) Strings() []string {
-	ct := "-"
-	if i.Content.Type != "" {
-		ct = i.Content.String()
-	}
-
-	expires := "-"
-	if !i.Expires.IsZero() {
-		expires = i.Expires.Format(time.RFC3339)
-	}
-
-	return []string{
-		strconv.Itoa(i.Code),
-		dashIfBlank(i.Location),
-		ct,
-		expires,
-		dashIfBlank(i.ETags),
-	}
-}
-
-func (i Item) String() string {
-	return strings.Join(i.Strings(), "\t")
-}
-
-func parseItem(line string) (string, Item) {
-	parts := strings.Split(line, "\t")
-
-	if len(parts) != 6 {
-		return "", Item{}
-	}
-
-	key := parts[0]
-	v1, _ := strconv.Atoi(parts[1])
-	v2 := parts[2]
-	v3 := parts[3]
-	v4 := parts[4]
-	v5 := parts[5]
-
-	var ct header.ContentType
-	if v3 != "-" {
-		ct = header.ParseContentType(v3)
-	}
-
-	var expires time.Time
-	if v4 != "-" {
-		// time.Parse conveniently returns the zero value on error
-		expires, _ = time.Parse(time.RFC3339, v4)
-	}
-
-	return key, Item{
-		Code:     v1,
-		Location: strNotDash(v2),
-		Content:  ct,
-		Expires:  expires,
-		ETags:    strNotDash(v5),
-	}
-
-}
-
-//-------------------------------------------------------------------------------------------------
+const FileName = "goscrape-cache.txt"
 
 // DB provides a persistent store for HTTP ETags and other metadata to reduce network traffic when
 // repeating a download session. If the store is unavailable for some reason, its methods are no-ops.
 type DB struct {
-	file    string
-	records map[string]Item
-	count   int
-	fs      afero.Fs
-	mu      sync.Mutex
+	dir          string
+	records      map[string]Item
+	unsavedItems int
+	fs           afero.Fs
+	mu           sync.Mutex
 }
 
 func DeleteFile(fs afero.Fs) {
@@ -122,24 +39,32 @@ func Open() *DB {
 	return OpenDB(localStateDir(), afero.NewOsFs())
 }
 
-const FileName = "goscrape-cache.txt"
-
 func OpenDB(dir string, fs afero.Fs) *DB {
+	dir = filepath.Clean(dir)
+
 	if err := fs.MkdirAll(dir, 0755); err != nil {
 		return nil
 	}
 
-	file := filepath.Join(dir, FileName)
-	store := &DB{file: file, fs: fs}
+	store := &DB{dir: appendSlash(dir), fs: fs, records: make(map[string]Item)}
 
-	f, err := fs.Open(file)
+	fileName := filepath.Join(dir, FileName)
+	f, err := fs.Open(fileName)
 	if err == nil {
+		defer f.Close()
 		store.records, err = readFile(f)
-	} else {
-		store.records = make(map[string]Item)
 	}
 
+	go store.syncPeriodically(time.Second)
 	return store
+}
+
+func appendSlash(dir string) string {
+	separator := string([]rune{filepath.Separator})
+	if strings.HasSuffix(dir, separator) {
+		return dir
+	}
+	return dir + separator
 }
 
 func strNotDash(s string) string {
@@ -192,7 +117,11 @@ func (store *DB) Close() error {
 	store.mu.Lock()
 	defer store.mu.Unlock()
 
-	store.flush()
+	if store.unsavedItems > 0 {
+		store.writeFileAtomically()
+	}
+
+	store.dir = "" // marks this store as being closed
 	return nil
 }
 
@@ -230,6 +159,8 @@ func (store *DB) Store(url *urlpkg.URL, item Item) {
 	case http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther, http.StatusTemporaryRedirect, http.StatusPermanentRedirect:
 		if item.Location != "" {
 			store.records[keyOf(url)] = item
+		} else {
+			delete(store.records, keyOf(url))
 		}
 
 	default:
@@ -240,15 +171,45 @@ func (store *DB) Store(url *urlpkg.URL, item Item) {
 		}
 	}
 
-	store.syncPeriodically()
+	store.unsavedItems++
+	if store.unsavedItems >= maxNumberOfUnsavedItems {
+		store.writeFileAtomically()
+	}
 }
 
-func (store *DB) flush() {
-	// store.mu is already locked
+// maxNumberOfUnsavedItems balances the cost of writing to disk against the lost items that
+// could happen when the whole app is interrupted.
+const maxNumberOfUnsavedItems = 100
 
-	file, err := store.fs.Create(store.file)
+// writeFileAtomically writes all the items to a specified file via a temporary file
+// to give an atomic write in the filesystem.
+// The mutex must be already locked.
+func (store *DB) writeFileAtomically() {
+	if store.dir == "" {
+		return // already closed
+	}
+
+	temporaryName := store.dir + randomName()
+	store.writeFile(temporaryName)
+
+	// rename the file so it appears (almost) instantly in the filesystem
+	//_ = os.Remove(store.file) -- not needed on Linux
+	if err := store.fs.Rename(temporaryName, store.dir+FileName); err != nil {
+		_ = store.fs.Remove(temporaryName)
+		logger.Warn("Cannot rename DB", slog.Any("temp", temporaryName), slog.String("file", store.dir+FileName))
+	} else {
+		logger.Debug("Wrote DB", slog.String("file", store.dir+FileName))
+	}
+
+	store.unsavedItems = 0
+}
+
+// writeFile writes all the items to a specified file. The URLs are sorted alphabetically.
+// The mutex must be already locked.
+func (store *DB) writeFile(fileName string) {
+	file, err := store.fs.Create(fileName)
 	if err != nil {
-		logger.Warn("Cannot create DB", slog.Any("err", err), slog.String("file", store.file))
+		logger.Warn("Cannot create DB", slog.Any("err", err), slog.String("file", fileName))
 		return
 	}
 	defer file.Close()
@@ -264,7 +225,7 @@ func (store *DB) flush() {
 	buf := bufio.NewWriter(file)
 	for _, key := range keys {
 		if err := writeItem(buf, key, store.records[key]); err != nil {
-			logger.Warn("Cannot create DB", slog.Any("err", err), slog.String("file", store.file))
+			logger.Warn("Cannot write DB", slog.Any("err", err), slog.String("file", fileName))
 			return
 		}
 	}
@@ -282,16 +243,23 @@ func writeItem(w io.Writer, key string, item Item) (err error) {
 	return err
 }
 
-// numberOfStoresPerSync balances the cost of writing to disk against the lost stores that
-// could happen when the whole app is interrupted.
-const numberOfStoresPerSync = 20
+// syncPeriodically is run as a goroutine to write the file periodically when there are changes,
+// stopping when Close has been called.
+func (store *DB) syncPeriodically(delay time.Duration) {
+	busy := true
+	for busy {
+		time.Sleep(delay)
+		store.mu.Lock()
 
-// syncPeriodically flushes changes to the disk but only after several store operations have happened.
-// The mutex must be already locked.
-func (store *DB) syncPeriodically() {
-	store.count++
-	if store.count >= numberOfStoresPerSync {
-		store.count = 0
-		store.flush()
+		busy = store.dir != ""
+		if busy && store.unsavedItems > 0 {
+			store.writeFileAtomically()
+		}
+
+		store.mu.Unlock()
 	}
+}
+
+func randomName() string {
+	return "." + strconv.FormatUint(uint64(rand.Uint32()), 36)
 }
