@@ -24,12 +24,12 @@ func TestGetFilePath(t *testing.T) {
 		{isAPage: true, downloadURL: must("https://github.com/test#fragment"), expected: "./test.html"},
 		{isAPage: false, downloadURL: must("https://github.com/test/#fragment"), expected: "./test/index.html"},
 		{isAPage: false, downloadURL: must("https://github.com/test/page+info.aspx#fragment"), expected: "./test/page+info.aspx"},
-		{isAPage: false, downloadURL: must("https://github.com/test/page+info.aspx?a=1&b=2&b=3#fragment"), expected: "./test/page+info_a=1_b=2_b=3.aspx"},
+		{isAPage: false, downloadURL: must("https://github.com/test/page+info.aspx?a=1&b=3&b=2#fragment"), expected: "./test/page+info_a=1_b=2_b=3.aspx"},
 		{isAPage: false, downloadURL: must("https://github.com/test/page+info.aspx?a=1&b=2&b=%33#fragment"), expected: "./test/page+info_a=1_b=2_b=3.aspx"},
 		{isAPage: false, downloadURL: must("https://github.com/?a=%31&b=2&b=3#fragment"), expected: "./a=1_b=2_b=3.html"},
 		// edge cases
 		{downloadURL: &urlpkg.URL{}, expected: "./___.html"},
-		{downloadURL: &urlpkg.URL{RawQuery: "a=1&b=4&b=3"}, expected: "./___a=1_b=4_b=3.html"},
+		{downloadURL: &urlpkg.URL{RawQuery: "a=1&b=4&b=3"}, expected: "./___a=1_b=3_b=4.html"},
 	}
 
 	logger.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -55,12 +55,12 @@ func TestGetPageFilePath(t *testing.T) {
 		{downloadURL: must("https://github.com/test/#fragment"), expected: "/test/index.html"},
 		{downloadURL: must("https://github.com/test.aspx#fragment"), expected: "/test.aspx"},
 		{downloadURL: must("https://github.com/test/page+info.aspx#fragment"), expected: "/test/page+info.aspx"},
-		{downloadURL: must("https://github.com/test/page%2Binfo.aspx?a=1&b=2&b=3#fragment"), expected: "/test/page+info_a=1_b=2_b=3.aspx"},
+		{downloadURL: must("https://github.com/test/page%2Binfo.aspx?a=1&b=3&b=2#fragment"), expected: "/test/page+info_a=1_b=2_b=3.aspx"},
 		{downloadURL: must("https://google.com/settings?year=2006&month=11#fragment"), expected: "/settings_month=11_year=2006.html"},
 		{downloadURL: must("https://google.com/settings/?year=2006&month=11#fragment"), expected: "/settings/month=11_year=2006.html"},
 		// edge cases
 		{downloadURL: &urlpkg.URL{}, expected: "/___.html"},
-		{downloadURL: &urlpkg.URL{RawQuery: "a=1&b=4&b=3"}, expected: "/___a=1_b=4_b=3.html"},
+		{downloadURL: &urlpkg.URL{RawQuery: "a=1&b=4&b=3"}, expected: "/___a=1_b=3_b=4.html"},
 	}
 
 	logger.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))

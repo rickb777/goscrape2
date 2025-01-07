@@ -98,6 +98,7 @@ func SortedQueryString(values url.Values, separator string) string {
 
 	for _, k := range keys {
 		vs := values[k]
+		slices.Sort(vs)
 		for _, v := range vs {
 			segments = append(segments, fmt.Sprintf("%s=%s", k, v))
 		}

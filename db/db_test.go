@@ -37,8 +37,8 @@ func Test_keyOf(t *testing.T) {
 		{input: "http://example.org/#here", expected: "http://example.org/"},
 		{input: "http://example.org/a/b/c/index.html?a=^#sec1", expected: "http://example.org/a/b/c/index.html?a=^"},
 		{input: "http://example.org/a/b/c/index.html?a=%5E#sec1", expected: "http://example.org/a/b/c/index.html?a=^"},
-		{input: "http://example.org/a/b/c/page%2Bstyle.css?a=1&b=%5E&%62=3", expected: "http://example.org/a/b/c/page+style.css?a=1&b=^&b=3"},
-		{input: "http://[::1]/a/b/c/page+style.css?a=1&b=%5E&b=3", expected: "http://[::1]/a/b/c/page+style.css?a=1&b=^&b=3"},
+		{input: "http://example.org/a/b/c/page%2Bstyle.css?a=1&b=%5E&%62=3", expected: "http://example.org/a/b/c/page+style.css?a=1&b=3&b=^"},
+		{input: "http://[::1]/a/b/c/page+style.css?a=1&b=%5E&b=3", expected: "http://[::1]/a/b/c/page+style.css?a=1&b=3&b=^"},
 	}
 
 	for _, c := range cases {
