@@ -49,13 +49,11 @@ func GetPageFilePath(url *url.URL) string {
 }
 
 func urlEndsWithSlash(url *url.URL) string {
-	query := url.Query()
-
-	if len(query) == 0 {
+	if url.RawQuery == "" {
 		return url.Path + pageDirIndex + htmlExtension
 	}
 
-	qs := fileSafeQueryString(query)
+	qs := fileSafeQueryString(url.Query())
 
 	return url.Path + qs + htmlExtension
 }
@@ -76,6 +74,12 @@ func defaultName(qs url.Values) string {
 }
 
 func fileSafeQueryString(values url.Values) string {
+	return SortedQueryString(values, "_")
+}
+
+// SortedQueryString builds a canonical representation of a query string by sorting
+// the keys. The provided values will be already unescaped (see url.Query()).
+func SortedQueryString(values url.Values, separator string) string {
 	if len(values) == 0 {
 		return ""
 	}
@@ -99,7 +103,7 @@ func fileSafeQueryString(values url.Values) string {
 		}
 	}
 
-	return strings.Join(segments, "_")
+	return strings.Join(segments, separator)
 }
 
 func prefixNonBlank(s string) string {

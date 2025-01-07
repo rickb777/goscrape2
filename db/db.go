@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/rickb777/goscrape2/logger"
+	"github.com/rickb777/goscrape2/mapping"
 	"github.com/spf13/afero"
 	"io"
 	"log/slog"
@@ -125,9 +126,25 @@ func (store *DB) Close() error {
 	return nil
 }
 
+// keyOf gets the canonical minimal form of the URL as a string such that all escaped
+// characters are unescaped, where possible. The URL fragment is discarded.
 func keyOf(u *urlpkg.URL) string {
-	v := *u
-	v.Fragment = ""
+	var v strings.Builder
+	if u.Scheme != "" {
+		v.WriteString(u.Scheme)
+		v.WriteString("://")
+	}
+	v.WriteString(u.Host)
+	path, err := urlpkg.PathUnescape(u.Path)
+	if err == nil {
+		v.WriteString(path)
+	} else {
+		v.WriteString(u.Path)
+	}
+	if u.RawQuery != "" {
+		v.WriteString("?")
+		v.WriteString(mapping.SortedQueryString(u.Query(), "&"))
+	}
 	return v.String()
 }
 

@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-func TestStringRepresentation(t *testing.T) {
+func Test_writeItem(t *testing.T) {
 	buf := &strings.Builder{}
 	t1 := time.Date(2000, 1, 1, 1, 1, 1, 0, time.UTC)
 	textHtml := header.ContentType{Type: "text", Subtype: "html"}
@@ -27,6 +27,24 @@ func TestStringRepresentation(t *testing.T) {
 	assert.Equal(t, `k2	200	-	text/html	2000-01-01T02:01:01Z	"abc123"`, s[1])
 	assert.Equal(t, `k3	200	-	-	-	"def123"`, s[2])
 	assert.Equal(t, `k4	308	/foo/bar.html	-	-	-`, s[3])
+}
+
+func Test_keyOf(t *testing.T) {
+	cases := []struct {
+		input, expected string
+	}{
+		{input: "http://example.org#here", expected: "http://example.org"},
+		{input: "http://example.org/#here", expected: "http://example.org/"},
+		{input: "http://example.org/a/b/c/index.html?a=^#sec1", expected: "http://example.org/a/b/c/index.html?a=^"},
+		{input: "http://example.org/a/b/c/index.html?a=%5E#sec1", expected: "http://example.org/a/b/c/index.html?a=^"},
+		{input: "http://example.org/a/b/c/page%2Bstyle.css?a=1&b=%5E&%62=3", expected: "http://example.org/a/b/c/page+style.css?a=1&b=^&b=3"},
+		{input: "http://[::1]/a/b/c/page+style.css?a=1&b=%5E&b=3", expected: "http://[::1]/a/b/c/page+style.css?a=1&b=^&b=3"},
+	}
+
+	for _, c := range cases {
+		y := keyOf(mustParse(c.input))
+		assert.Equal(t, c.expected, y)
+	}
 }
 
 func TestDB(t *testing.T) {
