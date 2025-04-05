@@ -106,13 +106,13 @@ func declareFlags() (Arguments, error) {
 
 	flag.Parse()
 
-	setUsageInfo("Scrape a website and create an offline browsable version on the disk.\n")
+	setUsageInfo("Scrape a website and create an offline browsable version on the disk.")
 	return arguments, nil
 }
 
 func setUsageInfo(headline string) {
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), headline)
+		fmt.Fprintln(flag.CommandLine.Output(), headline)
 		fmt.Fprintf(flag.CommandLine.Output(), "\nUsage:\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "  %s [options] [<url> ...]\n\n", os.Args[0])
 		flag.PrintDefaults()
@@ -165,7 +165,7 @@ func main() {
 	//ctx := app.Context() // provides signal handler cancellation
 
 	if !args.Serve && len(args.URLs) == 0 {
-		setUsageInfo("Must provide -serve to run webserver and/or URLs to scrape\n")
+		setUsageInfo("Must provide -serve to run webserver and/or URLs to scrape")
 		flag.Usage()
 		logger.Exit(1)
 	}
