@@ -2,8 +2,8 @@ package db
 
 import (
 	"github.com/rickb777/acceptable/header"
+	"github.com/rickb777/expect"
 	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
 	"net/url"
 	"os"
 	"strings"
@@ -23,10 +23,10 @@ func Test_writeItem(t *testing.T) {
 
 	s := strings.Split(buf.String(), "\n")
 
-	assert.Equal(t, `k1	200	-	-	2000-01-01T01:01:01Z	-`, s[0])
-	assert.Equal(t, `k2	200	-	text/html	2000-01-01T02:01:01Z	"abc123"`, s[1])
-	assert.Equal(t, `k3	200	-	-	-	"def123"`, s[2])
-	assert.Equal(t, `k4	308	/foo/bar.html	-	-	-`, s[3])
+	expect.String(s[0]).ToBe(t, `k1	200	-	-	2000-01-01T01:01:01Z	-`)
+	expect.String(s[1]).ToBe(t, `k2	200	-	text/html	2000-01-01T02:01:01Z	"abc123"`)
+	expect.String(s[2]).ToBe(t, `k3	200	-	-	-	"def123"`)
+	expect.String(s[3]).ToBe(t, `k4	308	/foo/bar.html	-	-	-`)
 }
 
 func Test_keyOf(t *testing.T) {
@@ -41,9 +41,9 @@ func Test_keyOf(t *testing.T) {
 		{input: "http://[::1]/a/b/c/page+style.css?a=1&b=%5E&b=3", expected: "http://[::1]/a/b/c/page+style.css?a=1&b=3&b=^"},
 	}
 
-	for _, c := range cases {
+	for i, c := range cases {
 		y := keyOf(mustParse(c.input))
-		assert.Equal(t, c.expected, y)
+		expect.String(y).I(i).ToBe(t, c.expected)
 	}
 }
 
@@ -65,14 +65,14 @@ func TestDB(t *testing.T) {
 	store1.Store(u3, Item{Code: 200, ETags: `W/"h3"`})
 
 	v1 := store1.Lookup(u1)
-	assert.Equal(t, Item{Code: 200, ETags: `"h1a", "h1b"`}, v1)
+	expect.Any(v1).ToBe(t, Item{Code: 200, ETags: `"h1a", "h1b"`})
 
 	v2 := store1.Lookup(u2)
-	assert.Equal(t, `"h2"`, v2.ETags)
-	assert.True(t, v2.Expires.Equal(t1), "%s %s", t1, v2.Expires)
+	expect.Any(v2.ETags).ToBe(t, `"h2"`)
+	expect.Any(v2.Expires).Info("%s %s", t1, v2.Expires).ToBe(t, t1)
 
 	v3 := store1.Lookup(u3)
-	assert.Equal(t, Item{Code: 200, ETags: `W/"h3"`}, v3)
+	expect.Any(v3).ToBe(t, Item{Code: 200, ETags: `W/"h3"`})
 
 	store1.Close()
 	store1 = nil
@@ -83,15 +83,15 @@ func TestDB(t *testing.T) {
 	store2.Store(u3, Item{})
 
 	w1 := store2.Lookup(u1)
-	assert.Equal(t, Item{Code: 200, ETags: `"h1a", "h1b"`}, w1)
+	expect.Any(w1).ToBe(t, Item{Code: 200, ETags: `"h1a", "h1b"`})
 
 	w2 := store2.Lookup(u2)
-	assert.Equal(t, `"h2"`, w2.ETags)
-	assert.True(t, w2.Expires.Equal(t1), "%s %s", t1, w2.Expires)
+	expect.String(w2.ETags).ToBe(t, `"h2"`)
+	expect.Any(w2.Expires).Info("%s %s", t1, w2.Expires).ToBe(t, t1)
 
 	w3 := store2.Lookup(u3)
-	assert.Equal(t, "", w3.ETags)
-	assert.True(t, w3.Expires.IsZero())
+	expect.String(w3.ETags).ToBe(t, "")
+	expect.Bool(w3.Expires.IsZero()).ToBeTrue(t)
 }
 
 func mustParse(s string) *url.URL {

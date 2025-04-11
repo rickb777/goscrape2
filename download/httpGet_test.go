@@ -2,10 +2,6 @@ package download
 
 import (
 	"context"
-	"github.com/rickb777/goscrape2/download/throttle"
-	"github.com/rickb777/goscrape2/stubclient"
-	"github.com/rickb777/goscrape2/utc"
-	"github.com/spf13/afero"
 	"net/http"
 	"net/url"
 	"os"
@@ -14,10 +10,13 @@ import (
 
 	"github.com/rickb777/acceptable/header"
 	"github.com/rickb777/acceptable/headername"
+	"github.com/rickb777/expect"
 	"github.com/rickb777/goscrape2/config"
 	"github.com/rickb777/goscrape2/db"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/rickb777/goscrape2/download/throttle"
+	"github.com/rickb777/goscrape2/stubclient"
+	"github.com/rickb777/goscrape2/utc"
+	"github.com/spf13/afero"
 )
 
 func TestGet200(t *testing.T) {
@@ -37,12 +36,12 @@ func TestGet200(t *testing.T) {
 
 	resp, err := d.httpGet(context.Background(), mustParse("http://example.org/"), lastModified, db.Item{})
 
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.Equal(t, "gzip", resp.Request.Header.Get(headername.AcceptEncoding))
-	assert.Equal(t, "Foo/Bar", resp.Request.Header.Get(headername.UserAgent))
-	assert.Equal(t, "Sat, 01 Jan 2000 01:01:01 UTC", resp.Request.Header.Get(headername.IfModifiedSince))
-	assert.Equal(t, "Hello", resp.Request.Header.Get("X-Extra"))
+	expect.Error(err).ToBeNil(t)
+	expect.Number(resp.StatusCode).ToBe(t, http.StatusOK)
+	expect.String(resp.Request.Header.Get(headername.AcceptEncoding)).ToBe(t, "gzip")
+	expect.String(resp.Request.Header.Get(headername.UserAgent)).ToBe(t, "Foo/Bar")
+	expect.String(resp.Request.Header.Get(headername.IfModifiedSince)).ToBe(t, "Sat, 01 Jan 2000 01:01:01 UTC")
+	expect.String(resp.Request.Header.Get("X-Extra")).ToBe(t, "Hello")
 }
 
 func TestGet404(t *testing.T) {
@@ -61,11 +60,11 @@ func TestGet404(t *testing.T) {
 
 	resp, err := d.httpGet(context.Background(), mustParse("http://example.org/"), lastModified, db.Item{})
 
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
-	assert.Equal(t, "gzip", resp.Request.Header.Get(headername.AcceptEncoding))
-	assert.Equal(t, "Foo/Bar", resp.Request.Header.Get(headername.UserAgent))
-	assert.Equal(t, "Sat, 01 Jan 2000 01:01:01 UTC", resp.Request.Header.Get(headername.IfModifiedSince))
+	expect.Error(err).ToBeNil(t)
+	expect.Number(resp.StatusCode).ToBe(t, http.StatusNotFound)
+	expect.String(resp.Request.Header.Get(headername.AcceptEncoding)).ToBe(t, "gzip")
+	expect.String(resp.Request.Header.Get(headername.UserAgent)).ToBe(t, "Foo/Bar")
+	expect.String(resp.Request.Header.Get(headername.IfModifiedSince)).ToBe(t, "Sat, 01 Jan 2000 01:01:01 UTC")
 }
 
 func TestGet429(t *testing.T) {
@@ -85,12 +84,12 @@ func TestGet429(t *testing.T) {
 
 	resp, err := d.httpGet(context.Background(), mustParse("http://example.org/"), lastModified, db.Item{})
 
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusTooManyRequests, resp.StatusCode)
-	assert.Equal(t, "gzip", resp.Request.Header.Get(headername.AcceptEncoding))
-	assert.Equal(t, "Foo/Bar", resp.Request.Header.Get(headername.UserAgent))
-	assert.Equal(t, "Sat, 01 Jan 2000 01:01:01 UTC", resp.Request.Header.Get(headername.IfModifiedSince))
-	assert.False(t, d.Lockdown.IsNormal())
+	expect.Error(err).ToBeNil(t)
+	expect.Number(resp.StatusCode).ToBe(t, http.StatusTooManyRequests)
+	expect.String(resp.Request.Header.Get(headername.AcceptEncoding)).ToBe(t, "gzip")
+	expect.String(resp.Request.Header.Get(headername.UserAgent)).ToBe(t, "Foo/Bar")
+	expect.String(resp.Request.Header.Get(headername.IfModifiedSince)).ToBe(t, "Sat, 01 Jan 2000 01:01:01 UTC")
+	expect.Bool(d.Lockdown.IsNormal()).ToBeFalse(t)
 }
 
 func TestGet200RevalidateWhenExpired(t *testing.T) {
@@ -114,12 +113,12 @@ func TestGet200RevalidateWhenExpired(t *testing.T) {
 
 	resp, err := d.httpGet(context.Background(), u, lastModified, item)
 
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.Equal(t, "gzip", resp.Request.Header.Get(headername.AcceptEncoding))
-	assert.Equal(t, "Foo/Bar", resp.Request.Header.Get(headername.UserAgent))
-	assert.Equal(t, "Sat, 01 Jan 2000 01:01:01 UTC", resp.Request.Header.Get(headername.IfModifiedSince))
-	assert.Equal(t, "Hello", resp.Request.Header.Get("X-Extra"))
+	expect.Error(err).ToBeNil(t)
+	expect.Number(resp.StatusCode).ToBe(t, http.StatusOK)
+	expect.String(resp.Request.Header.Get(headername.AcceptEncoding)).ToBe(t, "gzip")
+	expect.String(resp.Request.Header.Get(headername.UserAgent)).ToBe(t, "Foo/Bar")
+	expect.String(resp.Request.Header.Get(headername.IfModifiedSince)).ToBe(t, "Sat, 01 Jan 2000 01:01:01 UTC")
+	expect.String(resp.Request.Header.Get("X-Extra")).ToBe(t, "Hello")
 }
 
 func TestGet200RevalidateWhenLaxIsNegative(t *testing.T) {
@@ -144,12 +143,12 @@ func TestGet200RevalidateWhenLaxIsNegative(t *testing.T) {
 
 	resp, err := d.httpGet(context.Background(), u, lastModified, item)
 
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.Equal(t, "gzip", resp.Request.Header.Get(headername.AcceptEncoding))
-	assert.Equal(t, "Foo/Bar", resp.Request.Header.Get(headername.UserAgent))
-	assert.Equal(t, "Sat, 01 Jan 2000 01:01:01 UTC", resp.Request.Header.Get(headername.IfModifiedSince))
-	assert.Equal(t, "Hello", resp.Request.Header.Get("X-Extra"))
+	expect.Error(err).ToBeNil(t)
+	expect.Number(resp.StatusCode).ToBe(t, http.StatusOK)
+	expect.String(resp.Request.Header.Get(headername.AcceptEncoding)).ToBe(t, "gzip")
+	expect.String(resp.Request.Header.Get(headername.UserAgent)).ToBe(t, "Foo/Bar")
+	expect.String(resp.Request.Header.Get(headername.IfModifiedSince)).ToBe(t, "Sat, 01 Jan 2000 01:01:01 UTC")
+	expect.String(resp.Request.Header.Get("X-Extra")).ToBe(t, "Hello")
 }
 
 func TestGet304UsingEtag(t *testing.T) {
@@ -178,8 +177,8 @@ func TestGet304UsingEtag(t *testing.T) {
 
 	resp, err := d.httpGet(context.Background(), u, lastModified, item)
 
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusNotModified, resp.StatusCode)
+	expect.Error(err).ToBeNil(t)
+	expect.Number(resp.StatusCode).ToBe(t, http.StatusNotModified)
 }
 
 func TestNotYetExpired(t *testing.T) {
@@ -207,8 +206,8 @@ func TestNotYetExpired(t *testing.T) {
 
 	resp, err := d.httpGet(context.Background(), u, lastModified, item)
 
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusTeapot, resp.StatusCode)
+	expect.Error(err).ToBeNil(t)
+	expect.Number(resp.StatusCode).ToBe(t, http.StatusTeapot)
 }
 
 func TestGet500(t *testing.T) {
@@ -224,12 +223,12 @@ func TestGet500(t *testing.T) {
 
 	resp, err := d.httpGet(context.Background(), mustParse("http://example.org/"), time.Time{}, db.Item{})
 
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
-	assert.Equal(t, "gzip", resp.Request.Header.Get(headername.AcceptEncoding))
-	assert.Equal(t, "", resp.Request.Header.Get(headername.UserAgent))
-	assert.Equal(t, "", resp.Request.Header.Get(headername.IfModifiedSince))
-	assert.Equal(t, "", resp.Request.Header.Get("X-Extra"))
+	expect.Error(err).ToBeNil(t)
+	expect.Number(resp.StatusCode).ToBe(t, http.StatusInternalServerError)
+	expect.String(resp.Request.Header.Get(headername.AcceptEncoding)).ToBe(t, "gzip")
+	expect.String(resp.Request.Header.Get(headername.UserAgent)).ToBe(t, "")
+	expect.String(resp.Request.Header.Get(headername.IfModifiedSince)).ToBe(t, "")
+	expect.String(resp.Request.Header.Get("X-Extra")).ToBe(t, "")
 }
 
 func mustParse(s string) *url.URL {

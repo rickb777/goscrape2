@@ -20,3 +20,5 @@ goscrape2
 tmp/
 
 example.org/
+/go.work
+/go.work.sum

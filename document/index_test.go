@@ -7,9 +7,8 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/rickb777/expect"
 	"github.com/rickb777/goscrape2/logger"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func mustParseURL(s string) *url.URL {
@@ -35,16 +34,17 @@ func TestFindReferences(t *testing.T) {
 `)
 
 	doc, err := ParseHTML(u, u, bytes.NewReader(b))
-	require.NoError(t, err)
+	expect.Error(err).ToBeNil(t)
 
 	refs, err := doc.FindReferences()
-	require.NoError(t, err)
-	assert.Equal(t, 7, len(refs))
-	assert.Contains(t, refs, mustParseURL("http://domain.com/wp-content/uploads/document.pdf"))
-	assert.Contains(t, refs, mustParseURL("http://domain.com/some/things"))
-	assert.Contains(t, refs, mustParseURL("http://domain.com/more/things/"))
-	assert.Contains(t, refs, mustParseURL("http://domain.com/test.jpg"))
-	assert.Contains(t, refs, mustParseURL("https://domain.com/test-480w.jpg"))
-	assert.Contains(t, refs, mustParseURL("https://domain.com/test-800w.jpg"))
-	assert.Contains(t, refs, mustParseURL("http://domain.com/js/func.min.js"))
+	expect.Error(err).ToBeNil(t)
+	expect.Slice(refs).ToHaveLength(t, 7)
+	expect.Slice(refs).ToContainAll(t,
+		mustParseURL("http://domain.com/wp-content/uploads/document.pdf"),
+		mustParseURL("http://domain.com/some/things"),
+		mustParseURL("http://domain.com/more/things/"),
+		mustParseURL("http://domain.com/test.jpg"),
+		mustParseURL("https://domain.com/test-480w.jpg"),
+		mustParseURL("https://domain.com/test-800w.jpg"),
+		mustParseURL("http://domain.com/js/func.min.js"))
 }

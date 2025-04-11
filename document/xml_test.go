@@ -1,8 +1,7 @@
 package document
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/rickb777/expect"
 	"strings"
 	"testing"
 )
@@ -19,11 +18,11 @@ height="30" width="200">
 	u2 := mustParseURL("http://example.com/")
 
 	doc, err := ParseSVG(u1, u2, strings.NewReader(sample))
-	require.NoError(t, err)
+	expect.Error(err).ToBeNil(t)
 
 	_, fixed, _, err := doc.FixURLReferences()
-	require.NoError(t, err)
-	assert.True(t, fixed)
+	expect.Error(err).ToBeNil(t)
+	expect.Bool(fixed).ToBeTrue(t)
 
 	//	expected := `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.w3.org/1999/xlink" height="30" width="200">
 	//  <a href="link1.svg"><text>Link1</text></a>

@@ -4,11 +4,10 @@ import (
 	"io"
 	"log/slog"
 	"net/url"
-	"strings"
 	"testing"
 
+	"github.com/rickb777/expect"
 	"github.com/rickb777/goscrape2/logger"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestCheckCSSForURLs(t *testing.T) {
@@ -57,17 +56,17 @@ func TestCheckCSSForURLs(t *testing.T) {
 
 	cssURL, _ := url.Parse("http://localhost/css/x/page.css")
 
-	for _, c := range cases {
+	for i, c := range cases {
 		revised, refs := CheckCSSForUrls(cssURL, "localhost", []byte(c.input))
 
 		if c.ref == "" {
-			assert.Empty(t, refs)
+			expect.Slice(refs).Info(i).ToBeEmpty(t)
 			continue
 		}
 
-		assert.NotEmpty(t, refs)
-		assert.Equal(t, c.ref, refs[0].String())
+		expect.Slice(refs).Info(i).Not().ToBeEmpty(t)
+		expect.String(refs[0].String()).Info(i).ToBe(t, c.ref)
 
-		assert.True(t, strings.Contains(string(revised), c.resolved), string(revised))
+		expect.String(string(revised)).Info(i).ToContain(t, c.resolved)
 	}
 }

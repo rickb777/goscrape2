@@ -2,12 +2,11 @@ package download
 
 import (
 	"context"
+	"github.com/rickb777/expect"
 	"github.com/rickb777/goscrape2/config"
 	"github.com/rickb777/goscrape2/stubclient"
 	"github.com/rickb777/goscrape2/work"
 	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"testing"
 )
@@ -42,12 +41,13 @@ func TestProcessURL_200_HTML(t *testing.T) {
 
 	_, result, err := d.ProcessURL(context.Background(), work.Item{URL: mustParse("https://example.org/page2/")})
 
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, result.StatusCode)
-	assert.Equal(t, 3, len(result.References))
-	assert.Contains(t, result.References, mustParse("https://example.org/"))
-	assert.Contains(t, result.References, mustParse("https://example.org/sub/"))
-	assert.Contains(t, result.References, mustParse("https://example.org/page2/pix/photo.jpg"))
+	expect.Error(err).ToBeNil(t)
+	expect.Number(result.StatusCode).ToBe(t, http.StatusOK)
+	expect.Slice(result.References).ToHaveLength(t, 3)
+	expect.Slice(result.References).ToContainAll(t,
+		mustParse("https://example.org/"),
+		mustParse("https://example.org/sub/"),
+		mustParse("https://example.org/page2/pix/photo.jpg"))
 }
 
 func TestProcessURL_200_CSS(t *testing.T) {
@@ -71,9 +71,10 @@ func TestProcessURL_200_CSS(t *testing.T) {
 
 	_, result, err := d.ProcessURL(context.Background(), work.Item{URL: mustParse("https://example.org/sub/page2.css")})
 
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, result.StatusCode)
-	assert.Equal(t, 2, len(result.References))
-	assert.Contains(t, result.References, mustParse("https://example.org/doc/gopher.png"))
-	assert.Contains(t, result.References, mustParse("https://example.org/sub/food/cheese.png"))
+	expect.Error(err).ToBeNil(t)
+	expect.Number(result.StatusCode).ToBe(t, http.StatusOK)
+	expect.Slice(result.References).ToHaveLength(t, 2)
+	expect.Slice(result.References).ToContainAll(t,
+		mustParse("https://example.org/doc/gopher.png"),
+		mustParse("https://example.org/sub/food/cheese.png"))
 }

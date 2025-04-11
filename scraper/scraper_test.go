@@ -6,11 +6,10 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/rickb777/expect"
 	"github.com/rickb777/goscrape2/config"
 	"github.com/rickb777/goscrape2/stubclient"
 	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func newTestScraper(t *testing.T, startURL string, stub *stubclient.Client) *Scraper {
@@ -19,8 +18,8 @@ func newTestScraper(t *testing.T, startURL string, stub *stubclient.Client) *Scr
 
 	cfg := config.Config{MaxDepth: 10}
 	sc, err := New(cfg, mustParseURL(startURL), afero.NewMemMapFs())
-	require.NoError(t, err)
-	require.NotNil(t, sc)
+	expect.Error(err).ToBeNil(t)
+	expect.Any(sc).Not().ToBeNil(t)
 
 	sc.Client = stub
 	return sc
@@ -63,11 +62,11 @@ func TestScraperLinks(t *testing.T) {
 	stub.GivenResponse(http.StatusOK, "https://example.org/style.css", "text/css", "")
 
 	scraper := newTestScraper(t, "https://example.org/#fragment", stub)
-	require.NotNil(t, scraper)
+	expect.Any(scraper).Not().ToBeNil(t)
 
 	ctx := context.Background()
 	err := scraper.Start(ctx)
-	require.NoError(t, err)
+	expect.Error(err).ToBeNil(t)
 
 	expectedProcessed := []string{
 		"/",
@@ -79,7 +78,7 @@ func TestScraperLinks(t *testing.T) {
 	}
 	actualProcessed := scraper.processed.Slice()
 	slices.Sort(actualProcessed)
-	assert.Equal(t, expectedProcessed, actualProcessed)
+	expect.Slice(actualProcessed).ToBe(t, expectedProcessed...)
 }
 
 func TestScraperAttributes(t *testing.T) {
@@ -104,11 +103,11 @@ func TestScraperAttributes(t *testing.T) {
 	stub.GivenResponse(http.StatusOK, "https://example.org/bg.gif", "image/gif", "")
 
 	scraper := newTestScraper(t, startURL, stub)
-	require.NotNil(t, scraper)
+	expect.Any(scraper).Not().ToBeNil(t)
 
 	ctx := context.Background()
 	err := scraper.Start(ctx)
-	require.NoError(t, err)
+	expect.Error(err).ToBeNil(t)
 
 	expectedProcessed := []string{
 		"/",
@@ -116,5 +115,5 @@ func TestScraperAttributes(t *testing.T) {
 	}
 	actualProcessed := scraper.processed.Slice()
 	slices.Sort(actualProcessed)
-	assert.Equal(t, expectedProcessed, actualProcessed)
+	expect.Slice(actualProcessed).ToBe(t, expectedProcessed...)
 }

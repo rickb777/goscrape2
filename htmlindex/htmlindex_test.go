@@ -5,8 +5,7 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/rickb777/expect"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 )
@@ -26,64 +25,55 @@ func TestIndex(t *testing.T) {
 	idx := New()
 
 	doc, err := html.Parse(bytes.NewReader(input))
-	require.NoError(t, err)
+	expect.Error(err).ToBeNil(t)
 
 	idx.Index(mustParse("https://domain.com/"), doc)
 
 	// check <a> tag
 	{
 		references, err := idx.URLs(atom.A)
-		require.NoError(t, err)
-		require.Len(t, references, 3)
+		expect.Error(err).ToBeNil(t)
+		expect.Slice(references).ToHaveLength(t, 3)
 
-		u0 := "https://domain.com/about.html"
-		assert.Equal(t, u0, references[0].String())
-		assert.Equal(t, "/about.html", references[0].Path)
+		expect.String(references[0].String()).ToBe(t, "https://domain.com/about.html")
+		expect.String(references[0].Path).ToBe(t, "/about.html")
 
-		u1 := "https://domain.com/things"
-		assert.Equal(t, u1, references[1].String())
-		assert.Equal(t, "/things", references[1].Path)
+		expect.String(references[1].String()).ToBe(t, "https://domain.com/things")
+		expect.String(references[1].Path).ToBe(t, "/things")
 
-		u2 := "https://domain.com/wp-content/uploads/document%2Bindex.pdf"
-		assert.Equal(t, u2, references[2].String())
-		assert.Equal(t, "/wp-content/uploads/document+index.pdf", references[2].Path)
+		expect.String(references[2].String()).ToBe(t, "https://domain.com/wp-content/uploads/document%2Bindex.pdf")
+		expect.String(references[2].Path).ToBe(t, "/wp-content/uploads/document+index.pdf")
 
 		urls := idx.Nodes(atom.A)
-		require.Len(t, urls, 3)
-		nodes, ok := urls[u2]
-		require.True(t, ok)
-		require.Len(t, nodes, 1)
-		assert.Equal(t, "a", nodes[0].Data)
+		expect.Map(urls).ToHaveLength(t, 3)
+		nodes, ok := urls[("https://domain.com/wp-content/uploads/document%2Bindex.pdf")]
+		expect.Bool(ok).ToBeTrue(t)
+		expect.Slice(nodes).ToHaveLength(t, 1)
+		expect.String(nodes[0].Data).ToBe(t, "a")
 	}
 	// check <img> tag
 	{
 		references, err := idx.URLs(atom.Img)
-		require.NoError(t, err)
-		require.Len(t, references, 1)
-
-		tagURL := "https://domain.com/test%24file.jpg"
-		assert.Equal(t, tagURL, references[0].String())
-		assert.Equal(t, "/test$file.jpg", references[0].Path)
+		expect.Error(err).ToBeNil(t)
+		expect.Slice(references).ToHaveLength(t, 1)
+		expect.String(references[0].String()).ToBe(t, "https://domain.com/test%24file.jpg")
+		expect.String(references[0].Path).ToBe(t, "/test$file.jpg")
 	}
 	// check <script> tag
 	{
 		references, err := idx.URLs(atom.Script)
-		require.NoError(t, err)
-		require.Len(t, references, 2)
-
-		tagURL1 := "https://api.html5media.info/1.1.8/html5media.min.js"
-		assert.Equal(t, tagURL1, references[0].String())
-
-		tagURL2 := "https://domain.com/func.min.js"
-		assert.Equal(t, tagURL2, references[1].String())
+		expect.Error(err).ToBeNil(t)
+		expect.Slice(references).ToHaveLength(t, 2)
+		expect.String(references[0].String()).ToBe(t, "https://api.html5media.info/1.1.8/html5media.min.js")
+		expect.String(references[1].String()).ToBe(t, "https://domain.com/func.min.js")
 	}
 	// check for non-existent tag
 	{
 		references, err := idx.URLs(0)
-		require.NoError(t, err)
-		require.Empty(t, references)
+		expect.Error(err).ToBeNil(t)
+		expect.Slice(references).ToBeEmpty(t)
 		urls := idx.Nodes(0)
-		require.Empty(t, urls)
+		expect.Map(urls).ToBeEmpty(t)
 	}
 }
 
@@ -100,30 +90,28 @@ func TestIndexWithBase(t *testing.T) {
 	idx := New()
 
 	doc, err := html.Parse(bytes.NewReader(input))
-	require.NoError(t, err)
+	expect.Error(err).ToBeNil(t)
 
 	idx.Index(mustParse("https://www.domain.com/"), doc)
 
 	// check <a> tag
 	{
 		references, err := idx.URLs(atom.A)
-		require.NoError(t, err)
-		require.Len(t, references, 2)
+		expect.Error(err).ToBeNil(t)
+		expect.Slice(references).ToHaveLength(t, 2)
 
-		u0 := "https://domain.com/about.html"
-		assert.Equal(t, u0, references[0].String())
-		assert.Equal(t, "/about.html", references[0].Path)
+		expect.String(references[0].String()).ToBe(t, "https://domain.com/about.html")
+		expect.String(references[0].Path).ToBe(t, "/about.html")
 
-		u1 := "https://domain.com/things"
-		assert.Equal(t, u1, references[1].String())
-		assert.Equal(t, "/things", references[1].Path)
+		expect.String(references[1].String()).ToBe(t, "https://domain.com/things")
+		expect.String(references[1].Path).ToBe(t, "/things")
 
 		urls := idx.Nodes(atom.A)
-		require.Len(t, urls, 2)
-		nodes, ok := urls[u0]
-		require.True(t, ok)
-		require.Len(t, nodes, 1)
-		assert.Equal(t, "a", nodes[0].Data)
+		expect.Map(urls).ToHaveLength(t, 2)
+		nodes, ok := urls[("https://domain.com/about.html")]
+		expect.Bool(ok).ToBeTrue(t)
+		expect.Slice(nodes).ToHaveLength(t, 1)
+		expect.String(nodes[0].Data).ToBe(t, "a")
 	}
 }
 
@@ -139,23 +127,23 @@ func TestIndexImg(t *testing.T) {
 	idx := New()
 
 	doc, err := html.Parse(bytes.NewReader(input))
-	require.NoError(t, err)
+	expect.Error(err).ToBeNil(t)
 
 	idx.Index(mustParse("https://domain.com/"), doc)
 
 	{
 		references, err := idx.URLs(atom.Img)
-		require.NoError(t, err)
-		require.Len(t, references, 3)
-		assert.Equal(t, "https://domain.com/test-480w.jpg", references[0].String())
-		assert.Equal(t, "https://domain.com/test-800w.jpg", references[1].String())
-		assert.Equal(t, "https://domain.com/test.jpg", references[2].String())
+		expect.Error(err).ToBeNil(t)
+		expect.Slice(references).ToHaveLength(t, 3)
+		expect.String(references[0].String()).ToBe(t, "https://domain.com/test-480w.jpg")
+		expect.String(references[1].String()).ToBe(t, "https://domain.com/test-800w.jpg")
+		expect.String(references[2].String()).ToBe(t, "https://domain.com/test.jpg")
 	}
 	{
 		references, err := idx.URLs(atom.Body)
-		require.NoError(t, err)
-		require.Len(t, references, 1)
-		assert.Equal(t, "https://domain.com/bg.jpg", references[0].String())
+		expect.Error(err).ToBeNil(t)
+		expect.Slice(references).ToHaveLength(t, 1)
+		expect.String(references[0].String()).ToBe(t, "https://domain.com/bg.jpg")
 	}
 }
 

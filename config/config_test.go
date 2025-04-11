@@ -1,9 +1,8 @@
 package config
 
 import (
+	"github.com/rickb777/expect"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestHeaders(t *testing.T) {
@@ -24,6 +23,6 @@ func TestHeaders(t *testing.T) {
 			Value: "e",
 		},
 	})
-	assert.Equal(t, "b", headers.Get("a"))
-	assert.Equal(t, []string{"d", "e"}, headers.Values("c"))
+	expect.String(headers.Get("a")).ToBe(t, "b")
+	expect.Slice(headers.Values("c")).ToBe(t, "d", "e")
 }

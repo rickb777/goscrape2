@@ -2,12 +2,11 @@ package scraper
 
 import (
 	"fmt"
+	"github.com/rickb777/expect"
 	"github.com/rickb777/goscrape2/filter"
 	"github.com/rickb777/goscrape2/logger"
 	"github.com/rickb777/goscrape2/stubclient"
 	"github.com/rickb777/servefiles/v3"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io"
 	"log/slog"
 	"net/http"
@@ -49,7 +48,7 @@ func TestShouldURLBeDownloaded(t *testing.T) {
 	stub.GivenResponse(http.StatusOK, "https://example.org/style.css", "text/css", "")
 
 	scraper := newTestScraper(t, startURL, stub)
-	require.NotNil(t, scraper)
+	expect.Any(scraper).Not().ToBeNil(t)
 
 	scraper.processed.Add("/ok/done")
 	scraper.includes, _ = filter.New([]string{"/ok"})
@@ -73,6 +72,6 @@ func TestShouldURLBeDownloaded(t *testing.T) {
 
 	for _, c := range cases {
 		result := scraper.shouldURLBeDownloaded(c.item, c.depth)
-		assert.Equal(t, c.expected, result, c.item.String())
+		expect.Bool(result).I(c.item.String()).ToBe(t, c.expected)
 	}
 }

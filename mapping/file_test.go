@@ -6,8 +6,8 @@ import (
 	urlpkg "net/url"
 	"testing"
 
+	"github.com/rickb777/expect"
 	"github.com/rickb777/goscrape2/logger"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestGetFilePath(t *testing.T) {
@@ -36,7 +36,7 @@ func TestGetFilePath(t *testing.T) {
 
 	for _, c := range cases {
 		output := GetFilePath(c.downloadURL, c.isAPage)
-		assert.Equal(t, c.expected, output)
+		expect.String(output).ToBe(t, c.expected)
 	}
 }
 
@@ -67,7 +67,7 @@ func TestGetPageFilePath(t *testing.T) {
 
 	for _, c := range cases {
 		output := GetPageFilePath(c.downloadURL)
-		assert.Equal(t, c.expected, output)
+		expect.String(output).ToBe(t, c.expected)
 	}
 }
 

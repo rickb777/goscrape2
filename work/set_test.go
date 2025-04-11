@@ -1,13 +1,12 @@
 package work
 
 import (
-	assertpkg "github.com/stretchr/testify/assert"
+	"github.com/rickb777/expect"
 	"slices"
 	"testing"
 )
 
 func TestNewSet(t *testing.T) {
-	assert := assertpkg.New(t)
 	stringTests := []struct {
 		input          []string
 		expectedOutput []string
@@ -16,22 +15,21 @@ func TestNewSet(t *testing.T) {
 		{input: []string{"hi", "bob", "hi", "bob", "hi", "bob", "hi", "bob", "hi", "bob"}, expectedOutput: []string{"bob", "hi"}},
 	}
 
-	for _, test := range stringTests {
+	for i, test := range stringTests {
 		output := NewSet(test.input...).Slice()
 		slices.Sort(output) // otherwise the test would be unstable
-		assert.Equal(test.expectedOutput, output)
+		expect.Slice(output).I(i).ToBe(t, test.expectedOutput...)
 	}
 }
 
 func TestSetAdd(t *testing.T) {
-	assert := assertpkg.New(t)
 	s := NewSet[int]()
 	s.Add(1, 3, 5)
-	assert.Equal(3, s.Size())
-	assert.True(s.Contains(3))
-	assert.True(s.Contains(5))
+	expect.Number(s.Size()).ToBe(t, 3)
+	expect.Bool(s.Contains(3)).ToBeTrue(t)
+	expect.Bool(s.Contains(5)).ToBeTrue(t)
 
 	sl := s.Slice()
 	slices.Sort(sl)
-	assert.Equal([]int{1, 3, 5}, sl)
+	expect.Slice(sl).ToBe(t, 1, 3, 5)
 }

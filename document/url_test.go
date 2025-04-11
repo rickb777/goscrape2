@@ -1,10 +1,9 @@
 package document
 
 import (
+	"github.com/rickb777/expect"
 	"net/url"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestResolveURL(t *testing.T) {
@@ -36,9 +35,9 @@ func TestResolveURL(t *testing.T) {
 		{baseURL: URL, reference: "../argentina/cat.jpg", resolved: "../argentina/cat.jpg"},
 	}
 
-	for _, c := range cases {
+	for i, c := range cases {
 		resolved := resolveURL(&c.baseURL, c.reference, URL.Host, c.relativeToRoot)
-		assert.Equal(t, c.resolved, resolved)
+		expect.String(resolved).Info(i).ToBe(t, c.resolved)
 	}
 }
 
@@ -58,9 +57,9 @@ func Test_urlRelativeToOther(t *testing.T) {
 		{srcURL: url.URL{Path: "///earth//////cat.jpg"}, baseURL: url.URL{Path: "///earth/brasil//rio////////"}, expectedSrcPath: "../../cat.jpg"},
 	}
 
-	for _, c := range cases {
+	for i, c := range cases {
 		relativeURL := urlRelativeToOther(&c.srcURL, &c.baseURL)
-		assert.Equal(t, c.expectedSrcPath, relativeURL)
+		expect.String(relativeURL).Info(i).ToBe(t, c.expectedSrcPath)
 	}
 }
 
@@ -77,8 +76,8 @@ func Test_urlRelativeToRoot(t *testing.T) {
 		{srcURL: url.URL{Path: "///earth//////cat.jpg"}, expected: "../"},
 	}
 
-	for _, c := range cases {
+	for i, c := range cases {
 		relativeURL := urlRelativeToRoot(&c.srcURL)
-		assert.Equal(t, c.expected, relativeURL)
+		expect.String(relativeURL).Info(i).ToBe(t, c.expected)
 	}
 }

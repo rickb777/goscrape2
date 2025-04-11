@@ -3,14 +3,13 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/rickb777/expect"
 	"github.com/rickb777/goscrape2/config"
 	"github.com/rickb777/goscrape2/logger"
 	"github.com/rickb777/goscrape2/scraper"
 	"github.com/rickb777/goscrape2/stubclient"
 	"github.com/rickb777/servefiles/v3"
 	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io"
 	"log/slog"
 	"net/http"
@@ -48,8 +47,8 @@ func newTestScraper(t *testing.T, startURL string, stub *stubclient.Client) *scr
 
 	cfg := config.Config{MaxDepth: 10}
 	sc, err := scraper.New(cfg, mustParseURL(startURL), afero.NewMemMapFs())
-	require.NoError(t, err)
-	require.NotNil(t, sc)
+	expect.Error(err).ToBeNil(t)
+	expect.Any(sc).Not().ToBeNil(t)
 
 	sc.Client = stub
 	return sc
@@ -58,14 +57,14 @@ func newTestScraper(t *testing.T, startURL string, stub *stubclient.Client) *scr
 func TestServeDirectory(t *testing.T) {
 	stub := &stubclient.Client{}
 	sc := newTestScraper(t, "https://example.org/", stub)
-	require.NotNil(t, sc)
+	expect.Any(sc).Not().ToBeNil(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
 	// not testing what it actually does here - see below
 	err := ServeDirectory(ctx, sc, "", 14141)
-	require.NoError(t, err)
+	expect.Error(err).ToBeNil(t)
 }
 
 func TestLaunchWebserver_connectedToOrigin(t *testing.T) {
@@ -103,34 +102,34 @@ It's here!
 	originStub.GivenResponse(http.StatusOK, "https://example.org/missing.html", "text/html", missing)
 
 	sc := newTestScraper(t, "https://example.org/", originStub)
-	require.NotNil(t, sc)
+	expect.Any(sc).Not().ToBeNil(t)
 
 	sc.Fs = afero.NewMemMapFs()
 	writeFile(sc.Fs, "example.org/index.html", indexPage)
 	writeFile(sc.Fs, "example.org/page2/index.html", page2)
 
 	server, errChan, err := LaunchWebserver(sc, "", 14141)
-	require.NoError(t, err)
-	require.NotNil(t, server)
+	expect.Error(err).ToBeNil(t)
+	expect.Any(server).Not().ToBeNil(t)
 
 	c := &http.Client{}
 
 	resp, err := c.Get("http://localhost:14141/")
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode, "/")
+	expect.Error(err).ToBeNil(t)
+	expect.Number(resp.StatusCode).I("/").ToBe(t, http.StatusOK)
 
 	resp, err = c.Get("http://localhost:14141/missing.html")
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode, "/missing.html")
+	expect.Error(err).ToBeNil(t)
+	expect.Number(resp.StatusCode).I("/missing.html").ToBe(t, http.StatusOK)
 
 	resp, err = c.Get("http://localhost:14141/page2/")
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode, "/page2/")
+	expect.Error(err).ToBeNil(t)
+	expect.Number(resp.StatusCode).I("/page2/").ToBe(t, http.StatusOK)
 
 	err = server.Shutdown(context.Background())
-	require.NoError(t, err)
+	expect.Error(err).ToBeNil(t)
 
-	require.Equal(t, http.ErrServerClosed, <-errChan)
+	expect.Any(<-errChan).ToBe(t, http.ErrServerClosed)
 }
 
 func TestLaunchWebserver_notConnected(t *testing.T) {
@@ -164,36 +163,36 @@ func TestLaunchWebserver_notConnected(t *testing.T) {
 		})
 
 	sc := newTestScraper(t, "https://example.org/", originStub)
-	require.NotNil(t, sc)
+	expect.Any(sc).Not().ToBeNil(t)
 
 	sc.Fs = afero.NewMemMapFs()
 	writeFile(sc.Fs, "example.org/index.html", indexPage)
 	writeFile(sc.Fs, "example.org/page2/index.html", page2)
 
 	server, errChan, err := LaunchWebserver(sc, "", 14141)
-	require.NoError(t, err)
-	require.NotNil(t, server)
+	expect.Error(err).ToBeNil(t)
+	expect.Any(server).Not().ToBeNil(t)
 
 	time.Sleep(50 * time.Millisecond)
 
 	c := &http.Client{}
 
 	resp, err := c.Get("http://localhost:14141/")
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode, "/")
+	expect.Error(err).ToBeNil(t)
+	expect.Number(resp.StatusCode).I("/").ToBe(t, http.StatusOK)
 
 	resp, err = c.Get("http://localhost:14141/missing.html")
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusBadGateway, resp.StatusCode, "/missing.html")
+	expect.Error(err).ToBeNil(t)
+	expect.Number(resp.StatusCode).I("/missing.html").ToBe(t, http.StatusBadGateway)
 
 	resp, err = c.Get("http://localhost:14141/page2/")
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode, "/page2/")
+	expect.Error(err).ToBeNil(t)
+	expect.Number(resp.StatusCode).I("/page2/").ToBe(t, http.StatusOK)
 
 	err = server.Shutdown(context.Background())
-	require.NoError(t, err)
+	expect.Error(err).ToBeNil(t)
 
-	require.Equal(t, http.ErrServerClosed, <-errChan)
+	expect.Any(<-errChan).ToBe(t, http.ErrServerClosed)
 }
 
 func writeFile(fs afero.Fs, name, text string) {

@@ -6,9 +6,8 @@ import (
 	"log/slog"
 	"testing"
 
+	"github.com/rickb777/expect"
 	"github.com/rickb777/goscrape2/logger"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestFixURLReferences(t *testing.T) {
@@ -25,11 +24,11 @@ func TestFixURLReferences(t *testing.T) {
 `)
 
 	doc, err := ParseHTML(u, u, bytes.NewReader(b))
-	require.NoError(t, err)
+	expect.Error(err).ToBeNil(t)
 
 	ref, fixed, err := doc.FixURLReferences()
-	require.NoError(t, err)
-	assert.True(t, fixed)
+	expect.Error(err).ToBeNil(t)
+	expect.Bool(fixed).ToBeTrue(t)
 
 	expected := `<html lang="es"><head></head>
 <body>
@@ -39,5 +38,5 @@ func TestFixURLReferences(t *testing.T) {
   <img src="../other.jpg" srcset="../other-480w.jpg 480w, ../other-800w.jpg 800w"/>
 
 </body></html>`
-	assert.Equal(t, expected, string(ref))
+	expect.String(ref).ToEqual(t, expected)
 }
