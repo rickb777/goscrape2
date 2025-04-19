@@ -5,11 +5,12 @@ go 1.24.1
 toolchain go1.24.2
 
 require (
-	github.com/beevik/etree v1.5.0
+	github.com/beevik/etree v1.5.1
 	github.com/gorilla/css v1.0.1
 	github.com/gorilla/handlers v1.5.2
 	github.com/h2non/filetype v1.1.4-0.20231228185113-6469358c2bcb
-	github.com/rickb777/acceptable v0.43.0
+	github.com/magefile/mage v1.15.0
+	github.com/rickb777/acceptable v0.44.0
 	github.com/rickb777/expect v0.19.2
 	github.com/rickb777/logrotate v0.15.0
 	github.com/rickb777/path v1.3.1
@@ -18,7 +19,7 @@ require (
 	github.com/samber/slog-http v1.6.0
 	github.com/sgreben/flagvar v1.10.2
 	github.com/spf13/afero v1.14.0
-	golang.org/x/net v0.38.0
+	golang.org/x/net v0.39.0
 )
 
 require (
@@ -30,5 +31,7 @@ require (
 	github.com/rickb777/plural v1.4.2 // indirect
 	go.opentelemetry.io/otel v1.35.0 // indirect
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect
-	golang.org/x/text v0.23.0 // indirect
+	golang.org/x/text v0.24.0 // indirect
 )
+
+tool github.com/magefile/mage

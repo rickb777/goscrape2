@@ -31,19 +31,23 @@ Features and advantages over existing tools like wget, httrack, Teleport Pro:
 
 ## Installation
 
-There are 2 options to install `goscrape2`:
-
-1. Download and unpack a binary release from [Releases](https://github.com/rickb777/goscrape2/releases)
-
-or
-
-2. Compile the latest release from source:
+Compile the latest release from source:
 
 ```
 go install github.com/rickb777/goscrape2@latest
 ```
 
 Compiling the tool from source code needs to have a recent version of [Go](https://go.dev/) installed (v1.23 or later).
+
+Alternatively, grab the source code and build it locally.
+
+```
+git clone https://github.com/rickb777/goscrape2
+cd goscrape2
+go install tool
+mage
+./goscrape2
+```
 
 ## Usage
 
