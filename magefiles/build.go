@@ -2,7 +2,7 @@
 
 //go:build mage
 
-// Build steps for the expect API:
+// Build steps for goscrape2:
 package main
 
 import (
@@ -16,13 +16,15 @@ import (
 
 const GOLANGCI_VERSION = "v1.60.3"
 
+var (
+	date    = time.Now().Format("2006-01-02")
+	ldFlags = fmt.Sprintf(`-s -X main.version=%s -X main.date=%s`, gitDescribe(), date)
+)
+
 var Default = Build
 
 func Build() {
 	mg.Deps(Test)
-
-	date := time.Now().Format("2006-01-02")
-	ldFlags := fmt.Sprintf(`-s -X main.version=%s -X main.date=%s`, gitDescribe(), date)
 
 	sh.RunV("go", "vet", "./...")
 	sh.RunV("go", "build", "-o", "goscrape2", "-ldflags", ldFlags, ".")
@@ -30,9 +32,6 @@ func Build() {
 
 // install all binaries
 func Install() {
-	date := time.Now().Format("2006-01-02")
-	ldFlags := fmt.Sprintf(`-s -X main.version=%s -X main.date=%s`, gitDescribe(), date)
-
 	sh.RunV("go", "install", "-buildvcs=false", "-ldflags", ldFlags, ".")
 }
 
