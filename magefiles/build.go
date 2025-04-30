@@ -23,31 +23,36 @@ var (
 
 var Default = Build
 
-func Build() {
+func Build() error {
 	mg.Deps(Test)
 
-	sh.RunV("go", "vet", "./...")
-	sh.RunV("go", "build", "-o", "goscrape2", "-ldflags", ldFlags, ".")
+	if err := sh.RunV("go", "vet", "./..."); err != nil {
+		return err
+	}
+	if err := sh.RunV("go", "build", "-o", "goscrape2", "-ldflags", ldFlags, "."); err != nil {
+		return err
+	}
+	return nil
 }
 
 // install all binaries
-func Install() {
-	sh.RunV("go", "install", "-buildvcs=false", "-ldflags", ldFlags, ".")
+func Install() error {
+	return sh.RunV("go", "install", "-buildvcs=false", "-ldflags", ldFlags, ".")
 }
 
 // run tests
-func Test() {
+func Test() error {
 	sh.Rm("goscrape2")
-	sh.RunV("go", "test", "-timeout", "10s", "-race", "./...")
+	return sh.RunV("go", "test", "-timeout", "10s", "-race", "./...")
 }
 
 // run unit tests and create test coverage
-func TestCoverage() {
-	sh.RunV("go", "test", "-timeout", "10s", "./...", "-coverprofile", ".testCoverage", "-covermode=atomic", "-coverpkg=./...")
+func TestCoverage() error {
+	return sh.RunV("go", "test", "-timeout", "10s", "./...", "-coverprofile", ".testCoverage", "-covermode=atomic", "-coverpkg=./...")
 }
 
 // run unit tests and show test coverage in browser
-func TestCoverageWeb() {
+func TestCoverageWeb() error {
 	lines, err := sh.Output("go", "tool", "cover", "-func", ".testCoverage")
 	if e := sh.ExitStatus(err); e != 0 {
 		os.Exit(e)
@@ -62,12 +67,12 @@ func TestCoverageWeb() {
 			}
 		}
 	}
-	sh.RunV("go", "tool", "cover", "-html=.testCoverage")
+	return sh.RunV("go", "tool", "cover", "-html=.testCoverage")
 }
 
 // build release binaries from current git state as snapshot
-func ReleaseSnapshot() {
-	sh.RunV("goreleaser", "release", "--snapshot", "--clean")
+func ReleaseSnapshot() error {
+	return sh.RunV("goreleaser", "release", "--snapshot", "--clean")
 }
 
 func gitDescribe() string {
