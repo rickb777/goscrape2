@@ -28,10 +28,13 @@ require (
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
 	github.com/rickb777/plural v1.4.4 // indirect
+	github.com/rickb777/process v1.3.1 // indirect
+	github.com/rickb777/servefiles v3.1.0+incompatible // indirect
 	go.opentelemetry.io/otel v1.37.0 // indirect
 	go.opentelemetry.io/otel/trace v1.37.0 // indirect
-	golang.org/x/text v0.26.0 // indirect
+	golang.org/x/text v0.27.0 // indirect
 )
 
 tool github.com/magefile/mage
