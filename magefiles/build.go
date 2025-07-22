@@ -16,6 +16,8 @@ import (
 
 const GOLANGCI_VERSION = "v1.60.3"
 
+const binary = "goscrape2"
+
 var (
 	date    = time.Now().Format("2006-01-02")
 	ldFlags = fmt.Sprintf(`-s -X main.version=%s -X main.date=%s`, gitDescribe(), date)
@@ -29,7 +31,7 @@ func Build() error {
 	if err := sh.RunV("go", "vet", "./..."); err != nil {
 		return err
 	}
-	if err := sh.RunV("go", "build", "-o", "goscrape2", "-ldflags", ldFlags, "."); err != nil {
+	if err := sh.RunV("go", "build", "-o", binary, "-ldflags", ldFlags, "."); err != nil {
 		return err
 	}
 	return nil
@@ -42,7 +44,7 @@ func Install() error {
 
 // run tests
 func Test() error {
-	sh.Rm("goscrape2")
+	sh.Rm(binary)
 	return sh.RunV("go", "test", "-timeout", "10s", "-race", "./...")
 }
 
