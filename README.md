@@ -1,8 +1,9 @@
 # goscrape - create offline browsable copies of websites
 
-[![Build status](https://github.com/rickb777/goscrape2/actions/workflows/go.yaml/badge.svg?branch=main)](https://github.com/rickb777/goscrape2/actions)
-[![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white&style=flat-square)](https://pkg.go.dev/github.com/rickb777/goscrape2)
+[![GoDoc](https://img.shields.io/badge/api-Godoc-blue.svg)](http://pkg.go.dev/github.com/rickb777/goscrape2)
 [![Go Report Card](https://goreportcard.com/badge/github.com/rickb777/goscrape2)](https://goreportcard.com/report/github.com/rickb777/goscrape2)
+[![Build](https://github.com/rickb777/goscrape2/actions/workflows/go.yml/badge.svg)](https://github.com/rickb777/goscrape2/actions)
+[![Issues](https://img.shields.io/github/issues/rickb777/goscrape2.svg)](https://github.com/rickb777/goscrape2/issues)
 
 A web scraper built with [Go](https://go.dev/). It downloads the content of a website and allows it to be archived and
 read offline.
