@@ -14,7 +14,7 @@ require (
 	github.com/rickb777/expect v1.0.5
 	github.com/rickb777/logrotate v0.19.0
 	github.com/rickb777/path v1.4.1
-	github.com/rickb777/process/v2 v2.1.3
+	github.com/rickb777/process/v2 v2.1.4
 	github.com/rickb777/servefiles/v3 v3.9.13
 	github.com/samber/slog-http v1.9.0
 	github.com/sgreben/flagvar v1.10.2
@@ -24,7 +24,7 @@ require (
 
 require (
 	github.com/felixge/httpsnoop v1.0.4 // indirect
-	github.com/gammazero/deque v1.1.0 // indirect
+	github.com/gammazero/deque v1.2.0 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
