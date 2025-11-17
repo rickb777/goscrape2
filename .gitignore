@@ -22,3 +22,4 @@ tmp/
 example.org/
 /go.work
 /go.work.sum
+/db/goscrape-cache.txt
