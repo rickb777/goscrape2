@@ -1,10 +1,11 @@
 package db
 
 import (
-	"github.com/rickb777/acceptable/header"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/rickb777/acceptable/header"
 )
 
 // Item is a record in the database.
@@ -17,8 +18,7 @@ type Item struct {
 }
 
 func (i Item) EmptyContentType() bool {
-	return (i.Content.Type == "" && i.Content.Subtype == "") ||
-		(i.Content.Type == "*" && i.Content.Subtype == "*")
+	return (i.Content.MediaType == "") || (i.Content.MediaType == "*/*")
 }
 
 func (i Item) Empty() bool {
@@ -34,7 +34,7 @@ func dashIfBlank(s string) string {
 
 func (i Item) Strings() []string {
 	ct := "-"
-	if i.Content.Type != "" {
+	if i.Content.Type() != "" {
 		ct = i.Content.String()
 	}
 

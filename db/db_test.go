@@ -1,20 +1,21 @@
 package db
 
 import (
-	"github.com/rickb777/acceptable/header"
-	"github.com/rickb777/expect"
-	"github.com/spf13/afero"
 	"net/url"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/rickb777/acceptable/header"
+	"github.com/rickb777/expect"
+	"github.com/spf13/afero"
 )
 
 func Test_writeItem(t *testing.T) {
 	buf := &strings.Builder{}
 	t1 := time.Date(2000, 1, 1, 1, 1, 1, 0, time.UTC)
-	textHtml := header.ContentType{Type: "text", Subtype: "html"}
+	textHtml := header.ContentType{MediaType: "text/html"}
 
 	writeItem(buf, "k1", Item{Code: 200, Expires: t1})
 	writeItem(buf, "k2", Item{Code: 200, Content: textHtml, Expires: t1.Add(time.Hour), ETags: `"abc123"`})

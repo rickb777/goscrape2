@@ -42,7 +42,7 @@ func (d *Download) response200(item work.Item, resp *http.Response) (*url.URL, *
 	//case isSVG(contentType):
 	//	return d.svg200(item, resp, lastModified, isGzip)
 
-	case contentType.Type == "image" && d.Config.ImageQuality != 0:
+	case contentType.Type() == "image" && d.Config.ImageQuality != 0:
 		return d.image200(item, resp, lastModified, contentType, isGzip)
 
 	default:
@@ -261,17 +261,17 @@ func (r *countingReader) Read(p []byte) (n int, err error) {
 //-------------------------------------------------------------------------------------------------
 
 func isHtml(contentType header.ContentType) bool {
-	return contentType.Type == "text" && contentType.Subtype == "html"
+	return contentType.MediaType == "text/html"
 }
 
 func isXHtml(contentType header.ContentType) bool {
-	return contentType.Type == "application" && contentType.Subtype == "xhtml+xml"
+	return contentType.MediaType == "application/xhtml+xml"
 }
 
 func isCSS(contentType header.ContentType) bool {
-	return contentType.Type == "text" && contentType.Subtype == "css"
+	return contentType.MediaType == "text/css"
 }
 
 func isSVG(contentType header.ContentType) bool {
-	return contentType.Type == "image" && contentType.Subtype == "svg+xml"
+	return contentType.MediaType == "image/svg+xml"
 }
