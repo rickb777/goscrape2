@@ -7,11 +7,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/magefile/mage/mg"
-	"github.com/magefile/mage/sh"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/magefile/mage/mg"
+	"github.com/magefile/mage/sh"
 )
 
 const GOLANGCI_VERSION = "v1.60.3"
@@ -50,7 +51,13 @@ func Test() error {
 
 // run unit tests and create test coverage
 func TestCoverage() error {
-	return sh.RunV("go", "test", "-timeout", "10s", "./...", "-coverprofile", ".testCoverage", "-covermode=atomic", "-coverpkg=./...")
+	if err := sh.RunV("go", "test", "-cover", "./...", "-coverprofile", "coverage.out", "-coverpkg", "./..."); err != nil {
+		return err
+	}
+	if err := sh.RunV("go", "tool", "cover", "-func", "coverage.out", "-o", "report.out"); err != nil {
+		return err
+	}
+	return nil
 }
 
 // run unit tests and show test coverage in browser
