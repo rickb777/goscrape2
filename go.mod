@@ -3,7 +3,7 @@ module github.com/rickb777/goscrape2
 go 1.26.0
 
 require (
-	github.com/beevik/etree v1.7.1
+	github.com/beevik/etree v1.8.1
 	github.com/gorilla/css v1.0.1
 	github.com/gorilla/handlers v1.5.2
 	github.com/h2non/filetype v1.1.4-0.20231228185113-6469358c2bcb
