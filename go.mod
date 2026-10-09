@@ -8,16 +8,16 @@ require (
 	github.com/gorilla/handlers v1.5.2
 	github.com/h2non/filetype v1.1.4-0.20231228185113-6469358c2bcb
 	github.com/magefile/mage v1.17.2
-	github.com/rickb777/acceptable v1.0.1
+	github.com/rickb777/acceptable v1.0.2
 	github.com/rickb777/expect v1.3.4
 	github.com/rickb777/logrotate v0.25.0
 	github.com/rickb777/path v1.4.5
 	github.com/rickb777/process/v2 v2.1.11
-	github.com/rickb777/servefiles/v3 v3.9.27
+	github.com/rickb777/servefiles/v3 v3.9.28
 	github.com/samber/slog-http v1.12.1
 	github.com/sgreben/flagvar v1.10.2
 	github.com/spf13/afero v1.15.0
-	golang.org/x/net v0.59.0
+	golang.org/x/net v0.60.0
 )
 
 require (
